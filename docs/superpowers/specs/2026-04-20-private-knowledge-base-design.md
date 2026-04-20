@@ -69,14 +69,12 @@
 
 现有能力包括：
 
-- `knowledge` 与 `memory` 的明确分层
 - 基于 Git 的历史、分支、回滚和审计
 - 基于 LLM 的分类、矛盾检测和人工确认入口
 - 面向 agent 的 `acquire / retrieve / read / list / history / branch` 能力接口
 
 继承原则：
 
-- 必须继承 `knowledge` 与 `memory` 分层，不能把长期领域知识和会话记忆混成一套状态
 - 必须继承 `history / branch / manual review / time-truth` 这些治理机制
 - 不能把 markdown 条目仓直接当作最终知识中台主模型
 - `expert` 当前 prompt 中“知识目录注入”的方式只能作为过渡能力，不能作为长期 agent 消费主模式
@@ -167,14 +165,14 @@
 
 本次采用 `Java State Core + Python Worker Mesh + Graph/Wiki Artifacts` 的分层协同方案。
 
-- `Java State Core` 负责核心状态、任务编排、恢复机制和 agent-facing 输出
+- `Java State Core` 负责核心状态、任务编排、恢复和 agent-facing 输出
 - `.rwa` 负责受控录入
 - `Python Worker Mesh` 负责来源规范化、抽取、`graphify` 调用、diff 计算和 wiki 候选生成
 - `graphify` 负责结构化知识底座与图谱分析信号
 - `wiki` 负责面向人的长期沉淀
 - `Obsidian` 负责浏览、导航和人工审校
 
-该方案的关键不是“Python 先实现”，而是“Java 从一期开始就是长期主控边界”。Python 可以先跑通处理能力，但不能拥有最终状态定义权。
+Java 从一期开始就是长期主控边界。Python 可以先承担处理能力，但不拥有最终状态定义权。
 
 ### 5.2 核心原则
 
@@ -199,9 +197,6 @@
 - `超大来源分层处理，展示层分层投影`
   对 10W+ 代码仓库、超大 PDF/PPT、长视频等来源，系统先建立骨架和分段导航，再按需深挖，禁止把全量结果直接堆到人类展示层。
 
-- `knowledge 不等于 memory`
-  长期领域知识、知识治理状态、会话记忆必须分开建模。
-
 - `稳定知识必须经过治理`
   graph 信号、局部摘要、wiki 草稿不能直接冒充稳定领域结论；必须经过聚合、校验和必要的人审。
 
@@ -216,8 +211,6 @@
   持有 `source_registry`、`snapshot_store`、`knowledge_state`、`review_state`、`agent-facing views`，并负责任务编排、状态流转、失败恢复和外部消费接口。
 - `Python Worker Mesh`
   承担来源规范化、抽取、`graphify` 调用、wiki 候选生成、lint/audit worker 等处理能力，通过稳定 job/artifact contract 与 Java 交互。
-
-五层逻辑架构描述的是系统职责，不代表 Python 可以长期拥有状态主导权。
 
 ### 6.1 Source Registry
 
@@ -442,9 +435,9 @@
 - `content_fingerprint`
   当前内容快照指纹，用于判断“同一来源是否发生内容变化”。
 
-### 8.2 三层状态
+### 8.2 核心状态
 
-系统至少维护三类状态。
+系统至少维护以下状态：
 
 #### 8.2.1 `source_registry`
 
@@ -485,18 +478,16 @@
 - wiki 页面依赖映射
 - 上次分析深度和更新时间
 
-#### 8.2.4 `knowledge_assets`、`knowledge_control_state` 与 `memory_state`
+#### 8.2.4 `knowledge_assets` 与 `knowledge_control_state`
 
-为避免把长期知识和交互记忆混成一层，系统必须明确拆分三类状态：
+系统必须明确拆分两类知识状态：
 
 - `knowledge_assets`
   长期知识资产。包括 graph facts、结构关系、wiki 页面、来源总结、主题总结、变更总结和经确认的高层结论。
 - `knowledge_control_state`
   知识治理状态。包括覆盖范围、结论状态、待审任务、来源到知识资产的依赖映射、review/audit 状态和失效标记。
-- `memory_state`
-  会话与偏好记忆。包括用户偏好、近期上下文、agent 交互习惯和短期工作记忆，不直接进入长期领域知识主模型。
 
-`expert` 现有 `knowledge / memory` 分层思想在此被保留，但主存储模型升级为中台级状态，而不是 markdown 条目仓。
+`expert` 的知识治理思路在此被保留，但主存储模型升级为中台级状态，而不是 markdown 条目仓。
 
 #### 8.2.5 知识生命周期
 
@@ -1137,8 +1128,8 @@ Obsidian 是唯一人类入口。
 - 一期允许 `Python-first`
 - 一期禁止 `Python-only`
 - 所有长期状态和对外消费输出都必须 `language-neutral`
-- Java 不是单纯消费层，而是长期 `state + retrieval + planning` 主控
-- Python 默认定位为 ETL/worker，不拥有长期状态定义权
+- Java 负责长期 `state + retrieval + planning`
+- Python 默认定位为 ETL/worker
 
 ### 16.2 语言无关契约层
 
@@ -1345,13 +1336,13 @@ TODO 的目标不是提醒“还有什么没做”，而是直接成为 implemen
 #### 18.2.5 定义知识资产与治理状态模型
 
 - `任务`
-  定义 `knowledge_assets`、`knowledge_control_state`、`memory_state` 的边界，以及统一生命周期状态。
+  定义 `knowledge_assets`、`knowledge_control_state` 的边界，以及统一生命周期状态。
 - `归属 Workstream`
   `snapshot-state`
 - `产出`
   语言无关 schema、状态枚举、最小字段约定。
 - `完成标准`
-  长期知识、治理状态、会话记忆三者边界清晰，且任一知识结果都能表达 `candidate / active / needs_review / stale / superseded / rejected`。
+  长期知识与治理状态边界清晰，且任一知识结果都能表达 `candidate / active / needs_review / stale / superseded / rejected`。
 - `依赖`
   `source_registry`、`snapshot_store` 初版。
 - `阶段`
@@ -1793,7 +1784,7 @@ TODO 的目标不是提醒“还有什么没做”，而是直接成为 implemen
 核心结论进一步更新为：
 
 - 抽取逻辑必须是框架能力，而不是某个工具实现细节
-- `knowledge`、`knowledge governance`、`memory` 必须分层，不能退化为单一 markdown 条目仓
+- `knowledge_assets` 与 `knowledge_control_state` 必须分层，不能退化为单一 markdown 条目仓
 - 超大来源必须先做结构分层，再做知识深挖，再做展示投影
 - 图谱可以保存全结构，但 wiki / Obsidian 只展示人能读的分层视图
 - 当前优先让 `Codex` / `Trae` 通过 Java 暴露的稳定 knowledge views 消费这套知识底座，同时不阻断未来更强抽取器和私有模型接入
