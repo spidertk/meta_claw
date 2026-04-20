@@ -8,6 +8,7 @@
 
 目标不是直接实现完整私有智能体，也不是重写 `graphify` 或 `llm-wiki`，而是基于现有分析结果，设计一个可持续积累、可增量维护、可审计、可扩展的知识底座，用于：
 
+- 以 `Java State Core` 作为长期主控，以 `Python Worker Mesh` 作为 ETL/抽取执行层
 - 通过 `.rwa` 持续录入文件、代码仓库和受控外链副本
 - 用结构化图谱维护领域知识的深度、广度和变化
 - 用 Wiki 将高价值知识沉淀为人类可读资产
@@ -61,6 +62,24 @@
 - `graph.json` 是结构化知识底座，优先给模型和程序消费
 - 领域深度和广度应由图谱分析信号驱动
 - 增量维护必须围绕快照、diff 和受影响范围传播设计
+
+### 2.4 `.rwa/expert_project` knowledge 设计
+
+该实现提供了一个值得继承、但不能原样照搬的知识治理思路。
+
+现有能力包括：
+
+- `knowledge` 与 `memory` 的明确分层
+- 基于 Git 的历史、分支、回滚和审计
+- 基于 LLM 的分类、矛盾检测和人工确认入口
+- 面向 agent 的 `acquire / retrieve / read / list / history / branch` 能力接口
+
+继承原则：
+
+- 必须继承 `knowledge` 与 `memory` 分层，不能把长期领域知识和会话记忆混成一套状态
+- 必须继承 `history / branch / manual review / time-truth` 这些治理机制
+- 不能把 markdown 条目仓直接当作最终知识中台主模型
+- `expert` 当前 prompt 中“知识目录注入”的方式只能作为过渡能力，不能作为长期 agent 消费主模式
 
 ## 3. 产品目标与接入优先级
 
@@ -146,14 +165,16 @@
 
 ### 5.1 方案选择
 
-本次采用“图谱底座 + wiki 投影 + Obsidian 人类入口”的双层协同方案。
+本次采用 `Java State Core + Python Worker Mesh + Graph/Wiki Artifacts` 的分层协同方案。
 
+- `Java State Core` 负责核心状态、任务编排、恢复机制和 agent-facing 输出
 - `.rwa` 负责受控录入
-- `graphify` 负责结构化知识底座和增量判断
+- `Python Worker Mesh` 负责来源规范化、抽取、`graphify` 调用、diff 计算和 wiki 候选生成
+- `graphify` 负责结构化知识底座与图谱分析信号
 - `wiki` 负责面向人的长期沉淀
 - `Obsidian` 负责浏览、导航和人工审校
 
-该方案不把图谱直接当人类界面，也不让 wiki 承担全部结构判断，而是让两者各司其职。
+该方案的关键不是“Python 先实现”，而是“Java 从一期开始就是长期主控边界”。Python 可以先跑通处理能力，但不能拥有最终状态定义权。
 
 ### 5.2 核心原则
 
@@ -162,6 +183,9 @@
 
 - `图谱是底座，wiki 是投影`
   图谱保存完整结构，wiki 只呈现经过组织后的稳定知识。
+
+- `Java 主控，Python 加工`
+  Java 持有长期状态、编排和对外契约；Python 负责 ETL、抽取和离线/半离线处理。
 
 - `增量维护优先于全量重建`
   先识别变化，再更新受影响子图和相关 wiki 页面。
@@ -175,9 +199,25 @@
 - `超大来源分层处理，展示层分层投影`
   对 10W+ 代码仓库、超大 PDF/PPT、长视频等来源，系统先建立骨架和分段导航，再按需深挖，禁止把全量结果直接堆到人类展示层。
 
+- `knowledge 不等于 memory`
+  长期领域知识、知识治理状态、会话记忆必须分开建模。
+
+- `稳定知识必须经过治理`
+  graph 信号、局部摘要、wiki 草稿不能直接冒充稳定领域结论；必须经过聚合、校验和必要的人审。
+
+- `agent 只消费稳定视图`
+  `Codex`、`Trae` 和后续 Java agent 默认消费 Java 暴露的稳定 knowledge views，而不是直接耦合底层 graph/wiki/raw snapshot 结构。
+
 ## 6. 系统架构
 
-系统分为五层，每层只负责一件事。
+系统在逻辑上分为五层，但在运行时分为两个主边界：
+
+- `Java State Core`
+  持有 `source_registry`、`snapshot_store`、`knowledge_state`、`review_state`、`agent-facing views`，并负责任务编排、状态流转、失败恢复和外部消费接口。
+- `Python Worker Mesh`
+  承担来源规范化、抽取、`graphify` 调用、wiki 候选生成、lint/audit worker 等处理能力，通过稳定 job/artifact contract 与 Java 交互。
+
+五层逻辑架构描述的是系统职责，不代表 Python 可以长期拥有状态主导权。
 
 ### 6.1 Source Registry
 
@@ -444,6 +484,38 @@
 - 主题覆盖状态
 - wiki 页面依赖映射
 - 上次分析深度和更新时间
+
+#### 8.2.4 `knowledge_assets`、`knowledge_control_state` 与 `memory_state`
+
+为避免把长期知识和交互记忆混成一层，系统必须明确拆分三类状态：
+
+- `knowledge_assets`
+  长期知识资产。包括 graph facts、结构关系、wiki 页面、来源总结、主题总结、变更总结和经确认的高层结论。
+- `knowledge_control_state`
+  知识治理状态。包括覆盖范围、结论状态、待审任务、来源到知识资产的依赖映射、review/audit 状态和失效标记。
+- `memory_state`
+  会话与偏好记忆。包括用户偏好、近期上下文、agent 交互习惯和短期工作记忆，不直接进入长期领域知识主模型。
+
+`expert` 现有 `knowledge / memory` 分层思想在此被保留，但主存储模型升级为中台级状态，而不是 markdown 条目仓。
+
+#### 8.2.5 知识生命周期
+
+知识结果至少应支持以下生命周期状态：
+
+- `candidate`
+  新抽取或新聚合出的候选知识，尚未升级为稳定资产。
+- `active`
+  当前有效的稳定知识。
+- `needs_review`
+  受局部变更、覆盖不足或冲突影响，等待人工或规则复核。
+- `stale`
+  仍可参考，但已不适合作为当前结论直接消费。
+- `superseded`
+  被新知识替代，但需要保留追溯关系。
+- `rejected`
+  被确认无效或不应进入长期资产。
+
+`time-truth` 规则应作用于这一生命周期，而不是只作用于单个 markdown 文件。
 
 ### 8.3 四层 diff
 
@@ -773,7 +845,7 @@ Obsidian 是唯一人类入口。
 
 ## 13. 长期定位与扩展点
 
-### 12.1 长期定位
+### 13.1 长期定位
 
 本系统第一阶段按“知识中台”设计边界，但数据模型、状态管理和输出接口必须天然支持后续作为私有智能体外挂知识底座使用。
 
@@ -786,9 +858,9 @@ Obsidian 是唯一人类入口。
 - 持续吸收代码、文档、网页、PDF、视频和临时兴趣来源
 - 将这些私有知识沉淀为可追踪、可增量更新、可被主题归档和可被智能体消费的长期资产
 
-### 12.2 必须预留的扩展点
+### 13.2 必须预留的扩展点
 
-#### 12.2.1 `source_adapters`
+#### 13.2.1 `source_adapters`
 
 录入层必须允许未来增加：
 
@@ -801,7 +873,7 @@ Obsidian 是唯一人类入口。
 
 `链接 -> 下载/转录/摘要 -> 结构化 source`
 
-#### 12.2.2 `multimodal_snapshots`
+#### 13.2.2 `multimodal_snapshots`
 
 快照层不能只假设输入是文本文件。状态模型必须允许一个来源包含：
 
@@ -811,7 +883,7 @@ Obsidian 是唯一人类入口。
 - 提取元数据
 - 派生知识结果
 
-#### 12.2.3 `topic_routing`
+#### 13.2.3 `topic_routing`
 
 新增来源后续应能自动：
 
@@ -820,17 +892,19 @@ Obsidian 是唯一人类入口。
 
 第一阶段需要把主题归档规则和知识页依赖映射做成独立层。
 
-#### 12.2.4 `agent_facing_outputs`
+#### 13.2.4 `agent_facing_outputs`
 
 第一阶段不做完整私有 agent 集成，但应保持稳定中间表示，便于后续提供：
 
-- 领域摘要
-- 主题候选上下文
-- 来源追溯
-- 变更提示
-- 个人长期兴趣画像
+- `topic summary view`
+- `source-backed answer context`
+- `change alert view`
+- `review-needed view`
+- `coverage-bounded context pack`
 
-### 12.3 私有模型接入约束
+这些输出默认由 Java 暴露给 agent。agent 不应直接依赖 Python worker 私有产物，也不应直接绑定 wiki 文件路径或 graph 底层结构。
+
+### 13.3 私有模型接入约束
 
 私有模型接入不属于本次实现目标，但必须预留稳定扩展点。
 
@@ -857,7 +931,7 @@ Obsidian 是唯一人类入口。
 - 一期扩展预留 = `Phase 3 + Phase 4`
 - 后续 implementation plan 只从 `Phase 1 + Phase 2` 的 TODO 中生成
 
-### 13.1 Phase 1：知识源闭环
+### 14.1 Phase 1：知识源闭环
 
 目标是先把“来源进系统”这件事做稳，建立最小知识闭环。
 
@@ -878,7 +952,7 @@ Obsidian 是唯一人类入口。
 - 同一来源重复同步时，系统能区分未变和已变
 - Obsidian 能作为唯一人类入口使用
 
-### 13.2 Phase 2：增量维护闭环
+### 14.2 Phase 2：增量维护闭环
 
 目标是让系统不只是“能导入”，而是“能持续维护”。
 
@@ -899,7 +973,7 @@ Obsidian 是唯一人类入口。
 - wiki 更新有明确依据，而不是无差别重写
 - 失败来源不会破坏已有知识状态
 
-### 13.3 Phase 3：多模态与主题归档扩展
+### 14.3 Phase 3：多模态与主题归档扩展
 
 目标是让知识源类型扩展，但不破坏前两阶段底座。
 
@@ -913,7 +987,7 @@ Obsidian 是唯一人类入口。
 
 该阶段不属于当前实现范围，但必须在一期预留接口。
 
-### 13.4 Phase 4：私有模型消费层
+### 14.4 Phase 4：私有模型消费层
 
 目标是把知识中台真正变成私有智能体的外挂知识底座。
 
@@ -931,7 +1005,7 @@ Obsidian 是唯一人类入口。
 
 在 Phase 之下，固定拆成 7 条工作流。Phase 表示时间顺序，Workstream 表示长期稳定边界。
 
-### 14.1 `source-intake`
+### 15.1 `source-intake`
 
 负责所有知识源进入系统之前的规范化。
 
@@ -948,7 +1022,7 @@ Obsidian 是唯一人类入口。
 - 只解决“来源如何进入系统”
 - 不处理图谱和 wiki
 
-### 14.2 `snapshot-state`
+### 15.2 `snapshot-state`
 
 负责来源身份、快照、内容指纹和状态落盘。
 
@@ -964,7 +1038,7 @@ Obsidian 是唯一人类入口。
 
 - 只解决“系统知道它是谁、现在是什么版本、历史有哪些版本”
 
-### 14.3 `incremental-diff`
+### 15.3 `incremental-diff`
 
 负责四层 diff 和变化分类。
 
@@ -981,7 +1055,7 @@ Obsidian 是唯一人类入口。
 
 - 只解决“哪里变了、变化多大、会影响什么”
 
-### 14.4 `graph-foundation`
+### 15.4 `graph-foundation`
 
 负责结构化知识底座。
 
@@ -999,7 +1073,7 @@ Obsidian 是唯一人类入口。
 - 只解决“知识结构长什么样”
 - 不负责人类阅读层
 
-### 14.5 `wiki-maintenance`
+### 15.5 `wiki-maintenance`
 
 负责从结构变化到人类知识资产的沉淀。
 
@@ -1017,7 +1091,7 @@ Obsidian 是唯一人类入口。
 
 - 只解决“人该看到什么、wiki 如何持续整理”
 
-### 14.6 `agent-consumption`
+### 15.6 `agent-consumption`
 
 负责让 `Codex` / `Trae` 在不直接依赖内部实现的情况下消费知识底座。
 
@@ -1034,7 +1108,7 @@ Obsidian 是唯一人类入口。
 - 只解决“外部 agent 怎么读”
 - 不负责底层知识生成
 
-### 14.7 `quality-recovery`
+### 15.7 `quality-recovery`
 
 负责系统可靠性。
 
@@ -1056,16 +1130,17 @@ Obsidian 是唯一人类入口。
 
 一期实现允许优先使用 Python，以利用其在数据处理、文本抽取、图谱编排和快速验证上的优势；但系统长期承载目标必须面向 Java 个人助理项目，以获得更高的可维护性、稳定性和长期演进能力。
 
-因此，本项目从第一阶段开始必须按“Python 可先实现，Java 可后接管”的原则设计，而不能让关键状态、核心流程和 agent 消费接口绑定到 Python 私有实现细节。
+因此，本项目从第一阶段开始必须按“Python 可先实现，Java 立即主控”的原则设计，而不能让关键状态、核心流程和 agent 消费接口绑定到 Python 私有实现细节。
 
-### 15.1 设计原则
+### 16.1 设计原则
 
 - 一期允许 `Python-first`
 - 一期禁止 `Python-only`
 - 所有长期状态和对外消费输出都必须 `language-neutral`
-- 二期 Java 个人助理接入应以“消费既有知识底座”为目标，而不是推翻重做
+- Java 不是单纯消费层，而是长期 `state + retrieval + planning` 主控
+- Python 默认定位为 ETL/worker，不拥有长期状态定义权
 
-### 15.2 语言无关契约层
+### 16.2 语言无关契约层
 
 以下内容必须定义为稳定 schema 或持久化产物，而不是运行时内部对象：
 
@@ -1078,7 +1153,34 @@ Obsidian 是唯一人类入口。
 
 这些结构必须允许 Python 生成、Java 读取，也允许未来由 Java 重写部分生成逻辑而不破坏既有数据资产。
 
-### 15.3 Python 优先实现层
+### 16.2.1 Job / Artifact Contract
+
+Java 与 Python 之间必须通过稳定契约交互，而不是共享运行时内部对象。
+
+Java 下发的 job 至少包括：
+
+- `job_id`
+- `job_type`
+- `source_ref`
+- `snapshot_ref`
+- `processing_scope`
+- `budget_hint`
+- `expected_artifacts`
+
+Python 回传的 artifact/result 至少包括：
+
+- `job_id`
+- `status`
+- `artifacts`
+- `coverage`
+- `scope`
+- `issues`
+- `stats`
+- `retriable`
+
+只有 Java 可以更新主状态；Python 只能提交结果和建议，不能直接修改最终 `knowledge_state`。
+
+### 16.3 Python 优先实现层
 
 一期更适合由 Python 承担的模块包括：
 
@@ -1091,19 +1193,20 @@ Obsidian 是唯一人类入口。
 
 原因是这些能力与文本处理、脚本编排、文件系统操作和快速迭代强相关，Python 实现成本更低。
 
-### 15.4 Java 后续承载层
+### 16.4 Java 后续承载层
 
-后续更适合逐步迁移或接管的模块包括：
+后续更适合由 Java 长期持有或优先接管的模块包括：
 
 - 长期运行的知识服务编排
 - 状态存储访问层
 - 面向个人助理系统的服务接口
 - 稳定的 agent / model 接入层
+- retrieval、planning、review state 编排
 - 更严格的任务调度、监控和恢复机制
 
 原因是这些能力更接近长期系统承载、服务化和工程稳定性需求，Java 的维护收益更高。
 
-### 15.5 语言边界对 TODO 的影响
+### 16.5 语言边界对 TODO 的影响
 
 后续任务必须补充以下项：
 
@@ -1111,6 +1214,7 @@ Obsidian 是唯一人类入口。
 - 定义 Python 产物与 Java 消费之间的文件 / 接口契约
 - 明确一期哪些模块允许先用 Python 原型实现
 - 明确二期哪些模块优先抽离为 Java 可接管边界
+- 明确哪些状态只能由 Java 持有和修改
 
 ## 17. TODO 模板
 
@@ -1129,9 +1233,9 @@ TODO 的目标不是提醒“还有什么没做”，而是直接成为 implemen
 
 ## 18. 首批 TODO 清单
 
-### 17.1 Phase 1 / `source-intake`
+### 18.1 Phase 1 / `source-intake`
 
-#### 17.1.1 定义 `.rwa` 来源目录约束
+#### 18.1.1 定义 `.rwa` 来源目录约束
 
 - `任务`
   定义文件、仓库、外链副本、指针文件和元数据文件的目录规则。
@@ -1146,7 +1250,7 @@ TODO 的目标不是提醒“还有什么没做”，而是直接成为 implemen
 - `阶段`
   `Phase 1`
 
-#### 17.1.2 定义来源登记格式
+#### 18.1.2 定义来源登记格式
 
 - `任务`
   定义统一的来源登记结构。
@@ -1161,7 +1265,7 @@ TODO 的目标不是提醒“还有什么没做”，而是直接成为 implemen
 - `阶段`
   `Phase 1`
 
-#### 17.1.3 定义录入命令接口
+#### 18.1.3 定义录入命令接口
 
 - `任务`
   定义手动录入命令的命令形态、参数约定和失败返回规则。
@@ -1176,9 +1280,9 @@ TODO 的目标不是提醒“还有什么没做”，而是直接成为 implemen
 - `阶段`
   `Phase 1`
 
-### 17.2 Phase 1 / `snapshot-state`
+### 18.2 Phase 1 / `snapshot-state`
 
-#### 17.2.1 定义 `source_id` 生成规则
+#### 18.2.1 定义 `source_id` 生成规则
 
 - `任务`
   定义文件、目录、仓库、URL 的稳定身份规则。
@@ -1193,7 +1297,7 @@ TODO 的目标不是提醒“还有什么没做”，而是直接成为 implemen
 - `阶段`
   `Phase 1`
 
-#### 17.2.2 定义 `content_fingerprint` 生成规则
+#### 18.2.2 定义 `content_fingerprint` 生成规则
 
 - `任务`
   定义不同来源类型的内容指纹策略。
@@ -1208,7 +1312,7 @@ TODO 的目标不是提醒“还有什么没做”，而是直接成为 implemen
 - `阶段`
   `Phase 1`
 
-#### 17.2.3 定义 `snapshot_store` 存储结构
+#### 18.2.3 定义 `snapshot_store` 存储结构
 
 - `任务`
   定义快照记录格式、历史保存规则和当前有效版本标记规则。
@@ -1223,7 +1327,7 @@ TODO 的目标不是提醒“还有什么没做”，而是直接成为 implemen
 - `阶段`
   `Phase 1`
 
-#### 17.2.4 定义 `unit_ref` 父子与邻接关系模型
+#### 18.2.4 定义 `unit_ref` 父子与邻接关系模型
 
 - `任务`
   定义切块单元的父子关系、邻接关系和来源范围字段，确保切块后仍可恢复整体上下文。
@@ -1238,9 +1342,24 @@ TODO 的目标不是提醒“还有什么没做”，而是直接成为 implemen
 - `阶段`
   `Phase 1`
 
-### 17.3 Phase 1 / `graph-foundation`
+#### 18.2.5 定义知识资产与治理状态模型
 
-#### 17.3.1 定义 `graphify` 输出归档规范
+- `任务`
+  定义 `knowledge_assets`、`knowledge_control_state`、`memory_state` 的边界，以及统一生命周期状态。
+- `归属 Workstream`
+  `snapshot-state`
+- `产出`
+  语言无关 schema、状态枚举、最小字段约定。
+- `完成标准`
+  长期知识、治理状态、会话记忆三者边界清晰，且任一知识结果都能表达 `candidate / active / needs_review / stale / superseded / rejected`。
+- `依赖`
+  `source_registry`、`snapshot_store` 初版。
+- `阶段`
+  `Phase 1`
+
+### 18.3 Phase 1 / `graph-foundation`
+
+#### 18.3.1 定义 `graphify` 输出归档规范
 
 - `任务`
   定义图谱输出在项目中的存放位置以及与来源、快照的关联方式。
@@ -1255,7 +1374,7 @@ TODO 的目标不是提醒“还有什么没做”，而是直接成为 implemen
 - `阶段`
   `Phase 1`
 
-#### 17.3.2 定义图谱更新触发规则
+#### 18.3.2 定义图谱更新触发规则
 
 - `任务`
   定义跳过、局部更新和全量重建的触发条件。
@@ -1270,7 +1389,7 @@ TODO 的目标不是提醒“还有什么没做”，而是直接成为 implemen
 - `阶段`
   `Phase 1`
 
-#### 17.3.3 定义抽取器统一输入输出契约
+#### 18.3.3 定义抽取器统一输入输出契约
 
 - `任务`
   定义抽取器的统一输入输出 schema，确保后续实现可串联、可替换、可并存。
@@ -1285,9 +1404,9 @@ TODO 的目标不是提醒“还有什么没做”，而是直接成为 implemen
 - `阶段`
   `Phase 1`
 
-### 17.4 Phase 1 / `wiki-maintenance`
+### 18.4 Phase 1 / `wiki-maintenance`
 
-#### 17.4.1 定义 wiki 页面类型和最小模板
+#### 18.4.1 定义 wiki 页面类型和最小模板
 
 - `任务`
   定义 summary / concept / entity / project / topic 页模板和 `index.md` 最低结构。
@@ -1302,7 +1421,7 @@ TODO 的目标不是提醒“还有什么没做”，而是直接成为 implemen
 - `阶段`
   `Phase 1`
 
-#### 17.4.2 定义 wiki 页面依赖映射
+#### 18.4.2 定义 wiki 页面依赖映射
 
 - `任务`
   定义页面如何关联来源、主题和图谱节点。
@@ -1317,7 +1436,7 @@ TODO 的目标不是提醒“还有什么没做”，而是直接成为 implemen
 - `阶段`
   `Phase 1`
 
-#### 17.4.3 定义 `wiki_planner` 输出格式
+#### 18.4.3 定义 `wiki_planner` 输出格式
 
 - `任务`
   定义待处理任务结构、优先级和状态。
@@ -1332,7 +1451,7 @@ TODO 的目标不是提醒“还有什么没做”，而是直接成为 implemen
 - `阶段`
   `Phase 1`
 
-#### 17.4.4 定义展示层分层投影规则
+#### 18.4.4 定义展示层分层投影规则
 
 - `任务`
   定义超大来源在 wiki / Obsidian 中的分层展示规则，禁止全量聚合展示。
@@ -1347,7 +1466,7 @@ TODO 的目标不是提醒“还有什么没做”，而是直接成为 implemen
 - `阶段`
   `Phase 1`
 
-#### 17.4.5 定义聚合摘要规则
+#### 18.4.5 定义聚合摘要规则
 
 - `任务`
   定义子块摘要、父块聚合摘要和文档 / 模块级总览摘要的生成与使用规则。
@@ -1362,9 +1481,9 @@ TODO 的目标不是提醒“还有什么没做”，而是直接成为 implemen
 - `阶段`
   `Phase 1`
 
-### 17.5 Phase 2 / `incremental-diff`
+### 18.5 Phase 2 / `incremental-diff`
 
-#### 17.5.1 定义四层 diff 数据结构
+#### 18.5.1 定义四层 diff 数据结构
 
 - `任务`
   定义 `source-level`、`snapshot-level`、`unit-level`、`knowledge-level` 的结果格式。
@@ -1379,7 +1498,7 @@ TODO 的目标不是提醒“还有什么没做”，而是直接成为 implemen
 - `阶段`
   `Phase 2`
 
-#### 17.5.2 定义仓库增量规则
+#### 18.5.2 定义仓库增量规则
 
 - `任务`
   定义 `repo -> commit -> file/symbol` 判定规则，以及新增、修改、删除、重命名的处理策略。
@@ -1394,7 +1513,7 @@ TODO 的目标不是提醒“还有什么没做”，而是直接成为 implemen
 - `阶段`
   `Phase 2`
 
-#### 17.5.3 定义文档增量规则
+#### 18.5.3 定义文档增量规则
 
 - `任务`
   定义 `document -> snapshot -> section/chunk` 判定规则，以及小改动和大版本更新区分标准。
@@ -1409,7 +1528,7 @@ TODO 的目标不是提醒“还有什么没做”，而是直接成为 implemen
 - `阶段`
   `Phase 2`
 
-#### 17.5.4 定义 `knowledge-level impact` 映射
+#### 18.5.4 定义 `knowledge-level impact` 映射
 
 - `任务`
   定义变化如何映射到主题页、领域页和摘要页。
@@ -1424,7 +1543,7 @@ TODO 的目标不是提醒“还有什么没做”，而是直接成为 implemen
 - `阶段`
   `Phase 2`
 
-#### 17.5.5 定义超大来源切块和 `unit_ref` 规则
+#### 18.5.5 定义超大来源切块和 `unit_ref` 规则
 
 - `任务`
   定义仓库、PDF、PPT、长视频等超大来源的切块规则，以及切块单元的统一引用方式。
@@ -1439,7 +1558,7 @@ TODO 的目标不是提醒“还有什么没做”，而是直接成为 implemen
 - `阶段`
   `Phase 2`
 
-#### 17.5.6 定义大来源默认降级和按需深挖规则
+#### 18.5.6 定义大来源默认降级和按需深挖规则
 
 - `任务`
   定义大项目、大 PDF、大 PPT、长视频等来源的默认处理级别、降级策略和深挖触发条件。
@@ -1454,7 +1573,7 @@ TODO 的目标不是提醒“还有什么没做”，而是直接成为 implemen
 - `阶段`
   `Phase 2`
 
-#### 17.5.7 定义语义保真切块规则
+#### 18.5.7 定义语义保真切块规则
 
 - `任务`
   定义结构优先切块规则、语义边界细切规则，并明确禁止固定长度硬切作为默认策略。
@@ -1469,9 +1588,9 @@ TODO 的目标不是提醒“还有什么没做”，而是直接成为 implemen
 - `阶段`
   `Phase 2`
 
-### 17.6 Phase 2 / `agent-consumption`
+### 18.6 Phase 2 / `agent-consumption`
 
-#### 17.6.1 定义 `Codex` / `Trae` 最小消费输出
+#### 18.6.1 定义 `Codex` / `Trae` 最小消费输出
 
 - `任务`
   定义面向 agent 的稳定输出格式和最小上下文视图约定。
@@ -1486,7 +1605,7 @@ TODO 的目标不是提醒“还有什么没做”，而是直接成为 implemen
 - `阶段`
   `Phase 2`
 
-#### 17.6.2 定义私有模型扩展接口占位
+#### 18.6.2 定义私有模型扩展接口占位
 
 - `任务`
   定义稳定中间表示和后续上下文打包接口占位。
@@ -1501,9 +1620,9 @@ TODO 的目标不是提醒“还有什么没做”，而是直接成为 implemen
 - `阶段`
   `Phase 2`
 
-### 17.7 Phase 2 / `quality-recovery`
+### 18.7 Phase 2 / `quality-recovery`
 
-#### 17.7.1 定义错误码和失败状态模型
+#### 18.7.1 定义错误码和失败状态模型
 
 - `任务`
   定义来源错误、抽取错误、映射错误、沉淀错误的状态模型。
@@ -1518,7 +1637,7 @@ TODO 的目标不是提醒“还有什么没做”，而是直接成为 implemen
 - `阶段`
   `Phase 2`
 
-#### 17.7.2 定义 lint / audit 最小闭环
+#### 18.7.2 定义 lint / audit 最小闭环
 
 - `任务`
   定义 wiki 健康检查项和审校任务最小流程。
@@ -1533,7 +1652,7 @@ TODO 的目标不是提醒“还有什么没做”，而是直接成为 implemen
 - `阶段`
   `Phase 2`
 
-#### 17.7.3 定义首批测试样本和验收用例
+#### 18.7.3 定义首批测试样本和验收用例
 
 - `任务`
   定义一个仓库样本、一个 PDF 样本和一组端到端验收步骤。
@@ -1548,7 +1667,7 @@ TODO 的目标不是提醒“还有什么没做”，而是直接成为 implemen
 - `阶段`
   `Phase 2`
 
-#### 17.7.4 定义 upward validation 规则
+#### 18.7.4 定义 upward validation 规则
 
 - `任务`
   定义子块结论进入主题页或领域页前的一致性校验规则。
@@ -1563,9 +1682,9 @@ TODO 的目标不是提醒“还有什么没做”，而是直接成为 implemen
 - `阶段`
   `Phase 2`
 
-### 17.8 跨 Workstream 关键任务
+### 18.8 跨 Workstream 关键任务
 
-#### 17.8.1 定义 graph / wiki / source 三者的关联主键
+#### 18.8.1 定义 graph / wiki / source 三者的关联主键
 
 - `任务`
   定义 source、snapshot、graph node / community、wiki 页面之间的统一引用策略。
@@ -1580,7 +1699,7 @@ TODO 的目标不是提醒“还有什么没做”，而是直接成为 implemen
 - `阶段`
   `Phase 1`
 
-#### 17.8.2 定义 Python / Java 共享契约
+#### 18.8.2 定义 Python / Java 共享契约
 
 - `任务`
   定义语言无关 schema，以及 Python 产物与 Java 消费之间的文件 / 接口契约。
@@ -1595,7 +1714,37 @@ TODO 的目标不是提醒“还有什么没做”，而是直接成为 implemen
 - `阶段`
   `Phase 2`
 
-#### 17.8.3 定义 coverage / scope 标记
+#### 18.8.2A 定义 Java orchestrator / Python worker job contract
+
+- `任务`
+  定义 Java 下发 job、Python 回传 artifact/result 的统一契约，并明确哪些状态只能由 Java 持有和更新。
+- `归属 Workstream`
+  `snapshot-state` + `graph-foundation` + `agent-consumption`
+- `产出`
+  job schema、artifact schema、状态流转图、失败与重试约定。
+- `完成标准`
+  任一 worker 任务都能被 Java 调度、追踪、重试和审计，且 Python 不需要知道 Java 内部对象实现。
+- `依赖`
+  语言中立契约规范、`source_registry`、`snapshot_store`、`knowledge_state` 初版。
+- `阶段`
+  `Phase 1`
+
+#### 18.8.2B 定义 reviewed knowledge promotion 规则
+
+- `任务`
+  定义 graph 信号、局部摘要、wiki 草稿升级为稳定知识资产的规则和 review 门槛。
+- `归属 Workstream`
+  `graph-foundation` + `wiki-maintenance` + `quality-recovery`
+- `产出`
+  knowledge promotion 规则、review gate 规则、traceability 要求。
+- `完成标准`
+  任一高层结论都能说明其来源、覆盖范围、聚合依据和是否经过人工确认。
+- `依赖`
+  `knowledge_control_state`、coverage / scope 标记规范、页面依赖映射。
+- `阶段`
+  `Phase 2`
+
+#### 18.8.3 定义 coverage / scope 标记
 
 - `任务`
   定义 coverage 字段、scope 字段，以及局部结论升级为全局结论时的限制规则。
@@ -1610,6 +1759,21 @@ TODO 的目标不是提醒“还有什么没做”，而是直接成为 implemen
 - `阶段`
   `Phase 2`
 
+#### 18.8.4 定义 agent-facing knowledge views
+
+- `任务`
+  定义 `topic summary view`、`source-backed answer context`、`change alert view`、`review-needed view`、`coverage-bounded context pack` 的稳定输出结构。
+- `归属 Workstream`
+  `agent-consumption`
+- `产出`
+  agent-facing views schema、最小字段集、消费约定。
+- `完成标准`
+  `Codex`、`Trae` 和后续 Java agent 都能基于统一视图消费知识，而不直接依赖底层 graph/wiki/raw snapshot 结构。
+- `依赖`
+  Python / Java 共享契约、coverage / scope 标记规范、`knowledge_state` 初版。
+- `阶段`
+  `Phase 2`
+
 ## 19. 结论
 
 `meta_claw` 第一阶段应被设计为一个私有知识中台，而不是一次性图谱生成工具，也不是立即面向所有模型的问答系统。
@@ -1617,6 +1781,8 @@ TODO 的目标不是提醒“还有什么没做”，而是直接成为 implemen
 其核心形态应为：
 
 - `.rwa` 受控录入
+- `Java State Core` 作为状态与接口主控
+- `Python Worker Mesh` 作为 ETL 与抽取执行层
 - 可编排、可替换的抽取层，当前优先复用 `graphify`
 - 面向超大项目和超大文件的分层处理与按需深挖机制
 - wiki 面向人的知识沉淀
@@ -1627,8 +1793,10 @@ TODO 的目标不是提醒“还有什么没做”，而是直接成为 implemen
 核心结论进一步更新为：
 
 - 抽取逻辑必须是框架能力，而不是某个工具实现细节
+- `knowledge`、`knowledge governance`、`memory` 必须分层，不能退化为单一 markdown 条目仓
 - 超大来源必须先做结构分层，再做知识深挖，再做展示投影
 - 图谱可以保存全结构，但 wiki / Obsidian 只展示人能读的分层视图
-- 当前优先让 `Codex` / `Trae` 消费这套知识底座，同时不阻断未来更强抽取器和私有模型接入
+- 当前优先让 `Codex` / `Trae` 通过 Java 暴露的稳定 knowledge views 消费这套知识底座，同时不阻断未来更强抽取器和私有模型接入
+- `expert` 现有 knowledge 设计中的 `history / branch / manual review / time-truth` 应被提升为中台治理能力，而不是保留为单一实现形态
 
 这保证系统既能在当前 CLI coding 工作流中立即创造价值，又不会阻断未来向私有智能体长期知识底座演化。
