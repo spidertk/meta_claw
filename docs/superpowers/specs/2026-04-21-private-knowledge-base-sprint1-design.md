@@ -48,13 +48,14 @@ meta_claw/
     examples/
     service/
       java/
+        core/
     workers/
       python/
 ```
 
 约束如下：
 
-- `knowledge/service/java`
+- `knowledge/service/java/core`
   代表 `Java State Core` 的实现目录
 - `knowledge/workers/python`
   代表 Python worker 目录
@@ -123,7 +124,7 @@ meta_claw/
 
 ## 6. Java 骨架
 
-`knowledge/service/java` 本轮只落以下骨架。
+`knowledge/service/java/core` 本轮只落以下骨架。
 
 ### 6.1 Domain
 
