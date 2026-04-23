@@ -5,7 +5,7 @@ import java.util.List;
 public record AgentRoleBinding(
         String roleName,
         String spaceId,
-        String path,
+        String spacePath,
         List<String> inherits,
         String templateId
 ) {

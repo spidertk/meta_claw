@@ -32,7 +32,8 @@
 完成后必须满足：
 
 - 角色通过 `.knowledge_registry.json` 绑定独立 knowledge space
-- `shared` space 与 agent private space 可被统一管理
+- `shared` space 固定集中维护在 `/meta_claw/knowledge_shared`
+- agent private space 路径由外部 agent/runtime 配置传入
 - 能登记本地文件、目录、仓库、受控外链副本
 - 能生成稳定 `source_id`、`snapshot`、`unit_ref`
 - 能由 Python 产出 graph/wiki artifacts
@@ -84,6 +85,7 @@
 Java 负责：
 
 - `.knowledge_registry.json`
+- `/meta_claw/knowledge_shared` 的 shared space 解析
 - `source_registry`
 - `snapshot_store`
 - `knowledge_state`
@@ -178,6 +180,7 @@ Python 负责：
 完成标准：
 
 - role -> `space_id` 映射有统一 schema 表达
+- shared root 与 external space path 的边界清晰
 - 任一来源可用统一 schema 表达
 - 任一 worker 结果可用统一 artifact 表达
 - Java 主状态和 Python 处理结果边界清晰
@@ -186,6 +189,7 @@ Python 负责：
 测试与验收：
 
 - registry 样例覆盖 private space 与 shared space
+- registry 样例覆盖 centralized shared root 与 external private space path
 - schema 样例覆盖文件、仓库、文档三类来源
 - job/result 样例覆盖成功、失败、部分成功三类结果
 
@@ -232,6 +236,7 @@ Python 负责：
 完成标准：
 
 - 同一 role 始终落入同一 private space
+- shared knowledge 始终从 `/meta_claw/knowledge_shared` 解析
 - 同一来源重复录入不会生成新身份
 - 内容不变返回 `unchanged`
 - 内容变化生成新 snapshot
@@ -382,6 +387,7 @@ Python 负责：
   - `snapshot_store`
   - `knowledge_state`
   - `knowledge_control_state`
+- Java 不拥有 private space 的物理路径生成逻辑，只消费外部配置
 - Python worker 只能产出 `artifact/result`
 - 任一状态更新都必须带：
   - `space_id`

@@ -45,7 +45,6 @@
 
 ```text
 meta_claw/
-  .knowledge_registry.json
   knowledge/
     contracts/
     examples/
@@ -54,16 +53,15 @@ meta_claw/
         core/
     workers/
       python/
-    shared/
-      <shared_space_id>/
-    spaces/
-      <space_id>/
+  knowledge_shared/
+    <shared_space_id>/
+  .knowledge_registry.json
 ```
 
 约束如下：
 
 - `.knowledge_registry.json`
-  是角色到 knowledge space 的唯一注册入口
+  是角色到 external knowledge space 的唯一注册入口
 - `knowledge/service/java/core`
   代表 `Java State Core` 的实现目录
 - `knowledge/workers/python`
@@ -72,8 +70,10 @@ meta_claw/
   存放语言无关 schema
 - `knowledge/examples`
   存放共享样例
-- `knowledge/shared` 与 `knowledge/spaces`
-  是知识数据层，不是系统实现层
+- `knowledge_shared`
+  是集中维护的 shared knowledge 根目录，不属于 core 代码结构
+- private `spaces`
+  由外部 agent/runtime 配置提供路径，core 只读取与处理
 
 本轮不引入第二个 Java 根目录，也不把 Python worker 混入 Java 服务目录。
 

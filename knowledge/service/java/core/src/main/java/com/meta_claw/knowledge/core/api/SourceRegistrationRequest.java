@@ -5,7 +5,7 @@ import com.meta_claw.knowledge.core.domain.SourceRecord;
 import java.time.Instant;
 
 public record SourceRegistrationRequest(
-        String spaceId,
+        String roleName,
         String sourceId,
         String sourceType,
         String location,
@@ -15,7 +15,7 @@ public record SourceRegistrationRequest(
         SourceRecord.WorkspaceIdentity workspaceIdentity,
         SourceRecord.SnapshotHint snapshotHint
 ) {
-    public SourceRecord toDomain() {
+    public SourceRecord toDomain(String spaceId) {
         Instant now = Instant.now();
         return new SourceRecord(
                 spaceId,

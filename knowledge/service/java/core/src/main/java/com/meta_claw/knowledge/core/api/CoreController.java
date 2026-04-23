@@ -8,6 +8,7 @@ import com.meta_claw.knowledge.core.domain.AgentRoleBinding;
 import com.meta_claw.knowledge.core.domain.SourceRecord;
 import com.meta_claw.knowledge.core.domain.WorkerJob;
 import com.meta_claw.knowledge.core.domain.WorkerResult;
+import com.meta_claw.knowledge.core.transport.worker.WorkerResultEnvelope;
 
 public class CoreController {
     private final ResolveKnowledgeSpaceUseCase resolveKnowledgeSpaceUseCase;
@@ -32,14 +33,16 @@ public class CoreController {
     }
 
     public SourceRecord registerSource(SourceRegistrationRequest request) {
-        return registerSourceUseCase.execute(request.toDomain());
+        AgentRoleBinding binding = resolveKnowledgeSpaceUseCase.execute(request.roleName());
+        return registerSourceUseCase.execute(request.toDomain(binding.spaceId()));
     }
 
-    public WorkerJob submitWorkerJob(WorkerJob workerJob) {
-        return submitWorkerJobUseCase.execute(workerJob);
+    public WorkerJob submitWorkerJob(SubmitWorkerJobRequest request) {
+        AgentRoleBinding binding = resolveKnowledgeSpaceUseCase.execute(request.roleName());
+        return submitWorkerJobUseCase.execute(request.toDomain(binding.spaceId()));
     }
 
-    public WorkerResult ingestWorkerResult(WorkerResultRequest request) {
-        return ingestWorkerResultUseCase.execute(request.toDomain());
+    public WorkerResult ingestWorkerResult(WorkerResultEnvelope envelope) {
+        return ingestWorkerResultUseCase.execute(envelope.toDomain());
     }
 }

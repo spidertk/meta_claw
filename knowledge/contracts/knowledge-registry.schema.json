@@ -37,14 +37,18 @@
       "additionalProperties": false,
       "required": [
         "space_id",
-        "path",
+        "shared_root",
+        "relative_path",
         "description"
       ],
       "properties": {
         "space_id": {
           "type": "string"
         },
-        "path": {
+        "shared_root": {
+          "type": "string"
+        },
+        "relative_path": {
           "type": "string"
         },
         "description": {
@@ -57,7 +61,7 @@
       "additionalProperties": false,
       "required": [
         "space_id",
-        "path",
+        "space_path",
         "inherits",
         "template_id"
       ],
@@ -65,7 +69,7 @@
         "space_id": {
           "type": "string"
         },
-        "path": {
+        "space_path": {
           "type": "string"
         },
         "inherits": {

@@ -1,11 +1,11 @@
-package com.meta_claw.knowledge.core.api;
+package com.meta_claw.knowledge.core.transport.worker;
 
 import com.meta_claw.knowledge.core.domain.KnowledgeAsset;
 import com.meta_claw.knowledge.core.domain.WorkerResult;
 
 import java.util.List;
 
-public record WorkerResultRequest(
+public record WorkerResultEnvelope(
         String spaceId,
         String jobId,
         String status,

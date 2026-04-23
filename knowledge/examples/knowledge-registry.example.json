@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "shared_spaces": {
+    "shared_common": {
+      "space_id": "ks_shared_common",
+      "shared_root": "/meta_claw/knowledge_shared",
+      "relative_path": "ks_shared_common",
+      "description": "Common reusable knowledge."
+    }
+  },
+  "agent_roles": {
+    "finance_advisor": {
+      "space_id": "ks_agent_finance",
+      "space_path": "/external/agents/finance_advisor/knowledge_spaces/ks_agent_finance",
+      "inherits": [
+        "shared_common"
+      ],
+      "template_id": "advisor_template_v1"
+    },
+    "homebuying_advisor": {
+      "space_id": "ks_agent_homebuying",
+      "space_path": "/external/agents/homebuying_advisor/knowledge_spaces/ks_agent_homebuying",
+      "inherits": [
+        "shared_common"
+      ],
+      "template_id": "advisor_template_v1"
+    }
+  },
+  "policies": {
+    "default_inherit_mode": "explicit_only",
+    "allow_cross_role_read": false,
+    "allow_cross_role_write": false
+  }
+}

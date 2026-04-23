@@ -12,19 +12,19 @@ public class SampleKnowledgeRegistryRepository implements KnowledgeRegistryRepos
     private final Map<String, KnowledgeSpace> spaces = Map.of(
             "ks_shared_common", new KnowledgeSpace(
                     "ks_shared_common",
-                    "knowledge/shared/ks_shared_common",
+                    "/meta_claw/knowledge_shared/ks_shared_common",
                     true,
                     "Common reusable knowledge."
             ),
             "ks_agent_finance", new KnowledgeSpace(
                     "ks_agent_finance",
-                    "knowledge/spaces/ks_agent_finance",
+                    "/external/agents/finance_advisor/knowledge_spaces/ks_agent_finance",
                     false,
                     "Finance advisor private knowledge space."
             ),
             "ks_agent_homebuying", new KnowledgeSpace(
                     "ks_agent_homebuying",
-                    "knowledge/spaces/ks_agent_homebuying",
+                    "/external/agents/homebuying_advisor/knowledge_spaces/ks_agent_homebuying",
                     false,
                     "Homebuying advisor private knowledge space."
             )
@@ -34,14 +34,14 @@ public class SampleKnowledgeRegistryRepository implements KnowledgeRegistryRepos
             "finance_advisor", new AgentRoleBinding(
                     "finance_advisor",
                     "ks_agent_finance",
-                    "knowledge/spaces/ks_agent_finance",
+                    "/external/agents/finance_advisor/knowledge_spaces/ks_agent_finance",
                     List.of("shared_common"),
                     "advisor_template_v1"
             ),
             "homebuying_advisor", new AgentRoleBinding(
                     "homebuying_advisor",
                     "ks_agent_homebuying",
-                    "knowledge/spaces/ks_agent_homebuying",
+                    "/external/agents/homebuying_advisor/knowledge_spaces/ks_agent_homebuying",
                     List.of("shared_common"),
                     "advisor_template_v1"
             )
