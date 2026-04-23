@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "knowledge/contracts/artifact-result.schema.json",
+  "title": "WorkerResult",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "space_id",
+    "job_id",
+    "status",
+    "retriable",
+    "artifacts",
+    "issues"
+  ],
+  "properties": {
+    "space_id": {
+      "type": "string"
+    },
+    "job_id": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "success",
+        "partial_success",
+        "failed"
+      ]
+    },
+    "retriable": {
+      "type": "boolean"
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "$ref": "./knowledge-assets.schema.json"
+      }
+    },
+    "issues": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "coverage": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "scope": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  }
+}

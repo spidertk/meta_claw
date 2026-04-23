@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "knowledge/contracts/knowledge-assets.schema.json",
+  "title": "KnowledgeAsset",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "space_id",
+    "asset_id",
+    "asset_type",
+    "source_id",
+    "snapshot_id",
+    "status",
+    "created_at"
+  ],
+  "properties": {
+    "space_id": {
+      "type": "string"
+    },
+    "asset_id": {
+      "type": "string"
+    },
+    "asset_type": {
+      "type": "string",
+      "enum": [
+        "graph_artifact",
+        "wiki_candidate",
+        "source_summary",
+        "topic_summary"
+      ]
+    },
+    "source_id": {
+      "type": "string"
+    },
+    "snapshot_id": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "candidate",
+        "active",
+        "needs_review",
+        "stale",
+        "superseded",
+        "rejected"
+      ]
+    },
+    "coverage": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "scope": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

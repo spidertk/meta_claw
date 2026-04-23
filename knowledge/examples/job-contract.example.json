@@ -1,0 +1,12 @@
+{
+  "space_id": "ks_agent_finance",
+  "job_id": "job_ingest_meta_claw_001",
+  "job_type": "ingest",
+  "source_id": "src_repo_meta_claw",
+  "snapshot_id": "snapshot_meta_claw_001",
+  "processing_scope": "full",
+  "expected_artifacts": [
+    "graph_artifact",
+    "wiki_candidate"
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "space_id": "ks_agent_finance",
+  "job_id": "job_ingest_meta_claw_001",
+  "status": "failed",
+  "retriable": true,
+  "artifacts": [],
+  "issues": [
+    "sample worker failure for Sprint 1 contract validation"
+  ],
+  "coverage": null,
+  "scope": null
+}

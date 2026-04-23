@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "knowledge/contracts/snapshot-store.schema.json",
+  "title": "SnapshotRecord",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "space_id",
+    "snapshot_id",
+    "source_id",
+    "content_fingerprint",
+    "captured_at",
+    "units"
+  ],
+  "properties": {
+    "space_id": {
+      "type": "string"
+    },
+    "snapshot_id": {
+      "type": "string"
+    },
+    "source_id": {
+      "type": "string"
+    },
+    "content_fingerprint": {
+      "type": "string"
+    },
+    "captured_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "units": {
+      "type": "array",
+      "items": {
+        "$ref": "./unit-ref.schema.json"
+      }
+    }
+  }
+}

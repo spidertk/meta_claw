@@ -1,0 +1,142 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "knowledge/contracts/source-registry.schema.json",
+  "title": "SourceRecord",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "space_id",
+    "source_id",
+    "source_type",
+    "location",
+    "display_name",
+    "status",
+    "created_at",
+    "updated_at"
+  ],
+  "properties": {
+    "space_id": {
+      "type": "string"
+    },
+    "source_id": {
+      "type": "string"
+    },
+    "source_type": {
+      "type": "string",
+      "enum": [
+        "local_file",
+        "local_directory",
+        "git_repository",
+        "mirrored_remote"
+      ]
+    },
+    "location": {
+      "type": "string"
+    },
+    "display_name": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "new_source",
+        "unchanged",
+        "partial_update",
+        "major_update",
+        "failed"
+      ]
+    },
+    "description": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "workspace_identity": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "required": [
+        "workspace_id",
+        "workspace_root",
+        "vcs",
+        "origin_mode"
+      ],
+      "properties": {
+        "workspace_id": {
+          "type": "string"
+        },
+        "workspace_root": {
+          "type": "string"
+        },
+        "vcs": {
+          "type": "string",
+          "enum": [
+            "git"
+          ]
+        },
+        "origin_mode": {
+          "type": "string",
+          "enum": [
+            "native_git",
+            "imported"
+          ]
+        },
+        "remote_url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "default_branch": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "snapshot_hint": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "branch": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "head_commit": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "worktree_state": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "clean",
+            "dirty",
+            null
+          ]
+        }
+      }
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

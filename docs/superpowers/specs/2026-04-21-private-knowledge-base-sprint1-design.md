@@ -13,6 +13,8 @@
 本轮目标是固定后续不应轻易推翻的边界：
 
 - 共享 schema
+- `space_id` 隔离模型
+- `.knowledge_registry.json` 注册入口
 - 状态流转
 - Java 主状态模型骨架
 - Python worker 对接骨架
@@ -43,6 +45,7 @@
 
 ```text
 meta_claw/
+  .knowledge_registry.json
   knowledge/
     contracts/
     examples/
@@ -51,10 +54,16 @@ meta_claw/
         core/
     workers/
       python/
+    shared/
+      <shared_space_id>/
+    spaces/
+      <space_id>/
 ```
 
 约束如下：
 
+- `.knowledge_registry.json`
+  是角色到 knowledge space 的唯一注册入口
 - `knowledge/service/java/core`
   代表 `Java State Core` 的实现目录
 - `knowledge/workers/python`
@@ -63,6 +72,8 @@ meta_claw/
   存放语言无关 schema
 - `knowledge/examples`
   存放共享样例
+- `knowledge/shared` 与 `knowledge/spaces`
+  是知识数据层，不是系统实现层
 
 本轮不引入第二个 Java 根目录，也不把 Python worker 混入 Java 服务目录。
 
@@ -70,6 +81,7 @@ meta_claw/
 
 本轮先定义以下 contract：
 
+- `knowledge-registry.schema.json`
 - `unit-ref.schema.json`
 - `source-registry.schema.json`
 - `snapshot-store.schema.json`
@@ -110,6 +122,7 @@ meta_claw/
 ### 5.3 主控约束
 
 - 只有 Java 能修改：
+  - `.knowledge_registry.json`
   - `source_registry`
   - `snapshot_store`
   - `knowledge_state`
@@ -128,6 +141,8 @@ meta_claw/
 
 ### 6.1 Domain
 
+- `KnowledgeSpace`
+- `AgentRoleBinding`
 - `SourceRecord`
 - `SnapshotRecord`
 - `UnitRef`
@@ -138,6 +153,7 @@ meta_claw/
 
 要求：
 
+- 所有核心状态必须带 `space_id`
 - 字段与 contract 一一对应
 - 不引入 contract 外的核心语义字段
 - 先使用内存 repository stub
@@ -146,12 +162,14 @@ meta_claw/
 
 本轮只定义 3 个 use case：
 
+- `ResolveKnowledgeSpaceUseCase`
 - `RegisterSourceUseCase`
 - `SubmitWorkerJobUseCase`
 - `IngestWorkerResultUseCase`
 
 用途：
 
+- 根据 role 解析 `space_id`
 - 注册来源
 - 生成 worker job
 - ingest worker result 并更新状态
@@ -182,6 +200,7 @@ meta_claw/
 
 本轮至少需要以下样例：
 
+- `.knowledge_registry.json`
 - `source-registry.example.json`
 - `snapshot-store.example.json`
 - `job-contract.example.json`
@@ -199,11 +218,12 @@ meta_claw/
 
 本轮必须跑通一条假链路：
 
-1. Java 注册 source
-2. Java 生成 worker job
-3. Python stub 读取 job 并返回 artifact/result
-4. Java ingest result
-5. Java 更新主状态
+1. Java 根据 role 解析 `space_id`
+2. Java 在目标 `space_id` 下注册 source
+3. Java 生成带 `space_id` 的 worker job
+4. Python stub 读取 job 并返回 artifact/result
+5. Java ingest result
+6. Java 更新该 `space_id` 下的主状态
 
 该链路的目标是验证：
 
@@ -218,10 +238,11 @@ meta_claw/
 本轮完成标准：
 
 - 所有共享 contract 已落地
+- registry contract 与 registry example 已落地
 - Java domain 与 application 骨架已落地
 - Python worker stub 已落地
 - 至少一条成功样例和一条失败样例可跑通
-- source -> job -> result -> state 的追踪关系存在
+- role -> `space_id` -> source -> job -> result -> state 的追踪关系存在
 
 ## 11. 明确不做
 
@@ -257,6 +278,8 @@ meta_claw/
 本轮实现应严格收敛为：
 
 - contract
+- registry
+- `space_id`
 - 状态
 - Java 主状态骨架
 - Python worker stub

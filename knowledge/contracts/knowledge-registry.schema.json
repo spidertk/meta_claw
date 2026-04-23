@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "knowledge/contracts/knowledge-registry.schema.json",
+  "title": "KnowledgeRegistry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "shared_spaces",
+    "agent_roles",
+    "policies"
+  ],
+  "properties": {
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "shared_spaces": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/sharedSpace"
+      }
+    },
+    "agent_roles": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/agentRoleBinding"
+      }
+    },
+    "policies": {
+      "$ref": "#/$defs/policies"
+    }
+  },
+  "$defs": {
+    "sharedSpace": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "space_id",
+        "path",
+        "description"
+      ],
+      "properties": {
+        "space_id": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        }
+      }
+    },
+    "agentRoleBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "space_id",
+        "path",
+        "inherits",
+        "template_id"
+      ],
+      "properties": {
+        "space_id": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "inherits": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "template_id": {
+          "type": "string"
+        }
+      }
+    },
+    "policies": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "default_inherit_mode",
+        "allow_cross_role_read",
+        "allow_cross_role_write"
+      ],
+      "properties": {
+        "default_inherit_mode": {
+          "type": "string",
+          "enum": [
+            "explicit_only"
+          ]
+        },
+        "allow_cross_role_read": {
+          "type": "boolean"
+        },
+        "allow_cross_role_write": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

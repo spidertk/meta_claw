@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "knowledge/contracts/knowledge-control-state.schema.json",
+  "title": "KnowledgeControlState",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "space_id",
+    "asset_id",
+    "review_status",
+    "updated_at"
+  ],
+  "properties": {
+    "space_id": {
+      "type": "string"
+    },
+    "asset_id": {
+      "type": "string"
+    },
+    "review_status": {
+      "type": "string",
+      "enum": [
+        "candidate",
+        "active",
+        "needs_review",
+        "stale",
+        "superseded",
+        "rejected"
+      ]
+    },
+    "issues": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

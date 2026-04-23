@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "knowledge/contracts/unit-ref.schema.json",
+  "title": "UnitRef",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "unit_id",
+    "snapshot_id",
+    "unit_type",
+    "path"
+  ],
+  "properties": {
+    "unit_id": {
+      "type": "string"
+    },
+    "snapshot_id": {
+      "type": "string"
+    },
+    "parent_unit_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "unit_type": {
+      "type": "string",
+      "enum": [
+        "document",
+        "section",
+        "chunk",
+        "repo",
+        "file",
+        "symbol"
+      ]
+    },
+    "path": {
+      "type": "string"
+    },
+    "display_name": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "neighbors": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    }
+  }
+}

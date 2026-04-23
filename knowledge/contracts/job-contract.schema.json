@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "knowledge/contracts/job-contract.schema.json",
+  "title": "WorkerJob",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "space_id",
+    "job_id",
+    "job_type",
+    "source_id",
+    "snapshot_id",
+    "processing_scope",
+    "expected_artifacts"
+  ],
+  "properties": {
+    "space_id": {
+      "type": "string"
+    },
+    "job_id": {
+      "type": "string"
+    },
+    "job_type": {
+      "type": "string",
+      "enum": [
+        "ingest",
+        "graph_build",
+        "wiki_build",
+        "audit"
+      ]
+    },
+    "source_id": {
+      "type": "string"
+    },
+    "snapshot_id": {
+      "type": "string"
+    },
+    "processing_scope": {
+      "type": "string"
+    },
+    "expected_artifacts": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

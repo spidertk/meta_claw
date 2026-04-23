@@ -15,6 +15,7 @@
 
 核心原则：
 
+- 先立 `registry + space_id`
 - 先立 `Java State Core`
 - 再接 `Python Worker Mesh`
 - 先跑通闭环
@@ -26,10 +27,12 @@
 
 建立最小可运行闭环：
 
-`.rwa source -> source_registry -> snapshot_store -> Python worker -> graph artifacts -> wiki artifacts -> Java-managed knowledge_state -> agent-facing minimal views`
+`agent_role -> .knowledge_registry.json -> space_id -> source_registry -> snapshot_store -> Python worker -> graph artifacts -> wiki artifacts -> Java-managed knowledge_state -> agent-facing minimal views`
 
 完成后必须满足：
 
+- 角色通过 `.knowledge_registry.json` 绑定独立 knowledge space
+- `shared` space 与 agent private space 可被统一管理
 - 能登记本地文件、目录、仓库、受控外链副本
 - 能生成稳定 `source_id`、`snapshot`、`unit_ref`
 - 能由 Python 产出 graph/wiki artifacts
@@ -61,11 +64,12 @@
 
 必须先做：
 
-1. schema 与状态边界
-2. Java / Python job-artifact contract
-3. source / snapshot 主链路
-4. graph/wiki artifact 归档
-5. agent-facing minimal views
+1. registry 与 `space_id` 边界
+2. schema 与状态边界
+3. Java / Python job-artifact contract
+4. source / snapshot 主链路
+5. graph/wiki artifact 归档
+6. agent-facing minimal views
 
 可以后做：
 
@@ -79,6 +83,7 @@
 
 Java 负责：
 
+- `.knowledge_registry.json`
 - `source_registry`
 - `snapshot_store`
 - `knowledge_state`
@@ -102,6 +107,7 @@ Python 负责：
 
 完成标志：
 
+- registry schema 定稿
 - 核心 schema 定稿
 - job / artifact contract 定稿
 - 状态流转图定稿
@@ -139,6 +145,7 @@ Python 负责：
 
 任务：
 
+- 定义 `knowledge_registry` schema
 - 定义 `source_registry` schema
 - 定义 `snapshot_store` schema
 - 定义 `knowledge_assets` schema
@@ -162,6 +169,7 @@ Python 负责：
 
 产出物：
 
+- registry 文档与 example
 - schema 文档
 - 状态流转图
 - job/artifact contract 文档
@@ -169,6 +177,7 @@ Python 负责：
 
 完成标准：
 
+- role -> `space_id` 映射有统一 schema 表达
 - 任一来源可用统一 schema 表达
 - 任一 worker 结果可用统一 artifact 表达
 - Java 主状态和 Python 处理结果边界清晰
@@ -176,6 +185,7 @@ Python 负责：
 
 测试与验收：
 
+- registry 样例覆盖 private space 与 shared space
 - schema 样例覆盖文件、仓库、文档三类来源
 - job/result 样例覆盖成功、失败、部分成功三类结果
 
@@ -197,6 +207,7 @@ Python 负责：
 
 任务：
 
+- 实现 role -> `space_id` 解析入口
 - 定义 `.rwa` 来源目录规则
 - 定义来源登记命令接口
 - 支持本地文件、目录、仓库、受控外链副本录入
@@ -220,6 +231,7 @@ Python 负责：
 
 完成标准：
 
+- 同一 role 始终落入同一 private space
 - 同一来源重复录入不会生成新身份
 - 内容不变返回 `unchanged`
 - 内容变化生成新 snapshot
@@ -271,6 +283,7 @@ Python 负责：
 
 完成标准：
 
+- artifact 默认只能写回所属 `space_id`
 - 一个仓库来源能产出 graph + wiki
 - 一个文档来源能产出 graph + wiki
 - graph/wiki 都能追溯到 source/snapshot
@@ -299,6 +312,7 @@ Python 负责：
 
 任务：
 
+- 基于 role 构建可见 `space_id` 集合
 - Java 接入 job dispatch / result ingestion
 - 落地 `knowledge_state` 与 `knowledge_control_state`
 - 定义 `topic summary view`
@@ -320,6 +334,7 @@ Python 负责：
 
 - Java 能调度 Python worker
 - Java 能接收并落盘 worker 结果
+- agent 只能读取 own space + inherited shared spaces
 - `Codex` / `Trae` 可消费稳定 views
 - agent 不需要理解 graph/wiki 私有结构
 
@@ -362,12 +377,14 @@ Python 负责：
 ### 5.1 状态主控约束
 
 - 只有 Java 可以写：
+  - `.knowledge_registry.json`
   - `source_registry`
   - `snapshot_store`
   - `knowledge_state`
   - `knowledge_control_state`
 - Python worker 只能产出 `artifact/result`
 - 任一状态更新都必须带：
+  - `space_id`
   - `source_ref`
   - `snapshot_ref`
   - `job_id`
@@ -398,6 +415,7 @@ Python 负责：
 
 - graph artifact、wiki artifact、agent-facing view 必须彼此可追踪
 - 任一 artifact 必须能说明：
+  - 属于哪个 `space_id`
   - 来自哪个 source
   - 来自哪个 snapshot
   - 由哪个 job 生成
@@ -442,6 +460,7 @@ Python 负责：
 
 计划完成时至少应满足：
 
+- role -> `space_id` -> source -> snapshot -> artifact -> state -> view 全链路可追溯
 - Java 是唯一主状态持有者
 - Python worker 通过稳定契约交付处理结果
 - source -> snapshot -> artifact -> state -> view 全链路可追溯

@@ -1,0 +1,29 @@
+{
+  "space_id": "ks_agent_finance",
+  "snapshot_id": "snapshot_meta_claw_001",
+  "source_id": "src_repo_meta_claw",
+  "content_fingerprint": "sha256:sample-fingerprint-001",
+  "captured_at": "2026-04-21T09:05:00Z",
+  "units": [
+    {
+      "unit_id": "repo_root",
+      "snapshot_id": "snapshot_meta_claw_001",
+      "parent_unit_id": null,
+      "unit_type": "repo",
+      "path": ".",
+      "display_name": "meta_claw",
+      "neighbors": [
+        "docs_spec"
+      ]
+    },
+    {
+      "unit_id": "docs_spec",
+      "snapshot_id": "snapshot_meta_claw_001",
+      "parent_unit_id": "repo_root",
+      "unit_type": "file",
+      "path": "docs/superpowers/specs/2026-04-20-private-knowledge-base-design.md",
+      "display_name": "private-knowledge-base-design",
+      "neighbors": []
+    }
+  ]
+}

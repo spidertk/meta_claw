@@ -1,0 +1,22 @@
+{
+  "space_id": "ks_agent_finance",
+  "job_id": "job_ingest_meta_claw_001",
+  "status": "success",
+  "retriable": false,
+  "artifacts": [
+    {
+      "space_id": "ks_agent_finance",
+      "asset_id": "asset_graph_meta_claw_001",
+      "asset_type": "graph_artifact",
+      "source_id": "src_repo_meta_claw",
+      "snapshot_id": "snapshot_meta_claw_001",
+      "status": "candidate",
+      "coverage": "repository-wide skeleton coverage",
+      "scope": "full repository",
+      "created_at": "2026-04-21T09:10:00Z"
+    }
+  ],
+  "issues": [],
+  "coverage": "repository-wide skeleton coverage",
+  "scope": "full repository"
+}
