@@ -140,7 +140,7 @@
 
 ### 4.3 注册流程规则
 
-`SourceRegisterHandler` 按以下顺序协调两个 repository：
+`RegisterSourceProcess` 按以下顺序协调两个 repository：
 
 1. 解析或生成稳定 `sourceId`
 2. 读取已有 `SourceRecord`
@@ -164,7 +164,7 @@
 
 - `SnapshotStoreRepository` 写入的是历史事实
 - `SourceRegistryRepository` 写入的是当前视图
-- 二者由 `SourceRegisterHandler` 协调，不由任一 repository 吞并另一方职责
+- 二者由 `RegisterSourceProcess` 协调，不由任一 repository 吞并另一方职责
 
 当前阶段不额外引入事务抽象，但接口注释必须明确“双写由应用层保持一致性”。
 
@@ -197,7 +197,7 @@
 - 相关嵌套对象字段
 - `SourceRegistryRepository` 与 `SnapshotStoreRepository` 的类注释和方法注释
 - sample repository 的类注释和方法注释
-- `SourceRegisterHandler` 的类注释和核心方法注释
+- `RegisterSourceProcess` 的类注释和核心方法注释
 - demo 入口的装配说明注释
 
 注释要求：
@@ -206,6 +206,12 @@
 - 解释“职责边界与依赖关系”
 - 解释“何时更新 source，何时写 snapshot”
 - 保持简短，不写空话
+
+增量变更要求：
+
+- 本轮涉及的所有新增代码和修改代码都必须补齐与职责匹配的中文注释
+- 不允许只给新文件加注释而保留同一轮修改中的旧代码无注释
+- 如果某段代码在本轮被改动，就需要顺手补足该段上下文中缺失的必要注释
 
 ## 6. 实现调整范围
 
@@ -253,7 +259,7 @@
 
 - 阅读 `SourceRecord` 与 `SnapshotRecord` 就能直接理解 identity / history 分工
 - 阅读两个 repository 接口就能明确 `1 source -> N snapshots`
-- 阅读 `SourceRegisterHandler` 就能看懂未变化与已变化两条分支的处理逻辑
+- 阅读 `RegisterSourceProcess` 就能看懂未变化与已变化两条分支的处理逻辑
 - 代码注释、设计文档、实现文档使用同一套术语
 - demo 链路能验证：
   - 首次注册生成 snapshot，并回写 `latestSnapshotId`

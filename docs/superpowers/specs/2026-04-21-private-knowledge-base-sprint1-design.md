@@ -123,7 +123,9 @@ meta_claw/
 - 只有 Java 能修改：
   - `.knowledge_registry.json`
   - `source_registry`
+    负责来源稳定身份、当前状态和 `latest_snapshot_id`
   - `snapshot_store`
+    负责按 `source_id` 关联的不可变快照历史
   - `knowledge_state`
   - `knowledge_control_state`
 - Python 只能返回：
@@ -156,15 +158,16 @@ meta_claw/
 - 字段与 contract 一一对应
 - 不引入 contract 外的核心语义字段
 - 先使用内存 repository stub
+- 本轮所有新增和修改代码都必须补齐职责清晰的中文注释
 
 ### 6.2 Application
 
-本轮只定义 3 个 use case：
+本轮只定义 4 个 application process：
 
-- `ResolveKnowledgeSpaceUseCase`
-- `RegisterSourceUseCase`
-- `SubmitWorkerJobUseCase`
-- `IngestWorkerResultUseCase`
+- `ResolveRoleBindingProcess`
+- `RegisterSourceProcess`
+- `SubmitWorkerJobProcess`
+- `IngestWorkerResultProcess`
 
 用途：
 
