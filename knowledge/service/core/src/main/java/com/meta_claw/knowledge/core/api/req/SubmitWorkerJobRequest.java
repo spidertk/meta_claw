@@ -1,4 +1,4 @@
-package com.meta_claw.knowledge.core.api;
+package com.meta_claw.knowledge.core.api.req;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;

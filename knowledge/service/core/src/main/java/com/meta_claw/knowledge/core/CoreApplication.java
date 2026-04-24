@@ -3,17 +3,21 @@ package com.meta_claw.knowledge.core;
 import lombok.extern.slf4j.Slf4j;
 
 import com.meta_claw.knowledge.core.api.CoreController;
-import com.meta_claw.knowledge.core.api.SourceRegistrationRequest;
-import com.meta_claw.knowledge.core.application.IngestWorkerResultUseCase;
-import com.meta_claw.knowledge.core.application.RegisterSourceUseCase;
-import com.meta_claw.knowledge.core.application.ResolveKnowledgeSpaceUseCase;
-import com.meta_claw.knowledge.core.application.SubmitWorkerJobUseCase;
-import com.meta_claw.knowledge.core.infrastructure.SampleKnowledgeRegistryRepository;
-import com.meta_claw.knowledge.core.infrastructure.SampleKnowledgeStateRepository;
-import com.meta_claw.knowledge.core.infrastructure.SampleSnapshotStoreRepository;
-import com.meta_claw.knowledge.core.infrastructure.SampleSourceRegistryRepository;
+import com.meta_claw.knowledge.core.api.req.SourceRegistrationRequest;
+import com.meta_claw.knowledge.core.application.IngestWorkerResultProcess;
+import com.meta_claw.knowledge.core.application.RegisterSourceProcess;
+import com.meta_claw.knowledge.core.application.ResolveRoleBindingProcess;
+import com.meta_claw.knowledge.core.application.SubmitWorkerJobProcess;
+import com.meta_claw.knowledge.core.adapter.inbound.demo.SampleKnowledgeRegistryRepository;
+import com.meta_claw.knowledge.core.adapter.inbound.demo.SampleKnowledgeStateRepository;
+import com.meta_claw.knowledge.core.adapter.inbound.demo.SampleSnapshotStoreRepository;
+import com.meta_claw.knowledge.core.adapter.inbound.demo.SampleSourceRegistryRepository;
 
 @Slf4j
+/**
+ * 本地演示入口。
+ * 这里只负责装配 sample repository 和 process，便于验证骨架链路，不代表最终运行时装配方式。
+ */
 public class CoreApplication {
     public static void main(String[] args) {
         SampleKnowledgeRegistryRepository knowledgeRegistryRepository = new SampleKnowledgeRegistryRepository();
@@ -22,13 +26,29 @@ public class CoreApplication {
         SampleKnowledgeStateRepository knowledgeStateRepository = new SampleKnowledgeStateRepository();
 
         CoreController controller = new CoreController(
-                new ResolveKnowledgeSpaceUseCase(knowledgeRegistryRepository),
-                new RegisterSourceUseCase(sourceRegistryRepository, snapshotStoreRepository),
-                new SubmitWorkerJobUseCase(),
-                new IngestWorkerResultUseCase(knowledgeStateRepository)
+                new ResolveRoleBindingProcess(knowledgeRegistryRepository),
+                new RegisterSourceProcess(sourceRegistryRepository, snapshotStoreRepository),
+                new SubmitWorkerJobProcess(),
+                new IngestWorkerResultProcess(knowledgeStateRepository)
         );
 
-        var result = controller.registerSource(SourceRegistrationRequest.builder()
+        var firstRegistration = controller.registerSource(buildSampleRequest());
+        log.info("First registration -> source={}, snapshot={}, latestSnapshotId={}, unchanged={}",
+                firstRegistration.getSourceRecord().getSourceId(),
+                firstRegistration.getSnapshotRecord().getSnapshotId(),
+                firstRegistration.getSourceRecord().getLatestSnapshotId(),
+                firstRegistration.isUnchanged());
+
+        var secondRegistration = controller.registerSource(buildSampleRequest());
+        log.info("Second registration -> source={}, snapshot={}, latestSnapshotId={}, unchanged={}",
+                secondRegistration.getSourceRecord().getSourceId(),
+                secondRegistration.getSnapshotRecord().getSnapshotId(),
+                secondRegistration.getSourceRecord().getLatestSnapshotId(),
+                secondRegistration.isUnchanged());
+    }
+
+    private static SourceRegistrationRequest buildSampleRequest() {
+        return SourceRegistrationRequest.builder()
                 .roleName("finance_advisor")
                 .sourceType("git_repository")
                 .location("/Users/kai/IdeaProjects/meta_claw")
@@ -45,10 +65,6 @@ public class CoreApplication {
                         .branch("main")
                         .worktreeState("dirty")
                         .build())
-                .build());
-
-        log.info("Registered source {} with snapshot {}",
-                result.getSourceRecord().getSourceId(),
-                result.getSnapshotRecord().getSnapshotId());
+                .build();
     }
 }

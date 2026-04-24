@@ -1,4 +1,4 @@
-package com.meta_claw.knowledge.core.service;
+package com.meta_claw.knowledge.core.application;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -12,9 +12,13 @@ import java.time.Instant;
 
 @Slf4j
 @RequiredArgsConstructor
-public class IngestWorkerResultService {
+/**
+ * 应用层流程编排器：接收 worker 结果并更新知识状态。
+ */
+public class IngestWorkerResultProcess {
     private final KnowledgeStateRepository knowledgeStateRepository;
 
+    /** 将 worker 返回的产物和控制状态写回主状态仓库。 */
     public WorkerResult execute(WorkerResult workerResult) {
         for (KnowledgeAsset asset : workerResult.getArtifacts()) {
             knowledgeStateRepository.saveAsset(asset);

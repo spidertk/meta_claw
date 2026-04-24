@@ -1,4 +1,7 @@
-package com.meta_claw.knowledge.core.domain;
+package com.meta_claw.knowledge.core.repository;
+
+import com.meta_claw.knowledge.core.domain.AgentRoleBinding;
+import com.meta_claw.knowledge.core.domain.KnowledgeSpace;
 
 import java.util.Optional;
 

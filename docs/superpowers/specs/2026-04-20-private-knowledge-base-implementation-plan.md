@@ -87,7 +87,9 @@ Java 负责：
 - `.knowledge_registry.json`
 - `/meta_claw/knowledge_shared` 的 shared space 解析
 - `source_registry`
+  持有来源稳定身份、当前状态和 `latest_snapshot_id`
 - `snapshot_store`
+  持有按 `source_id` 关联的不可变快照历史
 - `knowledge_state`
 - `knowledge_control_state`
 - orchestration
@@ -217,6 +219,7 @@ Python 负责：
 - 支持本地文件、目录、仓库、受控外链副本录入
 - 实现 `source_id` 生成规则
 - 实现 `content_fingerprint` 生成规则
+- 实现 `source_registry.latest_snapshot_id` 回写规则
 - 实现 `snapshot_store` 写入
 - 实现 `unit_ref` 父子/邻接关系落盘
 - 实现最小 diff 判定：

@@ -1,4 +1,7 @@
-package com.meta_claw.knowledge.core.domain;
+package com.meta_claw.knowledge.core.repository;
+
+import com.meta_claw.knowledge.core.domain.KnowledgeAsset;
+import com.meta_claw.knowledge.core.domain.KnowledgeControlState;
 
 import java.util.List;
 import java.util.Optional;

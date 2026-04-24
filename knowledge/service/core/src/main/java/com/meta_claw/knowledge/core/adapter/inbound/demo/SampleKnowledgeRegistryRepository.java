@@ -1,4 +1,4 @@
-package com.meta_claw.knowledge.core.infrastructure;
+package com.meta_claw.knowledge.core.adapter.inbound.demo;
 
 import lombok.extern.slf4j.Slf4j;
 

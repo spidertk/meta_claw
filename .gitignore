@@ -21,7 +21,7 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
-.workspace/
+.rwa/
 # Virtual environments
 venv/
 env/
@@ -35,3 +35,5 @@ venv.bak/
 *.swp
 *.swo
 *~
+.*
+graphify-out

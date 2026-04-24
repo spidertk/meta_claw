@@ -1,4 +1,4 @@
-package com.meta_claw.knowledge.core.application;
+package com.meta_claw.knowledge.core.util;
 
 import com.meta_claw.knowledge.core.domain.SnapshotRecord;
 import com.meta_claw.knowledge.core.domain.SourceRecord;
@@ -17,11 +17,11 @@ import java.util.List;
 import java.util.Locale;
 import java.util.stream.Stream;
 
-final class SourceIntakeSupport {
+public final class SourceIntakeSupport {
     private SourceIntakeSupport() {
     }
 
-    static String ensureSourceId(SourceRecord sourceRecord) {
+    public static String ensureSourceId(SourceRecord sourceRecord) {
         if (sourceRecord.getSourceId() != null && !sourceRecord.getSourceId().isBlank()) {
             return sourceRecord.getSourceId();
         }
@@ -30,7 +30,7 @@ final class SourceIntakeSupport {
         return "src_" + slug(sourceRecord.getSourceType()) + "_" + shortHash(seed);
     }
 
-    static SnapshotRecord createSnapshot(SourceRecord sourceRecord) {
+    public static SnapshotRecord createSnapshot(SourceRecord sourceRecord) {
         Path path = Path.of(sourceRecord.getLocation()).toAbsolutePath().normalize();
         String fingerprint = fingerprint(path, sourceRecord.getSourceType());
         String snapshotId = "snapshot_" + shortHash(sourceRecord.getSpaceId() + "|" + sourceRecord.getSourceId() + "|" + fingerprint);

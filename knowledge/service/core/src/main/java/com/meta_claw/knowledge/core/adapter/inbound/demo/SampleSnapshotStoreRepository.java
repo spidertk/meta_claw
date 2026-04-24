@@ -1,4 +1,4 @@
-package com.meta_claw.knowledge.core.infrastructure;
+package com.meta_claw.knowledge.core.adapter.inbound.demo;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -10,6 +10,10 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
+/**
+ * 演示用快照历史存储实现。
+ * 仅用于本地内存示例，快照一旦写入就按历史记录对待。
+ */
 public class SampleSnapshotStoreRepository implements SnapshotStoreRepository {
     private final Map<String, SnapshotRecord> snapshots = new ConcurrentHashMap<>();
 
