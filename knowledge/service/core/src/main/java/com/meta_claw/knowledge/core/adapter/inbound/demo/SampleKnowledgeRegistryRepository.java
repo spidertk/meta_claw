@@ -3,7 +3,7 @@ package com.meta_claw.knowledge.core.infrastructure;
 import lombok.extern.slf4j.Slf4j;
 
 import com.meta_claw.knowledge.core.domain.AgentRoleBinding;
-import com.meta_claw.knowledge.core.domain.KnowledgeRegistryRepository;
+import com.meta_claw.knowledge.core.repository.KnowledgeRegistryRepository;
 import com.meta_claw.knowledge.core.domain.KnowledgeSpace;
 
 import java.util.List;

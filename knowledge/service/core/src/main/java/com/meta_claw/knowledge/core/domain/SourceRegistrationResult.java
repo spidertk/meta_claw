@@ -15,4 +15,5 @@ import com.meta_claw.knowledge.core.domain.SourceRecord;
 public class SourceRegistrationResult {
     private SourceRecord sourceRecord;
     private SnapshotRecord snapshotRecord;
+    private boolean unchanged;
 }

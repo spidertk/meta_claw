@@ -3,7 +3,7 @@ package com.meta_claw.knowledge.core.infrastructure;
 import lombok.extern.slf4j.Slf4j;
 
 import com.meta_claw.knowledge.core.domain.SourceRecord;
-import com.meta_claw.knowledge.core.domain.SourceRegistryRepository;
+import com.meta_claw.knowledge.core.repository.SourceRegistryRepository;
 
 import java.util.Map;
 import java.util.Optional;

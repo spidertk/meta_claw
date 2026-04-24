@@ -4,7 +4,7 @@ import lombok.extern.slf4j.Slf4j;
 
 import com.meta_claw.knowledge.core.domain.KnowledgeAsset;
 import com.meta_claw.knowledge.core.domain.KnowledgeControlState;
-import com.meta_claw.knowledge.core.domain.KnowledgeStateRepository;
+import com.meta_claw.knowledge.core.repository.KnowledgeStateRepository;
 
 import java.util.ArrayList;
 import java.util.List;

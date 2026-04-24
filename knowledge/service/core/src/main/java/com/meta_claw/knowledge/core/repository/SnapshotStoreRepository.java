@@ -6,4 +6,6 @@ public interface SnapshotStoreRepository {
     void save(SnapshotRecord snapshotRecord);
 
     Optional<SnapshotRecord> findById(String snapshotId);
+
+    Optional<SnapshotRecord> findLatestBySourceId(String sourceId);
 }

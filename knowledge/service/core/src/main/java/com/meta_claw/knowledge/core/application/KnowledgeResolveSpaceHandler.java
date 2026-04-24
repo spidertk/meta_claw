@@ -1,14 +1,14 @@
-package com.meta_claw.knowledge.core.application;
+package com.meta_claw.knowledge.core.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import com.meta_claw.knowledge.core.domain.AgentRoleBinding;
-import com.meta_claw.knowledge.core.domain.KnowledgeRegistryRepository;
+import com.meta_claw.knowledge.core.repository.KnowledgeRegistryRepository;
 
 @Slf4j
 @RequiredArgsConstructor
-public class ResolveKnowledgeSpaceUseCase {
+public class KnowledgeResolveSpaceService {
     private final KnowledgeRegistryRepository knowledgeRegistryRepository;
 
     public AgentRoleBinding execute(String roleName) {

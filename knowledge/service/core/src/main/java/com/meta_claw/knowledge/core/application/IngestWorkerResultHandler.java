@@ -1,18 +1,18 @@
-package com.meta_claw.knowledge.core.application;
+package com.meta_claw.knowledge.core.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import com.meta_claw.knowledge.core.domain.KnowledgeAsset;
 import com.meta_claw.knowledge.core.domain.KnowledgeControlState;
-import com.meta_claw.knowledge.core.domain.KnowledgeStateRepository;
+import com.meta_claw.knowledge.core.repository.KnowledgeStateRepository;
 import com.meta_claw.knowledge.core.domain.WorkerResult;
 
 import java.time.Instant;
 
 @Slf4j
 @RequiredArgsConstructor
-public class IngestWorkerResultUseCase {
+public class IngestWorkerResultService {
     private final KnowledgeStateRepository knowledgeStateRepository;
 
     public WorkerResult execute(WorkerResult workerResult) {
