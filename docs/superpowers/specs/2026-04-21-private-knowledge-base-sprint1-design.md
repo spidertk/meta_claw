@@ -49,8 +49,7 @@ meta_claw/
     contracts/
     examples/
     service/
-      java/
-        core/
+      core/
     workers/
       python/
   knowledge_shared/
@@ -62,7 +61,7 @@ meta_claw/
 
 - `.knowledge_registry.json`
   是角色到 external knowledge space 的唯一注册入口
-- `knowledge/service/java/core`
+- `knowledge/service/core`
   代表 `Java State Core` 的实现目录
 - `knowledge/workers/python`
   代表 Python worker 目录
@@ -137,7 +136,7 @@ meta_claw/
 
 ## 6. Java 骨架
 
-`knowledge/service/java/core` 本轮只落以下骨架。
+`knowledge/service/core` 本轮只落以下骨架。
 
 ### 6.1 Domain
 
