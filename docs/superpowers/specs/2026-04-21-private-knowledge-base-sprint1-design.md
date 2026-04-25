@@ -164,7 +164,7 @@ meta_claw/
 
 本轮只定义 4 个 application process：
 
-- `ResolveRoleBindingProcess`
+- `ResolveKnowledgeSpaceBindingProcess`
 - `RegisterSourceProcess`
 - `SubmitWorkerJobProcess`
 - `IngestWorkerResultProcess`

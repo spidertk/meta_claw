@@ -6,9 +6,9 @@ import com.meta_claw.knowledge.core.api.CoreController;
 import com.meta_claw.knowledge.core.api.req.SourceRegistrationRequest;
 import com.meta_claw.knowledge.core.application.IngestWorkerResultProcess;
 import com.meta_claw.knowledge.core.application.RegisterSourceProcess;
-import com.meta_claw.knowledge.core.application.ResolveRoleBindingProcess;
+import com.meta_claw.knowledge.core.application.ResolveKnowledgeSpaceBindingProcess;
 import com.meta_claw.knowledge.core.application.SubmitWorkerJobProcess;
-import com.meta_claw.knowledge.core.adapter.inbound.demo.SampleKnowledgeRegistryRepository;
+import com.meta_claw.knowledge.core.adapter.inbound.demo.SampleKnowledgeSpaceBindingRepository;
 import com.meta_claw.knowledge.core.adapter.inbound.demo.SampleKnowledgeStateRepository;
 import com.meta_claw.knowledge.core.adapter.inbound.demo.SampleSnapshotStoreRepository;
 import com.meta_claw.knowledge.core.adapter.inbound.demo.SampleSourceRegistryRepository;
@@ -20,13 +20,13 @@ import com.meta_claw.knowledge.core.adapter.inbound.demo.SampleSourceRegistryRep
  */
 public class CoreApplication {
     public static void main(String[] args) {
-        SampleKnowledgeRegistryRepository knowledgeRegistryRepository = new SampleKnowledgeRegistryRepository();
+        SampleKnowledgeSpaceBindingRepository knowledgeSpaceBindingRepository = new SampleKnowledgeSpaceBindingRepository();
         SampleSourceRegistryRepository sourceRegistryRepository = new SampleSourceRegistryRepository();
         SampleSnapshotStoreRepository snapshotStoreRepository = new SampleSnapshotStoreRepository();
         SampleKnowledgeStateRepository knowledgeStateRepository = new SampleKnowledgeStateRepository();
 
         CoreController controller = new CoreController(
-                new ResolveRoleBindingProcess(knowledgeRegistryRepository),
+                new ResolveKnowledgeSpaceBindingProcess(knowledgeSpaceBindingRepository),
                 new RegisterSourceProcess(sourceRegistryRepository, snapshotStoreRepository),
                 new SubmitWorkerJobProcess(),
                 new IngestWorkerResultProcess(knowledgeStateRepository)
