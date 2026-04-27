@@ -1,6 +1,11 @@
 plugins {
-    application
+    java
+    id("org.springframework.boot") version "3.3.0"
+    id("io.spring.dependency-management") version "1.1.5"
 }
+
+group = "com.meta-claw"
+version = "0.1.0-SNAPSHOT"
 
 java {
     toolchain {
@@ -13,15 +18,23 @@ repositories {
 }
 
 dependencies {
-    compileOnly("org.projectlombok:lombok:1.18.38")
-    annotationProcessor("org.projectlombok:lombok:1.18.38")
-    implementation("com.yomahub:liteflow-core:2.12.0")
-    implementation("com.fasterxml.jackson.core:jackson-databind:2.17.2")
-    implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.17.2")
-    implementation("org.slf4j:slf4j-api:2.0.17")
-    runtimeOnly("org.slf4j:slf4j-simple:2.0.17")
+    compileOnly("org.projectlombok:lombok")
+    annotationProcessor("org.projectlombok:lombok")
+
+    implementation("com.yomahub:liteflow-spring-boot-starter:2.12.0")
+    implementation("com.fasterxml.jackson.core:jackson-databind")
+    implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")
+
+    implementation("org.springframework.boot:spring-boot-starter-web")
+
+    testImplementation("org.springframework.boot:spring-boot-starter-test")
+    testImplementation("org.assertj:assertj-core:3.26.0")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
-application {
-    mainClass.set("com.meta_claw.knowledge.core.CoreApplication")
+tasks.withType<Test> {
+    useJUnitPlatform()
+    testLogging {
+        events("passed", "skipped", "failed")
+    }
 }

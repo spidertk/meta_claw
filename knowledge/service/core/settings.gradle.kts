@@ -1,1 +1,1 @@
-rootProject.name = "knowledge-java-core"
+rootProject.name = "knowledge-core"
