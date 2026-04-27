@@ -4,11 +4,11 @@ This module contains the Sprint 1 skeleton for the Java state core.
 
 Current scope:
 
-- role-to-space resolution from `.knowledge_registry.json`
+- role-to-space resolution through the repository/facade main path
 - domain records aligned with `knowledge/contracts`
 - repository interfaces
-- sample repository implementations
-- minimal use case and API skeletons
+- demo and JSONL file repository implementations
+- LiteFlow facade + chain/node application orchestration
 - internal worker transport models kept separate from external API requests
 
 This round does not include database persistence or production orchestration.
