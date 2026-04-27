@@ -41,11 +41,16 @@ public class SampleKnowledgeStateRepository implements KnowledgeStateRepository 
     public List<KnowledgeAsset> findAssetsBySourceId(String sourceId) {
         List<KnowledgeAsset> result = new ArrayList<>();
         for (KnowledgeAsset asset : assets.values()) {
-            if (asset.getSourceId().equals(sourceId)) {
+            if (sourceId.equals(asset.getSourceId())) {
                 result.add(asset);
             }
         }
         log.debug("Resolved {} assets for source {}", result.size(), sourceId);
         return result;
+    }
+
+    @Override
+    public List<KnowledgeAsset> findAll() {
+        return new ArrayList<>(assets.values());
     }
 }

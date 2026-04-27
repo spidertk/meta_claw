@@ -16,4 +16,6 @@ public interface KnowledgeStateRepository {
     Optional<KnowledgeControlState> findControlStateByAssetId(String assetId);
 
     List<KnowledgeAsset> findAssetsBySourceId(String sourceId);
+
+    List<KnowledgeAsset> findAll();
 }

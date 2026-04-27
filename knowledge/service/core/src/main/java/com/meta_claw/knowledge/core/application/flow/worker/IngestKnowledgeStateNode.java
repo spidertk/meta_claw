@@ -1,13 +1,10 @@
 package com.meta_claw.knowledge.core.application.flow.worker;
 
 import com.meta_claw.knowledge.core.application.flow.context.IngestWorkerResultFlowContext;
-import com.meta_claw.knowledge.core.domain.KnowledgeAsset;
-import com.meta_claw.knowledge.core.domain.KnowledgeControlState;
+import com.meta_claw.knowledge.core.application.state.KnowledgeStatePersister;
 import com.meta_claw.knowledge.core.domain.WorkerResult;
 import com.yomahub.liteflow.core.NodeComponent;
 import lombok.extern.slf4j.Slf4j;
-
-import java.time.Instant;
 
 @Slf4j
 public class IngestKnowledgeStateNode extends NodeComponent {
@@ -16,16 +13,16 @@ public class IngestKnowledgeStateNode extends NodeComponent {
     public void process() {
         IngestWorkerResultFlowContext context = this.getContextBean(IngestWorkerResultFlowContext.class);
         WorkerResult workerResult = context.getWorkerResult();
-        for (KnowledgeAsset asset : workerResult.getArtifacts()) {
-            context.getRuntimeDependencies().getKnowledgeStateRepository().saveAsset(asset);
-            context.getRuntimeDependencies().getKnowledgeStateRepository().saveControlState(KnowledgeControlState.builder()
-                    .spaceId(workerResult.getSpaceId())
-                    .assetId(asset.getAssetId())
-                    .reviewStatus(asset.getStatus())
-                    .issues(workerResult.getIssues())
-                    .updatedAt(Instant.now())
-                    .build());
+        if (workerResult == null || workerResult.getArtifacts() == null) {
+            log.warn("No worker result or artifacts to ingest");
+            return;
         }
+
+        KnowledgeStatePersister persister = new KnowledgeStatePersister(
+                context.getRuntimeDependencies().getKnowledgeStateRepository()
+        );
+        persister.persistAll(workerResult.getSpaceId(), workerResult.getJobId(), workerResult.getArtifacts());
+
         log.info("Ingested worker result {} for space {}", workerResult.getJobId(), workerResult.getSpaceId());
     }
 }
