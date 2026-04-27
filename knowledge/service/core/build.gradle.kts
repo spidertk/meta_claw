@@ -21,7 +21,7 @@ dependencies {
     compileOnly("org.projectlombok:lombok")
     annotationProcessor("org.projectlombok:lombok")
 
-    implementation("com.yomahub:liteflow-spring-boot-starter:2.12.0")
+    implementation("com.yomahub:liteflow-core:2.12.0")
     implementation("com.fasterxml.jackson.core:jackson-databind")
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")
 

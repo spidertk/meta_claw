@@ -9,7 +9,7 @@ public final class TestFixtures {
 
     public static SourceRegistrationRequest sampleRepoRequest() {
         return SourceRegistrationRequest.builder()
-                .roleName("test_role")
+                .roleName("finance_advisor")
                 .sourceType("git_repository")
                 .location("src/test/resources/samples/sample-repo")
                 .displayName("sample_repo")
