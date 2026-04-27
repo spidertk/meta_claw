@@ -29,4 +29,14 @@ public class SnapshotRecord {
     private Instant capturedAt;
     /** 本次快照下的可追踪内容单元引用。 */
     private List<UnitRef> units;
+    /** 当前快照扫描覆盖状态，例如 complete、partial、truncated 或 failed。 */
+    private String scanStatus;
+    /** 单批扫描最多纳入的子单元数量。 */
+    private int unitLimit;
+    /** 当前快照实际写入的 UnitRef 数量，包含根单元。 */
+    private int includedUnitCount;
+    /** 当前快照已经完成的扫描批次数。 */
+    private int scanBatchCount;
+    /** 下一批扫描的稳定游标；没有后续批次时为 null。 */
+    private String nextScanCursor;
 }

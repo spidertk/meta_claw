@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<flow>
+    <chain name="registerSourceChain">
+        THEN(
+            resolveKnowledgeSpaceNode,
+            buildSourceRecordNode,
+            loadLatestSnapshotNode,
+            createSnapshotNode,
+            decideUnchangedNode,
+            persistChangedSourceAndSnapshotNode,
+            persistUnchangedSourceNode,
+            buildSourceRegistrationResultNode
+        );
+    </chain>
+
+    <chain name="resumeSnapshotScanChain">
+        THEN(
+            loadSourceForResumeNode,
+            loadLatestSnapshotForResumeNode,
+            decideResumeNeededNode,
+            createNextSnapshotNode,
+            persistResumedSnapshotNode,
+            buildResumeResultNode
+        );
+    </chain>
+
+    <chain name="submitWorkerJobChain">
+        THEN(
+            resolveWorkerKnowledgeSpaceNode,
+            buildWorkerJobNode,
+            submitWorkerJobNode,
+            buildSubmitWorkerJobResultNode
+        );
+    </chain>
+
+    <chain name="ingestWorkerResultChain">
+        THEN(
+            readWorkerResultEnvelopeNode,
+            ingestKnowledgeStateNode,
+            buildIngestWorkerResultNode
+        );
+    </chain>
+</flow>

@@ -10,7 +10,12 @@
     "source_id",
     "content_fingerprint",
     "captured_at",
-    "units"
+    "units",
+    "scan_status",
+    "unit_limit",
+    "included_unit_count",
+    "scan_batch_count",
+    "next_scan_cursor"
   ],
   "properties": {
     "space_id": {
@@ -34,6 +39,33 @@
       "items": {
         "$ref": "./unit-ref.schema.json"
       }
+    },
+    "scan_status": {
+      "type": "string",
+      "enum": [
+        "complete",
+        "partial",
+        "truncated",
+        "failed"
+      ]
+    },
+    "unit_limit": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "included_unit_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "scan_batch_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "next_scan_cursor": {
+      "type": [
+        "string",
+        "null"
+      ]
     }
   }
 }

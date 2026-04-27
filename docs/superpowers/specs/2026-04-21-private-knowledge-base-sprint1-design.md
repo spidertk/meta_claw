@@ -10,6 +10,15 @@
 
 本设计只覆盖 `Sprint 1：状态骨架和契约骨架`。
 
+截至 2026-04-25，当前代码基线位于 `knowledge/`：
+
+- Java state core 位于 `knowledge/service/core`
+- Python worker stub 位于 `knowledge/workers/python`
+- 共享 contract 位于 `knowledge/contracts`
+- 共享 example 位于 `knowledge/examples`
+
+后续判断文档与实现是否一致时，以 `knowledge/service/core` 中的 Java domain、repository、application process，以及 `knowledge/workers/python/worker_entry.py` 的当前行为为准。
+
 本轮目标是固定后续不应轻易推翻的边界：
 
 - 共享 schema
@@ -123,7 +132,7 @@ meta_claw/
 - 只有 Java 能修改：
   - `.knowledge_registry.json`
   - `source_registry`
-    负责来源稳定身份、当前状态和 `latest_snapshot_id`
+    负责来源稳定身份、当前状态和 `latest_snapshot_id` 概念；Java 代码中对应字段名为 `latestSnapshotId`
   - `snapshot_store`
     负责按 `source_id` 关联的不可变快照历史
   - `knowledge_state`
@@ -155,10 +164,16 @@ meta_claw/
 要求：
 
 - 所有核心状态必须带 `space_id`
-- 字段与 contract 一一对应
-- 不引入 contract 外的核心语义字段
+- 字段优先与 contract 对齐；若代码因后续边界修正新增字段，应在文档中显式记录并后续同步 contract
+- 不引入未被文档记录的 contract 外核心语义字段
 - 先使用内存 repository stub
 - 本轮所有新增和修改代码都必须补齐职责清晰的中文注释
+
+当前实现说明：
+
+- `SourceRecord` 已包含 `latestSnapshotId`，用于表达当前最新快照派生指针
+- `source-registry.schema.json` 与 `source-registry.example.json` 已包含 `latest_snapshot_id`
+- 因此当前真实基线是 Java domain/application、contract 和 example 已对齐 source/snapshot 当前快照指针语义
 
 ### 6.2 Application
 
@@ -175,6 +190,13 @@ meta_claw/
 - 注册来源
 - 生成 worker job
 - ingest worker result 并更新状态
+
+当前实现说明：
+
+- `ResolveKnowledgeSpaceBindingProcess` 通过 `KnowledgeSpaceBindingRepository` 解析 `roleName -> spaceId`
+- `RegisterSourceProcess` 已协调 `SourceRegistryRepository` 与 `SnapshotStoreRepository`，并维护 `latestSnapshotId`
+- `SubmitWorkerJobProcess` 当前仍是最小返回式骨架
+- `IngestWorkerResultProcess` 当前负责把 worker result 写入 knowledge state repository
 
 ### 6.3 API
 
@@ -246,6 +268,13 @@ meta_claw/
 - 至少一条成功样例和一条失败样例可跑通
 - role -> `space_id` -> source -> job -> result -> state 的追踪关系存在
 
+当前实现校准：
+
+- Java domain、repository interface、sample repository、application process 和 API request/transport model 已落在 `knowledge/service/core`
+- Python stub 已落在 `knowledge/workers/python/worker_entry.py`，行为是读取 job fixture 并输出成功或失败 result fixture
+- 真实持久化、真实 graph/wiki、真实 diff 仍未实现
+- contract/example 与 Java `latestSnapshotId` 语义已对齐，后续继续推进逻辑时应保持 JSON 使用 `latest_snapshot_id`、Java 使用 `latestSnapshotId`
+
 ## 11. 明确不做
 
 本轮坚决不做：
@@ -287,4 +316,4 @@ meta_claw/
 - Python worker stub
 - 最小假链路
 
-只有这五件事完成，`Sprint 2` 才值得开始。
+只有上述边界保持对齐后，`Sprint 2` 才值得开始。

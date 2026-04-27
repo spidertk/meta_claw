@@ -13,7 +13,7 @@ import java.util.List;
 @SuperBuilder(toBuilder = true)
 @NoArgsConstructor
 @AllArgsConstructor
-public class SubmitWorkerJobRequest {
+public class SubmitWorkerJobRequest implements RoleScopedRequest {
     private String roleName;
     private String jobId;
     private String jobType;

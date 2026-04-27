@@ -25,5 +25,10 @@
       "display_name": "private-knowledge-base-design",
       "neighbors": []
     }
-  ]
+  ],
+  "scan_status": "complete",
+  "unit_limit": 512,
+  "included_unit_count": 2,
+  "scan_batch_count": 1,
+  "next_scan_cursor": null
 }

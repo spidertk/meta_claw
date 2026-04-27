@@ -13,7 +13,7 @@ import java.time.Instant;
 @SuperBuilder(toBuilder = true)
 @NoArgsConstructor
 @AllArgsConstructor
-public class SourceRegistrationRequest {
+public class SourceRegistrationRequest implements RoleScopedRequest {
     private String roleName;
     private String sourceId;
     private String sourceType;

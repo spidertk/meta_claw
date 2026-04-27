@@ -13,6 +13,16 @@
 
 执行重心放在 `Phase 1`。`Phase 2` 保持里程碑级约束，不在本轮细拆到同等粒度。
 
+截至 2026-04-25，`knowledge/` 当前实现已经完成一部分 Sprint 1/Sprint 2 边界骨架：
+
+- `knowledge/service/core` 是唯一 Java state core 目录
+- `knowledge/workers/python/worker_entry.py` 是当前 Python worker stub
+- Java domain 已包含 `SourceRecord.latestSnapshotId`
+- `RegisterSourceProcess` 已实现 source 注册、快照生成、未变化复用和 `latestSnapshotId` 回写的内存骨架
+- `source-registry.schema.json` 与 `source-registry.example.json` 已通过 `latest_snapshot_id` 对齐 Java `latestSnapshotId` 语义
+
+后续执行计划以代码事实为准：已在 Java 骨架中体现的逻辑不再描述为“完全未实现”，但生产级持久化、真实 ingest、真实 diff、graph/wiki 产出仍视为未完成。
+
 核心原则：
 
 - 先立 `registry + space_id`
@@ -87,7 +97,7 @@ Java 负责：
 - `.knowledge_registry.json`
 - `/meta_claw/knowledge_shared` 的 shared space 解析
 - `source_registry`
-  持有来源稳定身份、当前状态和 `latest_snapshot_id`
+  持有来源稳定身份、当前状态和 `latest_snapshot_id` 概念；Java 字段名为 `latestSnapshotId`
 - `snapshot_store`
   持有按 `source_id` 关联的不可变快照历史
 - `knowledge_state`
@@ -123,6 +133,14 @@ Python 负责：
 - `.rwa` 来源进入系统
 - snapshot 正常落盘
 - `unchanged / changed` 判定可用
+
+当前状态校准：
+
+- Java 内存骨架已能生成 snapshot、维护 `latestSnapshotId`，并通过 content fingerprint 判断 `unchanged`
+- `SourceSnapshotScanner` 已按文件内容 hash 和目录相对路径/文件内容 hash 生成 `contentFingerprint`
+- 目录快照已生成根 `UnitRef` 和最多 `SourceIntakeConfig` 指定数量的文件 `UnitRef`，文件单元挂到根单元下
+- “正常落盘”仍未完成；当前 sample repository 是内存实现
+- `.rwa` 来源目录规则与真实来源扫描仍未完成
 
 #### M3. graph/wiki 最小闭环
 
@@ -211,17 +229,38 @@ Python 负责：
 
 - 跑通来源进入系统并形成稳定快照
 
+当前实现基线：
+
+- 已有 `RegisterSourceProcess`、`SourceRegistryRepository`、`SnapshotStoreRepository` 和内存 sample adapter
+- 已有基于 Jackson JSON Lines 的本地 `FileSourceRegistryRepository` 与 `FileSnapshotStoreRepository`
+- 已有 `SourceSnapshotScanner` 生成 `sourceId`、内容型 `contentFingerprint`、`snapshotId` 与目录文件级 `UnitRef`
+- 已有 `SourceRecord.latestSnapshotId` 回写逻辑
+- 当前目录扫描上限已作为单批安全阈值落地，`SnapshotRecord`、contract、example 和 `SourceSnapshotScanner` 已包含 `scanStatus`、`unitLimit`、`includedUnitCount`、`scanBatchCount`、`nextScanCursor`；`unitLimit` 由 `SourceIntakeConfig` 提供
+- 已完成 LiteFlow POC，并通过 `KnowledgeFlowFacade` 跑通四条主链路：`registerSource`、`resumeSnapshotScan`、`submitWorkerJob`、`ingestWorkerResult`
+- 已通过 `FlowRuntimeDependencies` 收敛 LiteFlow 运行时依赖，当前不再在各条 chain context 中平铺 repository/config
+- 尚未实现真实 `.rwa` 来源规则、真实文件/目录/仓库扫描、持久化落盘和 production API
+- `source-registry.schema.json` 与 example 已补上 `latest_snapshot_id`
+
 任务：
 
-- 实现 role -> `space_id` 解析入口
+- 已为 `snapshot_store` 补充扫描覆盖字段：
+  - `scan_status`
+  - `unit_limit`
+  - `included_unit_count`
+  - `scan_batch_count`
+- 当前批次大小由 `SourceIntakeConfig` 明确定义，而不是写死在方法内部
+- 已补充最小 batch cursor：`next_scan_cursor`
+- 已补充 `ResumeSnapshotScanProcess`，每次调用可从 `next_scan_cursor` 继续生成一批新 snapshot
+- 后续补充 loop-to-complete 调度，使超大来源能多批补全到 `scan_status=complete`
+- 巩固 role -> `space_id` 解析入口
 - 定义 `.rwa` 来源目录规则
 - 定义来源登记命令接口
 - 支持本地文件、目录、仓库、受控外链副本录入
-- 实现 `source_id` 生成规则
-- 实现 `content_fingerprint` 生成规则
-- 实现 `source_registry.latest_snapshot_id` 回写规则
-- 实现 `snapshot_store` 写入
-- 实现 `unit_ref` 父子/邻接关系落盘
+- 巩固 `source_id` 生成规则
+- 继续巩固 `content_fingerprint` 生成规则，后续补充超大文件流式 hash 与忽略目录策略
+- 巩固 `source_registry.latest_snapshot_id` 回写规则
+- 已将 `source_registry`、`snapshot_store` 与其中的 `unit_ref` 父子/邻接关系升级为明确的本地 JSONL 文件存储
+- 后续将本地 JSONL 存储路径接入 `.knowledge_registry.json` 或 `.rwa` 配置
 - 实现最小 diff 判定：
   - `new_source`
   - `unchanged`
@@ -232,6 +271,7 @@ Python 负责：
 - `.rwa` 目录与元数据规范
 - source intake 接口定义
 - snapshot 样例
+- scan coverage 样例
 - 样本来源：
   - 一个本地仓库
   - 一个 PDF 或长文档

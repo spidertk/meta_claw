@@ -223,6 +223,18 @@
 - 修正示例装配代码，确保 demo 链路能体现 `latestSnapshotId` 语义
 - 同步修正已有设计文档和实现文档中的 source/snapshot 定义
 
+截至 2026-04-25 的代码事实：
+
+- `SourceRecord.latestSnapshotId` 已存在
+- `RegisterSourceProcess` 已维护首次写入、变化写入、未变化复用三类内存骨架逻辑
+- `SourceRegistryRepository` 与 `SnapshotStoreRepository` 已分离
+- `SourceSnapshotScanner` 已使用内容型 fingerprint，并为目录生成根单元和文件单元
+- 当前目录扫描上限应作为单批 batch size，后续由 `scanStatus` 和覆盖计数字段表达是否完整
+- sample adapter 仍是内存实现，不代表真实持久化
+- `source-registry.schema.json` 与 `source-registry.example.json` 已包含 `latest_snapshot_id`
+
+因此本文后续作为边界说明仍有效，后续重点转为真实持久化和来源扫描，而不是字段语义补齐。
+
 本轮不做：
 
 - 真实持久化层重构
@@ -264,6 +276,12 @@
 - demo 链路能验证：
   - 首次注册生成 snapshot，并回写 `latestSnapshotId`
   - 重复注册且内容未变时不生成新 snapshot，`latestSnapshotId` 不变
+
+当前验收状态：
+
+- Java 代码层面已满足 source/snapshot 分离和 `latestSnapshotId` 回写语义
+- repository 仍是内存 sample，不能视为生产持久化验收
+- contract/example 已同步 `latest_snapshot_id`，可视为当前字段层面的跨语言 contract 验收完成
 
 ## 9. 风险与取舍
 
