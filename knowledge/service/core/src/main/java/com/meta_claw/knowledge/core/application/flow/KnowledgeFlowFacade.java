@@ -78,6 +78,14 @@ public class KnowledgeFlowFacade {
         return resultContext.getResultSnapshot();
     }
 
+    public SnapshotRecord resumeSnapshotScan(String sourceId) {
+        return resumeSnapshotScan(
+                ResumeSnapshotScanFlowContext.builder()
+                        .sourceId(sourceId)
+                        .build()
+        );
+    }
+
     public WorkerJob submitWorkerJob(SubmitWorkerJobFlowContext context) {
         SubmitWorkerJobFlowContext resultContext = execute(
                 "submitWorkerJobChain",
