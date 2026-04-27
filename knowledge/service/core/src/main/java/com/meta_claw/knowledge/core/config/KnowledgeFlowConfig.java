@@ -15,23 +15,32 @@ import org.springframework.context.annotation.Configuration;
 public class KnowledgeFlowConfig {
 
     @Bean
-    public KnowledgeFlowFacade knowledgeFlowFacade() {
+    public SampleKnowledgeStateRepository sampleKnowledgeStateRepository() {
+        return new SampleKnowledgeStateRepository();
+    }
+
+    @Bean
+    public SampleKnowledgeSpaceBindingRepository sampleKnowledgeSpaceBindingRepository() {
+        return new SampleKnowledgeSpaceBindingRepository();
+    }
+
+    @Bean
+    public KnowledgeFlowFacade knowledgeFlowFacade(SampleKnowledgeStateRepository stateRepo,
+                                                    SampleKnowledgeSpaceBindingRepository bindingRepo) {
         KnowledgeFlowExecutor executor = new KnowledgeFlowExecutor();
         return new KnowledgeFlowFacade(
                 executor.getFlowExecutor(),
-                new SampleKnowledgeSpaceBindingRepository(),
+                bindingRepo,
                 new SampleSourceRegistryRepository(),
                 new SampleSnapshotStoreRepository(),
-                new SampleKnowledgeStateRepository(),
+                stateRepo,
                 SourceIntakeConfig.defaultConfig()
         );
     }
 
     @Bean
-    public AgentViewBuilder agentViewBuilder() {
-        return new AgentViewBuilder(
-                new SampleKnowledgeSpaceBindingRepository(),
-                new SampleKnowledgeStateRepository()
-        );
+    public AgentViewBuilder agentViewBuilder(SampleKnowledgeStateRepository stateRepo,
+                                              SampleKnowledgeSpaceBindingRepository bindingRepo) {
+        return new AgentViewBuilder(bindingRepo, stateRepo);
     }
 }

@@ -12,18 +12,25 @@ def run_graphify(source_dir: Path, output_dir: Path) -> dict[str, Any]:
     调用 graphify 分析 source_dir，产出 graph.json 到 output_dir。
     若 graphify 未安装，则产出一个最小占位 graph。
     """
-    graph_file = output_dir / "graph.json"
+    graphify_out = source_dir / "graphify-out"
+    graph_file = graphify_out / "graph.json"
 
-    # 尝试调用 graphify CLI（假设已安装为系统命令）
+    # 尝试调用 graphify CLI: graphify update <source_dir>
     try:
         result = subprocess.run(
-            ["graphify", str(source_dir), "--output", str(graph_file)],
+            ["graphify", "update", str(source_dir)],
             capture_output=True,
             text=True,
-            timeout=120,
+            timeout=300,
         )
         if result.returncode == 0 and graph_file.exists():
-            return json.loads(graph_file.read_text(encoding="utf-8"))
+            graph_data = json.loads(graph_file.read_text(encoding="utf-8"))
+            # 同时复制到 output_dir 以便归档
+            output_dir.mkdir(parents=True, exist_ok=True)
+            (output_dir / "graph.json").write_text(
+                json.dumps(graph_data, indent=2), encoding="utf-8"
+            )
+            return graph_data
     except (FileNotFoundError, subprocess.TimeoutExpired):
         pass
 
@@ -35,7 +42,9 @@ def run_graphify(source_dir: Path, output_dir: Path) -> dict[str, Any]:
         "communities": [],
     }
     output_dir.mkdir(parents=True, exist_ok=True)
-    graph_file.write_text(json.dumps(placeholder, indent=2), encoding="utf-8")
+    (output_dir / "graph.json").write_text(
+        json.dumps(placeholder, indent=2), encoding="utf-8"
+    )
     return placeholder
 
 
