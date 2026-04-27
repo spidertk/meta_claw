@@ -24,6 +24,7 @@ import java.util.List;
  * 本地演示入口。
  * 这里只负责装配 sample repository 和 flow facade，便于验证骨架链路，不代表最终运行时装配方式。
  */
+@Deprecated(since = "2026-04-27", forRemoval = true)
 public class CoreApplication {
     public static void main(String[] args) {
         Path demoStoreRoot = Path.of(System.getProperty("user.home"), "IdeaProjects", "meta_claw", "knowledge", "demo-store");
