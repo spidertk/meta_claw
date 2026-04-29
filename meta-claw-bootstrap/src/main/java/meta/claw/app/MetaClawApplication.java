@@ -4,7 +4,7 @@ import meta.claw.gateway.Gateway;
 import meta.claw.gateway.weixin.WeixinChannel;
 import meta.claw.runtime.AgentLoop;
 import meta.claw.runtime.ExpertManager;
-import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.chat.ChatClient;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -36,10 +36,10 @@ public class MetaClawApplication implements CommandLineRunner {
     private ExpertManager expertManager;
 
     /**
-     * Spring AI ChatModel，由 spring-ai-openai-spring-boot-starter 自动配置注入
+     * Spring AI ChatClient，由 spring-ai-openai-spring-boot-starter 自动配置注入
      */
     @Autowired
-    private ChatModel chatModel;
+    private ChatClient chatClient;
 
     /**
      * 网关中央控制器，负责渠道注册与消息路由
@@ -84,7 +84,7 @@ public class MetaClawApplication implements CommandLineRunner {
     @Override
     public void run(String... args) {
         // 步骤 1：为所有已加载的 Expert 创建运行时实例
-        appConfig.initializeRuntimes(expertManager, chatModel);
+        appConfig.initializeRuntimes(expertManager, chatClient);
 
         // 步骤 2：注册并启动微信渠道
         gateway.registerChannel(weixinChannel);

@@ -11,7 +11,7 @@ import meta.claw.runtime.ExpertRuntime;
 import meta.claw.runtime.model.ExpertConfig;
 import meta.claw.session.SessionManager;
 import meta.claw.session.storage.InMemorySessionStorage;
-import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.chat.ChatClient;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -170,11 +170,11 @@ public class AppConfig {
      * </p>
      *
      * @param expertManager Expert 管理器，包含已加载的 Expert 配置
-     * @param chatModel     Spring AI ChatModel，底层 AI 模型接口
+     * @param chatClient    Spring AI ChatClient，底层 AI 模型对话客户端
      */
-    public void initializeRuntimes(ExpertManager expertManager, ChatModel chatModel) {
+    public void initializeRuntimes(ExpertManager expertManager, ChatClient chatClient) {
         for (ExpertConfig config : expertManager.listAvailableExperts()) {
-            ExpertRuntime runtime = new ExpertRuntime(config, chatModel);
+            ExpertRuntime runtime = new ExpertRuntime(config, chatClient);
             expertManager.registerRuntime(config.getId(), runtime);
         }
     }

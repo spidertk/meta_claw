@@ -4,8 +4,7 @@ import lombok.extern.slf4j.Slf4j;
 import meta.claw.core.model.Reply;
 import meta.claw.core.model.ReplyType;
 import meta.claw.runtime.model.ExpertConfig;
-import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.chat.ChatClient;
 
 /**
  * Expert 核心运行时类
@@ -29,20 +28,14 @@ public class ExpertRuntime {
     private final ChatClient chatClient;
 
     /**
-     * 构造方法：根据 Expert 配置和 ChatModel 初始化运行时实例
-     * <p>
-     * 使用 ChatClient.builder 构建器模式创建 ChatClient 实例，
-     * 并将配置中的系统提示词（systemPrompt）设置为默认系统消息。
-     * </p>
+     * 构造方法：根据 Expert 配置和 ChatClient 初始化运行时实例
      *
-     * @param config    Expert 配置对象，包含系统提示词等元数据
-     * @param chatModel Spring AI ChatModel，底层 AI 模型接口
+     * @param config     Expert 配置对象，包含系统提示词等元数据
+     * @param chatClient Spring AI ChatClient，底层 AI 模型对话客户端
      */
-    public ExpertRuntime(ExpertConfig config, ChatModel chatModel) {
+    public ExpertRuntime(ExpertConfig config, ChatClient chatClient) {
         this.config = config;
-        this.chatClient = ChatClient.builder(chatModel)
-                .defaultSystem(config.getSystemPrompt())
-                .build();
+        this.chatClient = chatClient;
         log.info("ExpertRuntime 初始化完成: expertId={}, model={}, systemPromptLength={}",
                 config.getId(), config.getModel(),
                 config.getSystemPrompt() != null ? config.getSystemPrompt().length() : 0);
@@ -64,11 +57,8 @@ public class ExpertRuntime {
                 config.getId(), userMessage != null ? userMessage.length() : 0);
 
         try {
-            // 通过 ChatClient 构建 Prompt 并调用 AI 模型获取回复内容
-            String response = chatClient.prompt()
-                    .user(userMessage)
-                    .call()
-                    .content();
+            // 通过 ChatClient 直接调用 AI 模型获取回复内容
+            String response = chatClient.call(userMessage);
 
             log.debug("Expert 成功获取 AI 回复: expertId={}, responseLength={}",
                     config.getId(), response != null ? response.length() : 0);
