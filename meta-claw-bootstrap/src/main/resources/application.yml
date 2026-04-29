@@ -1,0 +1,32 @@
+# Meta-Claw 主配置文件
+# 包含 Spring 应用基础配置、Spring AI OpenAI 配置、Meta-Claw 业务配置及日志级别配置
+
+spring:
+  application:
+    # 应用名称，用于服务标识和监控
+    name: meta-claw
+
+  ai:
+    openai:
+      # OpenAI API 密钥，优先从环境变量 OPENAI_API_KEY 读取
+      api-key: ${OPENAI_API_KEY:}
+      # OpenAI API 基础地址，默认使用官方地址，可通过环境变量覆盖
+      base-url: ${OPENAI_BASE_URL:https://api.openai.com}
+      chat:
+        options:
+          # 默认使用的对话模型
+          model: gpt-3.5-turbo
+
+meta:
+  claw:
+    weixin:
+      # 微信渠道认证令牌，用于 openilink SDK 登录，优先从环境变量 WEIXIN_TOKEN 读取
+      token: ${WEIXIN_TOKEN:}
+    experts:
+      # Expert 配置目录，系统启动时会扫描该目录下的子目录及 expert.yaml 文件
+      dir: ./experts
+
+logging:
+  level:
+    # Meta-Claw 包下所有类的日志级别设为 DEBUG，便于开发调试和问题排查
+    meta.claw: DEBUG
