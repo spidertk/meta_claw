@@ -63,21 +63,6 @@
 - 领域深度和广度应由图谱分析信号驱动
 - 增量维护必须围绕快照、diff 和受影响范围传播设计
 
-### 2.4 `.rwa/expert_project` knowledge 设计
-
-该实现提供了一个值得继承、但不能原样照搬的知识治理思路。
-
-现有能力包括：
-
-- 基于 Git 的历史、分支、回滚和审计
-- 基于 LLM 的分类、矛盾检测和人工确认入口
-- 面向 agent 的 `acquire / retrieve / read / list / history / branch` 能力接口
-
-继承原则：
-
-- 必须继承 `history / branch / manual review / time-truth` 这些治理机制
-- 不能把 markdown 条目仓直接当作最终知识中台主模型
-- `expert` 当前 prompt 中“知识目录注入”的方式只能作为过渡能力，不能作为长期 agent 消费主模式
 
 ## 3. 产品目标与接入优先级
 
