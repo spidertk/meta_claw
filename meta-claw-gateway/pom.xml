@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- 
+    Meta-Claw Gateway 模块 POM
+    作用：定义系统对外交互的通用网关抽象、协议适配、消息路由等
+    依赖：meta-claw-core（复用核心工具类）
+    被依赖：meta-claw-gateway-weixin、meta-claw-bootstrap
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                             http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- 继承父 POM，统一版本和依赖管理 -->
+    <parent>
+        <groupId>com.meta</groupId>
+        <artifactId>meta-claw</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+    </parent>
+
+    <!-- 当前模块坐标 -->
+    <artifactId>meta-claw-gateway</artifactId>
+    <name>Meta-Claw Gateway</name>
+    <description>通用网关模块，提供对外交互的抽象与协议适配能力</description>
+
+    <dependencies>
+        <!-- 依赖核心模块，复用基础工具与公共类 -->
+        <dependency>
+            <groupId>com.meta</groupId>
+            <artifactId>meta-claw-core</artifactId>
+        </dependency>
+        <!-- Lombok：通过注解减少样板代码 -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+
+</project>

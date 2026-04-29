@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- 
+    Meta-Claw Core 模块 POM
+    作用：提供系统基础工具、公共常量、通用工具类等核心基础设施
+    被依赖：meta-claw-session、meta-claw-gateway、meta-claw-runtime、meta-claw-bootstrap
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                             http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- 继承父 POM，统一版本和依赖管理 -->
+    <parent>
+        <groupId>com.meta</groupId>
+        <artifactId>meta-claw</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+    </parent>
+
+    <!-- 当前模块坐标 -->
+    <artifactId>meta-claw-core</artifactId>
+    <name>Meta-Claw Core</name>
+    <description>核心基础模块，提供通用工具与基础设施</description>
+
+    <dependencies>
+        <!-- Guava：Google 开源的 Java 核心工具库，提供集合、缓存、并发等增强 -->
+        <dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+        </dependency>
+        <!-- Lombok：通过注解自动生成 getter/setter/构造器等，减少样板代码 -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+
+</project>

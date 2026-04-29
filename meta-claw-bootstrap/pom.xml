@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- 
+    Meta-Claw Bootstrap 模块 POM
+    作用：系统启动入口模块，整合所有子模块并对外提供可运行的 Spring Boot 应用
+    依赖：所有子模块（core、session、gateway、gateway-weixin、runtime）
+          + Spring Boot 启动器 + Spring AI OpenAI 启动器
+    注意：此模块为可执行 jar 的打包入口
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                             http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- 继承父 POM，统一版本和依赖管理 -->
+    <parent>
+        <groupId>com.meta</groupId>
+        <artifactId>meta-claw</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+    </parent>
+
+    <!-- 当前模块坐标 -->
+    <artifactId>meta-claw-bootstrap</artifactId>
+    <name>Meta-Claw Bootstrap</name>
+    <description>系统启动模块，聚合所有子模块并提供可运行的 Spring Boot 应用入口</description>
+
+    <dependencies>
+        <!-- 依赖核心基础模块 -->
+        <dependency>
+            <groupId>com.meta</groupId>
+            <artifactId>meta-claw-core</artifactId>
+        </dependency>
+        <!-- 依赖会话管理模块 -->
+        <dependency>
+            <groupId>com.meta</groupId>
+            <artifactId>meta-claw-session</artifactId>
+        </dependency>
+        <!-- 依赖通用网关模块 -->
+        <dependency>
+            <groupId>com.meta</groupId>
+            <artifactId>meta-claw-gateway</artifactId>
+        </dependency>
+        <!-- 依赖微信网关模块 -->
+        <dependency>
+            <groupId>com.meta</groupId>
+            <artifactId>meta-claw-gateway-weixin</artifactId>
+        </dependency>
+        <!-- 依赖运行时引擎模块 -->
+        <dependency>
+            <groupId>com.meta</groupId>
+            <artifactId>meta-claw-runtime</artifactId>
+        </dependency>
+        <!-- Spring Boot 启动器：提供 Spring Boot 核心自动配置能力 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter</artifactId>
+        </dependency>
+        <!-- Spring Boot Web 启动器：提供 Web 服务能力 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <!-- Spring AI OpenAI 启动器：集成 OpenAI 模型能力 -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-openai-spring-boot-starter</artifactId>
+        </dependency>
+        <!-- Lombok：通过注解减少样板代码 -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!-- Spring Boot Maven 插件：打包可执行 fat-jar -->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>

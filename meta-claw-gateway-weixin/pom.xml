@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- 
+    Meta-Claw Gateway Weixin 模块 POM
+    作用：微信公众号/小程序等微信生态的专属网关实现
+    依赖：
+        - meta-claw-gateway（复用通用网关抽象）
+        - meta-claw-session（复用会话管理能力）
+        - openilink-sdk-java（微信开放平台 SDK）
+    被依赖：meta-claw-bootstrap
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                             http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- 继承父 POM，统一版本和依赖管理 -->
+    <parent>
+        <groupId>com.meta</groupId>
+        <artifactId>meta-claw</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+    </parent>
+
+    <!-- 当前模块坐标 -->
+    <artifactId>meta-claw-gateway-weixin</artifactId>
+    <name>Meta-Claw Gateway Weixin</name>
+    <description>微信网关模块，实现微信公众号/小程序的对接与消息处理</description>
+
+    <dependencies>
+        <!-- 依赖通用网关模块，复用网关抽象与协议适配 -->
+        <dependency>
+            <groupId>com.meta</groupId>
+            <artifactId>meta-claw-gateway</artifactId>
+        </dependency>
+        <!-- 依赖会话管理模块，复用会话状态维护能力 -->
+        <dependency>
+            <groupId>com.meta</groupId>
+            <artifactId>meta-claw-session</artifactId>
+        </dependency>
+        <!-- OpenILink SDK：微信开放平台官方 SDK -->
+        <dependency>
+            <groupId>com.openilink</groupId>
+            <artifactId>openilink-sdk-java</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
+        <!-- Lombok：通过注解减少样板代码 -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+
+</project>
