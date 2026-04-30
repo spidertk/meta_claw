@@ -37,17 +37,21 @@
             <groupId>com.meta</groupId>
             <artifactId>meta-claw-session</artifactId>
         </dependency>
-        <!-- OpenILink SDK：微信开放平台官方 SDK -->
+        <!-- OpenILink SDK：微信 iLink 协议 Java SDK（本地子模块，版本由父 POM 统一管理） -->
         <dependency>
             <groupId>com.openilink</groupId>
             <artifactId>openilink-sdk-java</artifactId>
-            <version>1.0.0-SNAPSHOT</version>
         </dependency>
         <!-- Lombok：通过注解减少样板代码 -->
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
             <scope>provided</scope>
+        </dependency>
+        <!-- SLF4J API：Lombok @Slf4j 编译时需要 -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
         </dependency>
     </dependencies>
 

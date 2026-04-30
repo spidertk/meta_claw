@@ -2,7 +2,7 @@ package meta.claw.gateway.weixin;
 
 import com.openilink.ILinkClient;
 import com.openilink.auth.LoginCallbacks;
-import com.openilink.model.Message;
+import com.openilink.model.WeixinMessage;
 import com.openilink.model.response.LoginResult;
 import com.openilink.util.MessageHelper;
 import lombok.extern.slf4j.Slf4j;
@@ -144,7 +144,7 @@ public class WeixinChannel extends ChatChannel {
             log.info("[WeixinChannel] Monitor 线程已启动，开始监听微信消息...");
 
             // 调用 openilink 的 monitor 方法，传入消息处理器、选项（null 表示默认）和停止标志
-            client.monitor((Message msg) -> {
+            client.monitor((WeixinMessage msg) -> {
                 // 提取消息中的纯文本内容
                 String text = MessageHelper.extractText(msg);
                 if (text == null || text.isEmpty()) {

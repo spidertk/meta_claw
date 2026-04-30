@@ -37,3 +37,7 @@ venv.bak/
 *~
 .*
 graphify-out
+*.class
+knowledge
+*.lst
+*/target/*

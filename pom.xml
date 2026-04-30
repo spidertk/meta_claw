@@ -22,8 +22,9 @@
     <name>Meta-Claw</name>
     <description>Meta-Claw 多模块聚合项目</description>
 
-    <!-- 聚合的 6 个子模块 -->
+    <!-- 聚合的子模块：6 个业务模块 + 1 个第三方本地模块 -->
     <modules>
+        <module>third-party/openilink-sdk-java</module>
         <module>meta-claw-core</module>
         <module>meta-claw-session</module>
         <module>meta-claw-gateway</module>
@@ -117,6 +118,12 @@
                 <groupId>org.projectlombok</groupId>
                 <artifactId>lombok</artifactId>
                 <version>${lombok.version}</version>
+            </dependency>
+            <!-- OpenILink SDK：微信 iLink 协议 Java SDK（本地子模块） -->
+            <dependency>
+                <groupId>com.openilink</groupId>
+                <artifactId>openilink-sdk-java</artifactId>
+                <version>1.0.0-SNAPSHOT</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

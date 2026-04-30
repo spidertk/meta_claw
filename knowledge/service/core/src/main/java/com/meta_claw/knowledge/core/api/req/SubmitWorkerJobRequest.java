@@ -21,6 +21,10 @@ public class SubmitWorkerJobRequest implements RoleScopedRequest {
     private String snapshotId;
     private String processingScope;
     private List<String> expectedArtifacts;
+    private String analysisMode;
+    private String sourceType;
+    private String apiKey;
+    private java.util.Map<String, Object> budgetHint;
 
     public WorkerJob toDomain(String spaceId) {
         return WorkerJob.builder()
@@ -31,6 +35,10 @@ public class SubmitWorkerJobRequest implements RoleScopedRequest {
                 .snapshotId(snapshotId)
                 .processingScope(processingScope)
                 .expectedArtifacts(expectedArtifacts)
+                .analysisMode(analysisMode)
+                .sourceType(sourceType)
+                .apiKey(apiKey)
+                .budgetHint(budgetHint)
                 .build();
     }
 }

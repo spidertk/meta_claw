@@ -19,4 +19,8 @@ public class WorkerJob {
     private String snapshotId;
     private String processingScope;
     private List<String> expectedArtifacts;
+    private String analysisMode;
+    private String sourceType;
+    private String apiKey;
+    private java.util.Map<String, Object> budgetHint;
 }
