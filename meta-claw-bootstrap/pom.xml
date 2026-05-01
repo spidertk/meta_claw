@@ -45,11 +45,6 @@
             <groupId>com.meta</groupId>
             <artifactId>meta-claw-gateway-weixin</artifactId>
         </dependency>
-        <!-- 依赖运行时引擎模块 -->
-        <dependency>
-            <groupId>com.meta</groupId>
-            <artifactId>meta-claw-runtime</artifactId>
-        </dependency>
         <!-- Spring Boot 启动器：提供 Spring Boot 核心自动配置能力 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

@@ -2,8 +2,8 @@ package meta.claw.app;
 
 import meta.claw.gateway.Gateway;
 import meta.claw.gateway.weixin.WeixinChannel;
-import meta.claw.runtime.AgentLoop;
-import meta.claw.runtime.ExpertManager;
+import meta.claw.core.runtime.AgentLoop;
+import meta.claw.core.runtime.ExpertManager;
 import org.springframework.ai.chat.ChatClient;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;

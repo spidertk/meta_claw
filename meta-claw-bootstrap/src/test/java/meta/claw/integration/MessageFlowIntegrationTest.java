@@ -10,10 +10,10 @@ import meta.claw.core.model.Reply;
 import meta.claw.core.model.ReplyType;
 import meta.claw.gateway.Gateway;
 import meta.claw.gateway.channel.ChannelRegistry;
-import meta.claw.runtime.AgentLoop;
-import meta.claw.runtime.ExpertManager;
-import meta.claw.runtime.ExpertRuntime;
-import meta.claw.runtime.model.ExpertConfig;
+import meta.claw.core.runtime.AgentLoop;
+import meta.claw.core.runtime.ExpertManager;
+import meta.claw.core.runtime.ExpertRuntime;
+import meta.claw.core.model.ExpertConfig;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 

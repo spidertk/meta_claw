@@ -3,7 +3,7 @@
     Meta-Claw Session 模块 POM
     作用：管理用户会话状态、上下文保持、会话生命周期等
     依赖：meta-claw-core（复用核心工具类）
-    被依赖：meta-claw-gateway-weixin、meta-claw-runtime、meta-claw-bootstrap
+    被依赖：meta-claw-gateway-weixin、meta-claw-bootstrap
 -->
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"

@@ -3,7 +3,7 @@
     Meta-Claw 聚合父 POM
     作用：统一管理系统中所有子模块的依赖版本、构建配置和插件管理
     包含模块：meta-claw-core、meta-claw-session、meta-claw-gateway、
-             meta-claw-gateway-weixin、meta-claw-runtime、meta-claw-bootstrap
+             meta-claw-gateway-weixin、meta-claw-bootstrap
 -->
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -29,7 +29,6 @@
         <module>meta-claw-session</module>
         <module>meta-claw-gateway</module>
         <module>meta-claw-gateway-weixin</module>
-        <module>meta-claw-runtime</module>
         <module>meta-claw-bootstrap</module>
     </modules>
 
@@ -93,12 +92,6 @@
             <dependency>
                 <groupId>com.meta</groupId>
                 <artifactId>meta-claw-gateway-weixin</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <!-- 内部模块版本管理：meta-claw-runtime 运行时引擎模块 -->
-            <dependency>
-                <groupId>com.meta</groupId>
-                <artifactId>meta-claw-runtime</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <!-- 内部模块版本管理：meta-claw-bootstrap 系统启动模块 -->

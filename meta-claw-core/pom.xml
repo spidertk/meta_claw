@@ -2,7 +2,7 @@
 <!-- 
     Meta-Claw Core 模块 POM
     作用：提供系统基础工具、公共常量、通用工具类等核心基础设施
-    被依赖：meta-claw-session、meta-claw-gateway、meta-claw-runtime、meta-claw-bootstrap
+    被依赖：meta-claw-session、meta-claw-gateway、meta-claw-bootstrap
 -->
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -23,12 +23,19 @@
     <description>核心基础模块，提供通用工具与基础设施</description>
 
     <dependencies>
-        <!-- Guava：Google 开源的 Java 核心工具库，提供集合、缓存、并发等增强 -->
         <dependency>
             <groupId>com.google.guava</groupId>
             <artifactId>guava</artifactId>
         </dependency>
-        <!-- Lombok：通过注解自动生成 getter/setter/构造器等，减少样板代码 -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.yaml</groupId>
+            <artifactId>snakeyaml</artifactId>
+            <version>2.2</version>
+        </dependency>
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
