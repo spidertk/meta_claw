@@ -22,7 +22,7 @@
     <name>Meta-Claw</name>
     <description>Meta-Claw 多模块聚合项目</description>
 
-    <!-- 聚合的子模块：6 个业务模块 + 1 个第三方本地模块 -->
+    <!-- 聚合的子模块：7 个业务模块 + 1 个第三方本地模块 -->
     <modules>
         <module>third-party/openilink-sdk-java</module>
         <module>meta-claw-core</module>
@@ -30,6 +30,7 @@
         <module>meta-claw-gateway</module>
         <module>meta-claw-gateway-weixin</module>
         <module>meta-claw-bootstrap</module>
+        <module>meta-claw-export</module>
     </modules>
 
     <!-- 属性配置：统一管理版本号 -->
@@ -98,6 +99,12 @@
             <dependency>
                 <groupId>com.meta</groupId>
                 <artifactId>meta-claw-bootstrap</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <!-- 内部模块版本管理：meta-claw-export 专家配置管理模块 -->
+            <dependency>
+                <groupId>com.meta</groupId>
+                <artifactId>meta-claw-export</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <!-- Guava：Google 开源的 Java 核心工具库 -->
