@@ -1,0 +1,10 @@
+spring:
+  main:
+    web-application-type: none
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY:}
+      base-url: ${OPENAI_BASE_URL:https://api.moonshot.cn}
+      chat:
+        options:
+          model: moonshot-v1-8k

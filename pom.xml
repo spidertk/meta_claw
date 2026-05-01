@@ -31,6 +31,7 @@
         <module>meta-claw-gateway-weixin</module>
         <module>meta-claw-bootstrap</module>
         <module>meta-claw-export</module>
+        <module>meta-claw-cli</module>
     </modules>
 
     <!-- 属性配置：统一管理版本号 -->
@@ -105,6 +106,12 @@
             <dependency>
                 <groupId>com.meta</groupId>
                 <artifactId>meta-claw-export</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <!-- 内部模块版本管理：meta-claw-cli 命令行交互模块 -->
+            <dependency>
+                <groupId>com.meta</groupId>
+                <artifactId>meta-claw-cli</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <!-- Guava：Google 开源的 Java 核心工具库 -->
