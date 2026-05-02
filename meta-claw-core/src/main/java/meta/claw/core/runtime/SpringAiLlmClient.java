@@ -44,7 +44,7 @@ public class SpringAiLlmClient implements SpiLlmClient {
         Prompt prompt = new Prompt(springMessages);
         ChatResponse response = chatClient.call(prompt);
 
-        String content = response.getResult().getOutput().getContent();
+        String content = safeExtractContent(response);
 
         return SpiChatResponse.builder()
                 .content(content)
@@ -52,6 +52,15 @@ public class SpringAiLlmClient implements SpiLlmClient {
                 .usage(null)
                 .metadata(null)
                 .build();
+    }
+
+    private String safeExtractContent(ChatResponse response) {
+        if (response == null || response.getResult() == null || response.getResult().getOutput() == null) {
+            log.warn("SpringAiLlmClient 收到空响应或响应结构不完整");
+            return "";
+        }
+        String content = response.getResult().getOutput().getContent();
+        return content != null ? content : "";
     }
 
     @Override

@@ -2,6 +2,7 @@ package meta.claw.core.eventbus;
 
 import com.google.common.eventbus.AsyncEventBus;
 import com.google.common.eventbus.EventBus;
+import lombok.extern.slf4j.Slf4j;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -10,6 +11,7 @@ import java.util.concurrent.Executors;
  * Guava AsyncEventBus 封装类
  * 提供异步事件总线的统一入口，支持事件的发布、订阅与取消订阅
  */
+@Slf4j
 public class EventBusWrapper {
 
     /** 内部持有的 Guava 异步事件总线实例 */
@@ -24,11 +26,14 @@ public class EventBusWrapper {
         ExecutorService executor = Executors.newFixedThreadPool(10);
         // 初始化 AsyncEventBus，并绑定异常处理器，防止订阅者异常导致总线崩溃
         this.eventBus = new AsyncEventBus(executor, (throwable, subscriberExceptionContext) -> {
-            // 当订阅者处理事件抛出异常时，打印错误日志
-            System.err.println("【EventBus 异常】订阅者: " + subscriberExceptionContext.getSubscriberMethod()
-                    + ", 事件类型: " + subscriberExceptionContext.getEvent().getClass().getName()
-                    + ", 异常信息: " + throwable.getMessage());
-            throwable.printStackTrace();
+            String eventType = subscriberExceptionContext.getEvent() != null
+                    ? subscriberExceptionContext.getEvent().getClass().getName()
+                    : "null";
+            log.error("【EventBus 异常】订阅者: {}, 事件类型: {}, 异常信息: {}",
+                    subscriberExceptionContext.getSubscriberMethod(),
+                    eventType,
+                    throwable.getMessage(),
+                    throwable);
         });
     }
 

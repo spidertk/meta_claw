@@ -39,7 +39,7 @@ public class ConfigCommand implements Runnable {
                 case "set" -> setConfig(key, value);
                 case "get" -> getConfig(key);
                 case "list" -> listConfig();
-                default -> System.err.println("Unknown action: " + action);
+                default -> throw new IllegalArgumentException("Unknown action: " + action + ". Supported: set, get, list");
             }
         } catch (Exception e) {
             System.err.println("Config error: " + e.getMessage());
@@ -108,10 +108,12 @@ public class ConfigCommand implements Runnable {
         try {
             return Integer.parseInt(raw);
         } catch (NumberFormatException ignored) {
+            // 不是有效整数，继续尝试 Double
         }
         try {
             return Double.parseDouble(raw);
         } catch (NumberFormatException ignored) {
+            // 不是有效浮点数，回退为字符串类型
         }
         return raw;
     }

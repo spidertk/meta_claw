@@ -44,7 +44,7 @@ public class InitCommand implements Runnable {
             System.out.println("Please edit ~/.meta-claw/config.yaml and set your API key.");
             System.out.println("Run 'meta-claw chat default' to start chatting.");
         } catch (Exception e) {
-            System.err.println("Init failed: " + e.getMessage());
+            throw new RuntimeException("Init failed: " + e.getMessage(), e);
         }
     }
 }

@@ -5,6 +5,7 @@ import meta.claw.core.model.Reply;
 import meta.claw.core.model.ReplyType;
 import meta.claw.core.model.ExpertConfig;
 import org.springframework.ai.chat.ChatClient;
+import org.springframework.ai.chat.ChatResponse;
 import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.prompt.Prompt;
@@ -74,7 +75,8 @@ public class ExpertRuntime {
                         new SystemMessage(config.getSystemPrompt()),
                         new UserMessage(userMessage)
                 ));
-                response = chatClient.call(prompt).getResult().getOutput().getContent();
+                org.springframework.ai.chat.ChatResponse chatResponse = chatClient.call(prompt);
+                response = safeExtractContent(chatResponse);
             } else {
                 response = chatClient.call(userMessage);
             }
@@ -101,6 +103,15 @@ public class ExpertRuntime {
      */
     public String getExpertId() {
         return config != null ? config.getId() : "null";
+    }
+
+    private String safeExtractContent(ChatResponse response) {
+        if (response == null || response.getResult() == null || response.getResult().getOutput() == null) {
+            log.warn("ExpertRuntime 收到空响应或响应结构不完整");
+            return "";
+        }
+        String content = response.getResult().getOutput().getContent();
+        return content != null ? content : "";
     }
 
 }
