@@ -30,7 +30,7 @@
         <module>meta-claw-gateway</module>
         <module>meta-claw-gateway-weixin</module>
         <module>meta-claw-bootstrap</module>
-        <module>meta-claw-export</module>
+        <module>meta-claw-vessel</module>
         <module>meta-claw-cli</module>
     </modules>
 
@@ -102,10 +102,10 @@
                 <artifactId>meta-claw-bootstrap</artifactId>
                 <version>${project.version}</version>
             </dependency>
-            <!-- 内部模块版本管理：meta-claw-export 专家配置管理模块 -->
+            <!-- 内部模块版本管理：meta-claw-vessel 数字员工配置管理模块 -->
             <dependency>
                 <groupId>com.meta</groupId>
-                <artifactId>meta-claw-export</artifactId>
+                <artifactId>meta-claw-vessel</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <!-- 内部模块版本管理：meta-claw-cli 命令行交互模块 -->

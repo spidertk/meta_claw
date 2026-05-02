@@ -1,39 +1,26 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- 
-    Meta-Claw Core 模块 POM
-    作用：提供系统基础工具、公共常量、通用工具类等核心基础设施
-    被依赖：meta-claw-session、meta-claw-gateway、meta-claw-bootstrap
--->
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
                              http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
-
-    <!-- 继承父 POM，统一版本和依赖管理 -->
     <parent>
         <groupId>com.meta</groupId>
         <artifactId>meta-claw</artifactId>
         <version>0.1.0-SNAPSHOT</version>
     </parent>
-
-    <!-- 当前模块坐标 -->
-    <artifactId>meta-claw-core</artifactId>
-    <name>Meta-Claw Core</name>
-    <description>核心基础模块，提供通用工具与基础设施</description>
-
+    <artifactId>meta-claw-vessel</artifactId>
+    <name>Meta-Claw Vessel</name>
+    <description>数字员工（Vessel）配置管理模块，提供 YAML 配置加载、模板生成和目录结构初始化</description>
     <dependencies>
         <dependency>
-            <groupId>com.google.guava</groupId>
-            <artifactId>guava</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.ai</groupId>
-            <artifactId>spring-ai-core</artifactId>
+            <groupId>com.meta</groupId>
+            <artifactId>meta-claw-core</artifactId>
         </dependency>
         <dependency>
             <groupId>org.yaml</groupId>
             <artifactId>snakeyaml</artifactId>
+            <!-- 版本由 Spring Boot BOM 统一管理，无需显式指定 -->
         </dependency>
         <dependency>
             <groupId>org.projectlombok</groupId>
@@ -43,11 +30,6 @@
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.mockito</groupId>
-            <artifactId>mockito-core</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>
@@ -72,5 +54,4 @@
             </plugin>
         </plugins>
     </build>
-
 </project>

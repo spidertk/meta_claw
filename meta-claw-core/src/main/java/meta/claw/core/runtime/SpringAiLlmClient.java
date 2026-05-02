@@ -1,35 +1,42 @@
 package meta.claw.core.runtime;
 
 import lombok.extern.slf4j.Slf4j;
-import meta.claw.core.spi.llm.*;
+import meta.claw.core.spi.llm.SpiChatRequest;
+import meta.claw.core.spi.llm.SpiChatResponse;
+import meta.claw.core.spi.llm.SpiLlmClient;
+import meta.claw.core.spi.llm.SpiMessage;
+import meta.claw.core.spi.llm.SpiProviderMeta;
+import meta.claw.core.spi.llm.SpiStreamingCallback;
 import org.springframework.ai.chat.ChatClient;
 import org.springframework.ai.chat.ChatResponse;
-import org.springframework.ai.chat.messages.*;
+import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.messages.SystemMessage;
+import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.prompt.Prompt;
-
+import org.springframework.ai.chat.messages.Message;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 /**
- * 基于 Spring AI 0.8.0 ChatClient 的 LlmClient 实现。
+ * 基于 Spring AI 0.8.0 ChatClient 的 SpiLlmClient 实现。
  */
 @Slf4j
-public class SpringAiLlmClient implements LlmClient {
+public class SpringAiLlmClient implements SpiLlmClient {
 
     private final ChatClient chatClient;
-    private final ProviderMeta providerMeta;
+    private final SpiProviderMeta providerMeta;
 
-    public SpringAiLlmClient(ChatClient chatClient, ProviderMeta providerMeta) {
+    public SpringAiLlmClient(ChatClient chatClient, SpiProviderMeta providerMeta) {
         this.chatClient = chatClient;
         this.providerMeta = providerMeta;
     }
 
     @Override
-    public meta.claw.core.spi.llm.ChatResponse chat(meta.claw.core.spi.llm.ChatRequest request) {
+    public SpiChatResponse chat(SpiChatRequest request) {
         log.debug("SpringAiLlmClient chat: messages={}", request.messages().size());
 
-        List<Message> springMessages = request.messages().stream()
+        List<org.springframework.ai.chat.messages.Message> springMessages = request.messages().stream()
                 .map(this::toSpringMessage)
                 .collect(Collectors.toList());
 
@@ -38,7 +45,7 @@ public class SpringAiLlmClient implements LlmClient {
 
         String content = response.getResult().getOutput().getContent();
 
-        return meta.claw.core.spi.llm.ChatResponse.builder()
+        return SpiChatResponse.builder()
                 .content(content)
                 .toolCalls(null)
                 .usage(null)
@@ -47,10 +54,10 @@ public class SpringAiLlmClient implements LlmClient {
     }
 
     @Override
-    public void chatStream(meta.claw.core.spi.llm.ChatRequest request, StreamingCallback callback) {
+    public void chatStream(SpiChatRequest request, SpiStreamingCallback callback) {
         callback.onStart();
         try {
-            meta.claw.core.spi.llm.ChatResponse response = chat(request);
+            SpiChatResponse response = chat(request);
             callback.onChunk(response.content());
             callback.onComplete(response);
         } catch (Exception e) {
@@ -59,16 +66,16 @@ public class SpringAiLlmClient implements LlmClient {
     }
 
     @Override
-    public CompletableFuture<meta.claw.core.spi.llm.ChatResponse> chatAsync(meta.claw.core.spi.llm.ChatRequest request) {
+    public CompletableFuture<SpiChatResponse> chatAsync(SpiChatRequest request) {
         return CompletableFuture.supplyAsync(() -> chat(request));
     }
 
     @Override
-    public ProviderMeta getProviderMeta() {
+    public SpiProviderMeta getProviderMeta() {
         return providerMeta;
     }
 
-    private Message toSpringMessage(meta.claw.core.spi.llm.Message msg) {
+    private Message toSpringMessage(SpiMessage msg) {
         return switch (msg.role()) {
             case "system" -> new SystemMessage(msg.content());
             case "user" -> new UserMessage(msg.content());

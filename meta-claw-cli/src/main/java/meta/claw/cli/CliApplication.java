@@ -6,11 +6,13 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
 import picocli.CommandLine;
 
-@SpringBootApplication(scanBasePackages = {"meta.claw.cli", "meta.claw.core", "meta.claw.export"})
+@SpringBootApplication(scanBasePackages = {"meta.claw.cli", "meta.claw.core", "meta.claw.vessel"})
 public class CliApplication {
 
     public static void main(String[] args) {
-        System.exit(SpringApplication.exit(SpringApplication.run(CliApplication.class, args)));
+        SpringApplication app = new SpringApplication(CliApplication.class);
+        app.setAdditionalProfiles("cli");
+        System.exit(SpringApplication.exit(app.run(args)));
     }
 
     @Bean

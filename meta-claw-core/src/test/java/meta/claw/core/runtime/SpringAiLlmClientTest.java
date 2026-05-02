@@ -1,6 +1,9 @@
 package meta.claw.core.runtime;
 
-import meta.claw.core.spi.llm.*;
+import meta.claw.core.spi.llm.SpiChatRequest;
+import meta.claw.core.spi.llm.SpiChatResponse;
+import meta.claw.core.spi.llm.SpiMessage;
+import meta.claw.core.spi.llm.SpiProviderMeta;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.ChatClient;
 import org.springframework.ai.chat.ChatResponse;
@@ -27,16 +30,16 @@ class SpringAiLlmClientTest {
         when(mockResponse.getResult()).thenReturn(mockGen);
         when(mockGen.getOutput()).thenReturn(mockMsg);
 
-        ProviderMeta meta = ProviderMeta.builder()
+        SpiProviderMeta meta = SpiProviderMeta.builder()
                 .name("kimi").model("moonshot-v1-8k").baseUrl("https://api.moonshot.cn").build();
 
         SpringAiLlmClient client = new SpringAiLlmClient(mockClient, meta);
 
-        ChatRequest request = ChatRequest.builder()
-                .messages(List.of(Message.user("hi")))
+        SpiChatRequest request = SpiChatRequest.builder()
+                .messages(List.of(SpiMessage.user("hi")))
                 .build();
 
-        ChatResponse response = client.chat(request);
+        SpiChatResponse response = client.chat(request);
 
         assertEquals("Hello from AI", response.content());
         assertEquals("kimi", client.getProviderMeta().name());

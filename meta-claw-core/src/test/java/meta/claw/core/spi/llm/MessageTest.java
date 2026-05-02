@@ -7,7 +7,7 @@ class MessageTest {
 
     @Test
     void testBuilder() {
-        Message msg = Message.builder()
+        SpiMessage msg = SpiMessage.builder()
                 .role("user")
                 .content("hello")
                 .build();
@@ -17,9 +17,9 @@ class MessageTest {
 
     @Test
     void testFactoryMethods() {
-        assertEquals("system", Message.system("sys").role());
-        assertEquals("user", Message.user("hi").role());
-        assertEquals("assistant", Message.assistant("ok").role());
-        assertEquals("tool", Message.tool("result").role());
+        assertEquals("system", SpiMessage.system("sys").role());
+        assertEquals("user", SpiMessage.user("hi").role());
+        assertEquals("assistant", SpiMessage.assistant("ok").role());
+        assertEquals("tool", SpiMessage.tool("result").role());
     }
 }

@@ -19,7 +19,7 @@
         </dependency>
         <dependency>
             <groupId>com.meta</groupId>
-            <artifactId>meta-claw-export</artifactId>
+            <artifactId>meta-claw-vessel</artifactId>
         </dependency>
         <dependency>
             <groupId>info.picocli</groupId>

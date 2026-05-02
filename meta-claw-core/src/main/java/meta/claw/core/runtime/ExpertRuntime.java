@@ -36,9 +36,13 @@ public class ExpertRuntime {
     public ExpertRuntime(ExpertConfig config, ChatClient chatClient) {
         this.config = config;
         this.chatClient = chatClient;
-        log.info("ExpertRuntime 初始化完成: expertId={}, model={}, systemPromptLength={}",
-                config.getId(), config.getModel(),
-                config.getSystemPrompt() != null ? config.getSystemPrompt().length() : 0);
+        if (config != null) {
+            log.info("ExpertRuntime 初始化完成: expertId={}, model={}, systemPromptLength={}",
+                    config.getId(), config.getModel(),
+                    config.getSystemPrompt() != null ? config.getSystemPrompt().length() : 0);
+        } else {
+            log.info("ExpertRuntime 初始化完成: config=null");
+        }
     }
 
     /**
@@ -54,21 +58,21 @@ public class ExpertRuntime {
      */
     public Reply chat(String userMessage) {
         log.debug("Expert 开始处理用户消息: expertId={}, messageLength={}",
-                config.getId(), userMessage != null ? userMessage.length() : 0);
+                config != null ? config.getId() : "null", userMessage != null ? userMessage.length() : 0);
 
         try {
             // 通过 ChatClient 直接调用 AI 模型获取回复内容
             String response = chatClient.call(userMessage);
 
             log.debug("Expert 成功获取 AI 回复: expertId={}, responseLength={}",
-                    config.getId(), response != null ? response.length() : 0);
+                    config != null ? config.getId() : "null", response != null ? response.length() : 0);
 
             // 返回文本类型的标准化回复对象
             return new Reply(ReplyType.TEXT, response);
         } catch (Exception e) {
             // 记录异常日志，包含 Expert 标识和异常详情，便于后续问题定位
             log.error("Expert 对话调用异常: expertId={}, errorMessage={}",
-                    config.getId(), e.getMessage(), e);
+                    config != null ? config.getId() : "null", e.getMessage(), e);
 
             // 返回错误类型的标准化回复对象，向用户展示友好的错误提示
             return new Reply(ReplyType.ERROR, "服务异常，请稍后重试");
@@ -81,7 +85,7 @@ public class ExpertRuntime {
      * @return Expert 的 id，对应配置文件中的 id 字段
      */
     public String getExpertId() {
-        return config.getId();
+        return config != null ? config.getId() : "null";
     }
 
 }
