@@ -5,6 +5,11 @@ import meta.claw.core.model.Reply;
 import meta.claw.core.model.ReplyType;
 import meta.claw.core.model.ExpertConfig;
 import org.springframework.ai.chat.ChatClient;
+import org.springframework.ai.chat.messages.SystemMessage;
+import org.springframework.ai.chat.messages.UserMessage;
+import org.springframework.ai.chat.prompt.Prompt;
+
+import java.util.List;
 
 /**
  * Expert 核心运行时类
@@ -61,8 +66,18 @@ public class ExpertRuntime {
                 config != null ? config.getId() : "null", userMessage != null ? userMessage.length() : 0);
 
         try {
-            // 通过 ChatClient 直接调用 AI 模型获取回复内容
-            String response = chatClient.call(userMessage);
+            // 通过 ChatClient 调用 AI 模型获取回复内容
+            // 若配置了 systemPrompt，则先注入 SystemMessage
+            String response;
+            if (config != null && config.getSystemPrompt() != null && !config.getSystemPrompt().isBlank()) {
+                Prompt prompt = new Prompt(List.of(
+                        new SystemMessage(config.getSystemPrompt()),
+                        new UserMessage(userMessage)
+                ));
+                response = chatClient.call(prompt).getResult().getOutput().getContent();
+            } else {
+                response = chatClient.call(userMessage);
+            }
 
             log.debug("Expert 成功获取 AI 回复: expertId={}, responseLength={}",
                     config != null ? config.getId() : "null", response != null ? response.length() : 0);

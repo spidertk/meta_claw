@@ -10,6 +10,7 @@ import meta.claw.core.spi.llm.SpiStreamingCallback;
 import org.springframework.ai.chat.ChatClient;
 import org.springframework.ai.chat.ChatResponse;
 import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.messages.FunctionMessage;
 import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.prompt.Prompt;
@@ -80,7 +81,11 @@ public class SpringAiLlmClient implements SpiLlmClient {
             case "system" -> new SystemMessage(msg.content());
             case "user" -> new UserMessage(msg.content());
             case "assistant" -> new AssistantMessage(msg.content());
-            default -> new UserMessage(msg.content());
+            case "tool" -> new FunctionMessage(msg.content());
+            default -> {
+                log.warn("Unknown message role '{}', defaulting to user message", msg.role());
+                yield new UserMessage(msg.content());
+            }
         };
     }
 }
