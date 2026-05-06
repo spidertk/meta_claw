@@ -4,8 +4,8 @@ import lombok.extern.slf4j.Slf4j;
 import meta.claw.core.model.Reply;
 import meta.claw.core.model.ReplyType;
 import meta.claw.core.model.ExpertConfig;
-import org.springframework.ai.chat.ChatClient;
-import org.springframework.ai.chat.ChatResponse;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.prompt.Prompt;
@@ -75,10 +75,10 @@ public class ExpertRuntime {
                         new SystemMessage(config.getSystemPrompt()),
                         new UserMessage(userMessage)
                 ));
-                org.springframework.ai.chat.ChatResponse chatResponse = chatClient.call(prompt);
+                ChatResponse chatResponse = chatClient.prompt(prompt).call().chatResponse();
                 response = safeExtractContent(chatResponse);
             } else {
-                response = chatClient.call(userMessage);
+                response = chatClient.prompt().user(userMessage).call().content();
             }
 
             log.debug("Expert 成功获取 AI 回复: expertId={}, responseLength={}",
@@ -110,8 +110,8 @@ public class ExpertRuntime {
             log.warn("ExpertRuntime 收到空响应或响应结构不完整");
             return "";
         }
-        String content = response.getResult().getOutput().getContent();
-        return content != null ? content : "";
+        String text = response.getResult().getOutput().getText();
+        return text != null ? text : "";
     }
 
 }

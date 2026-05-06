@@ -19,7 +19,7 @@ import java.util.regex.Pattern;
 @Command(name = "config", description = "Manage CLI configuration")
 public class ConfigCommand implements Runnable {
 
-    private static final Path CONFIG_DIR = Paths.get(System.getProperty("user.home"), ".meta-claw");
+    private static final Path CONFIG_DIR = Paths.get(System.getProperty("user.dir"), ".meta-claw");
     private static final Path CONFIG_FILE = CONFIG_DIR.resolve("config.yaml");
     private static final Pattern API_KEY_LINE_PATTERN = Pattern.compile("^(.*?api_key\\s*:\\s*)(.*)$");
 

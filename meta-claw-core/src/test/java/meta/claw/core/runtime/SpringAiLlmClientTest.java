@@ -5,9 +5,9 @@ import meta.claw.core.spi.llm.SpiChatResponse;
 import meta.claw.core.spi.llm.SpiMessage;
 import meta.claw.core.spi.llm.SpiProviderMeta;
 import org.junit.jupiter.api.Test;
-import org.springframework.ai.chat.ChatClient;
-import org.springframework.ai.chat.ChatResponse;
-import org.springframework.ai.chat.Generation;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.prompt.Prompt;
 
@@ -22,11 +22,15 @@ class SpringAiLlmClientTest {
     @Test
     void testChat() {
         ChatClient mockClient = mock(ChatClient.class);
+        ChatClient.ChatClientRequestSpec mockSpec = mock(ChatClient.ChatClientRequestSpec.class);
+        ChatClient.CallResponseSpec mockCall = mock(ChatClient.CallResponseSpec.class);
         ChatResponse mockResponse = mock(ChatResponse.class);
         Generation mockGen = mock(Generation.class);
         AssistantMessage mockMsg = new AssistantMessage("Hello from AI");
 
-        when(mockClient.call(any(Prompt.class))).thenReturn(mockResponse);
+        when(mockClient.prompt(any(Prompt.class))).thenReturn(mockSpec);
+        when(mockSpec.call()).thenReturn(mockCall);
+        when(mockCall.chatResponse()).thenReturn(mockResponse);
         when(mockResponse.getResult()).thenReturn(mockGen);
         when(mockGen.getOutput()).thenReturn(mockMsg);
 

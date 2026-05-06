@@ -40,4 +40,5 @@ graphify-out
 *.class
 knowledge
 *.lst
-*/target/*
+*/.meta-claw/
+target/*

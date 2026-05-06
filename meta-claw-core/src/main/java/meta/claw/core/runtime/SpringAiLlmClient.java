@@ -7,20 +7,23 @@ import meta.claw.core.spi.llm.SpiLlmClient;
 import meta.claw.core.spi.llm.SpiMessage;
 import meta.claw.core.spi.llm.SpiProviderMeta;
 import meta.claw.core.spi.llm.SpiStreamingCallback;
-import org.springframework.ai.chat.ChatClient;
-import org.springframework.ai.chat.ChatResponse;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.messages.AssistantMessage;
-import org.springframework.ai.chat.messages.FunctionMessage;
+import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.SystemMessage;
+import org.springframework.ai.chat.messages.ToolResponseMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.prompt.Prompt;
-import org.springframework.ai.chat.messages.Message;
+
+import reactor.core.publisher.Flux;
+
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 /**
- * 基于 Spring AI 0.8.0 ChatClient 的 SpiLlmClient 实现。
+ * 基于 Spring AI 2.0 ChatClient 的 SpiLlmClient 实现。
  */
 @Slf4j
 public class SpringAiLlmClient implements SpiLlmClient {
@@ -37,12 +40,12 @@ public class SpringAiLlmClient implements SpiLlmClient {
     public SpiChatResponse chat(SpiChatRequest request) {
         log.debug("SpringAiLlmClient chat: messages={}", request.messages().size());
 
-        List<org.springframework.ai.chat.messages.Message> springMessages = request.messages().stream()
+        List<Message> springMessages = request.messages().stream()
                 .map(this::toSpringMessage)
                 .collect(Collectors.toList());
 
         Prompt prompt = new Prompt(springMessages);
-        ChatResponse response = chatClient.call(prompt);
+        ChatResponse response = chatClient.prompt(prompt).call().chatResponse();
 
         String content = safeExtractContent(response);
 
@@ -59,16 +62,33 @@ public class SpringAiLlmClient implements SpiLlmClient {
             log.warn("SpringAiLlmClient 收到空响应或响应结构不完整");
             return "";
         }
-        String content = response.getResult().getOutput().getContent();
-        return content != null ? content : "";
+        String text = response.getResult().getOutput().getText();
+        return text != null ? text : "";
     }
 
     @Override
     public void chatStream(SpiChatRequest request, SpiStreamingCallback callback) {
+        List<Message> springMessages = request.messages().stream()
+                .map(this::toSpringMessage)
+                .collect(Collectors.toList());
+        Prompt prompt = new Prompt(springMessages);
+
         callback.onStart();
+        StringBuilder contentBuilder = new StringBuilder();
         try {
-            SpiChatResponse response = chat(request);
-            callback.onChunk(response.content());
+            chatClient.prompt(prompt).stream().content()
+                    .doOnNext(chunk -> {
+                        contentBuilder.append(chunk);
+                        callback.onChunk(chunk);
+                    })
+                    .blockLast();
+
+            SpiChatResponse response = SpiChatResponse.builder()
+                    .content(contentBuilder.toString())
+                    .toolCalls(null)
+                    .usage(null)
+                    .metadata(null)
+                    .build();
             callback.onComplete(response);
         } catch (Exception e) {
             callback.onError(e);
@@ -90,7 +110,11 @@ public class SpringAiLlmClient implements SpiLlmClient {
             case "system" -> new SystemMessage(msg.content());
             case "user" -> new UserMessage(msg.content());
             case "assistant" -> new AssistantMessage(msg.content());
-            case "tool" -> new FunctionMessage(msg.content());
+            case "tool" -> ToolResponseMessage.builder()
+                    .responses(List.of(
+                            new ToolResponseMessage.ToolResponse("tool", "tool", msg.content())
+                    ))
+                    .build();
             default -> {
                 log.warn("Unknown message role '{}', defaulting to user message", msg.role());
                 yield new UserMessage(msg.content());

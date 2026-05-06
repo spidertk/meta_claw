@@ -6,7 +6,12 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
 import picocli.CommandLine;
 
-@SpringBootApplication(scanBasePackages = {"meta.claw.cli", "meta.claw.core", "meta.claw.vessel"})
+@SpringBootApplication(
+        scanBasePackages = {"meta.claw.cli", "meta.claw.core", "meta.claw.vessel"},
+        exclude = {
+                org.springframework.ai.model.openai.autoconfigure.OpenAiChatAutoConfiguration.class
+        }
+)
 public class CliApplication {
 
     public static void main(String[] args) {

@@ -11,7 +11,7 @@ import meta.claw.core.runtime.ExpertRuntime;
 import meta.claw.core.model.ExpertConfig;
 import meta.claw.session.SessionManager;
 import meta.claw.session.storage.InMemorySessionStorage;
-import org.springframework.ai.chat.ChatClient;
+import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

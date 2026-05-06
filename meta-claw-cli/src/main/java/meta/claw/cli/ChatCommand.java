@@ -5,6 +5,7 @@ import meta.claw.core.model.GlobalConfig;
 import meta.claw.core.model.ProviderConfig;
 import meta.claw.core.runtime.ExpertRuntime;
 import meta.claw.core.runtime.SpringAiLlmClient;
+import meta.claw.core.spi.llm.LlmClientFactoryManager;
 import meta.claw.core.spi.llm.SpiChatRequest;
 import meta.claw.core.spi.llm.SpiChatResponse;
 import meta.claw.core.spi.llm.SpiMessage;
@@ -12,7 +13,7 @@ import meta.claw.core.spi.llm.SpiProviderMeta;
 import meta.claw.vessel.GlobalConfigLoader;
 import meta.claw.vessel.VesselConfig;
 import meta.claw.vessel.VesselConfigLoader;
-import org.springframework.ai.chat.ChatClient;
+import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Component;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Parameters;
@@ -29,10 +30,10 @@ import java.util.List;
 @Command(name = "chat", description = "Chat with an expert")
 public class ChatCommand implements Runnable {
 
-    private final ChatClient chatClient;
+    private final LlmClientFactoryManager factoryManager;
 
-    public ChatCommand(ChatClient chatClient) {
-        this.chatClient = chatClient;
+    public ChatCommand(LlmClientFactoryManager factoryManager) {
+        this.factoryManager = factoryManager;
     }
 
     @Parameters(index = "0", defaultValue = "default", description = "Expert name")
@@ -40,7 +41,7 @@ public class ChatCommand implements Runnable {
 
     @Override
     public void run() {
-        Path configDir = Paths.get(System.getProperty("user.home"), ".meta-claw");
+        Path configDir = Paths.get(System.getProperty("user.dir"), ".meta-claw");
 
         // 1. Load global config
         GlobalConfigLoader globalLoader = new GlobalConfigLoader();
@@ -57,6 +58,8 @@ public class ChatCommand implements Runnable {
             providerName = globalConfig.getProviders().keySet().iterator().next();
         }
 
+        log.info("Using provider: {}", providerName);
+
         ProviderConfig providerConfig = globalConfig.getProviders().get(providerName);
         if (providerConfig == null) {
             System.err.println("Provider not found: " + providerName);
@@ -69,6 +72,10 @@ public class ChatCommand implements Runnable {
             System.err.println("Run 'meta-claw config set providers." + providerName + ".api_key <your-key>' to configure.");
             return;
         }
+
+        log.info("Provider config - baseUrl: {}, model: {}",
+                providerConfig.getBaseUrl(),
+                providerConfig.getModel());
 
         // 2. Load vessel config
         Path vesselPath = configDir.resolve("vessels").resolve(expertName).resolve("vessel.md");
@@ -87,6 +94,9 @@ public class ChatCommand implements Runnable {
             model = providerConfig.getModel();
         }
 
+        // 4. Build ChatClient via factory manager (dynamic routing by provider name)
+        ChatClient chatClient = factoryManager.create(providerName, providerConfig, model);
+
         SpiProviderMeta meta = SpiProviderMeta.builder()
                 .name(providerName)
                 .model(model)
@@ -97,8 +107,24 @@ public class ChatCommand implements Runnable {
         ExpertRuntime runtime = new ExpertRuntime(null, chatClient);
 
         String displayName = vesselConfig.getName() != null ? vesselConfig.getName() : expertName;
-        System.out.println("Chat with " + displayName + " (" + model + ")");
-        System.out.println("Type /exit to quit.");
+        String emoji = vesselConfig.getEmoji() != null ? vesselConfig.getEmoji() : "🤖";
+        String description = vesselConfig.getDescription() != null ? vesselConfig.getDescription() : "A general-purpose AI assistant.";
+
+        // Welcome screen (inspired by expert_cli/cli.py print_welcome)
+        System.out.println();
+        System.out.println("╔══════════════════════════════════════════════════════════════════╗");
+        System.out.println("║                                                                  ║");
+        System.out.println(String.format("║   %-60s ║", emoji + "  " + displayName));
+        System.out.println("║                                                                  ║");
+        System.out.println(String.format("║   %-60s ║", description));
+        System.out.println("║                                                                  ║");
+        System.out.println(String.format("║   Model: %-54s ║", model));
+        System.out.println(String.format("║   Provider: %-51s ║", providerName));
+        System.out.println("║                                                                  ║");
+        System.out.println("╚══════════════════════════════════════════════════════════════════╝");
+        System.out.println();
+        System.out.println("Commands: /exit  /clear");
+        System.out.println("Press Ctrl+D to quit");
         System.out.println();
 
         BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));

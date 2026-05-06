@@ -1,0 +1,9 @@
+id: default
+name: Default Expert
+description: A general-purpose AI assistant
+emoji: 🤖
+model: moonshot-v1-8k
+systemPrompt: |
+  You are a helpful AI assistant. Answer user questions concisely and accurately.
+memoryEnabled: true
+knowledgeDir: knowledge

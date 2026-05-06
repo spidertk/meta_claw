@@ -24,7 +24,7 @@ public class InitCommand implements Runnable {
     @Override
     public void run() {
         try {
-            Path baseDir = Paths.get(System.getProperty("user.home"), ".meta-claw");
+            Path baseDir = Paths.get(System.getProperty("user.dir"), ".meta-claw");
             Files.createDirectories(baseDir);
 
             // Create skills directory
@@ -41,7 +41,7 @@ public class InitCommand implements Runnable {
             }
 
             System.out.println("Meta-Claw initialized at: " + baseDir);
-            System.out.println("Please edit ~/.meta-claw/config.yaml and set your API key.");
+            System.out.println("Please edit .meta-claw/config.yaml and set your API key.");
             System.out.println("Run 'meta-claw chat default' to start chatting.");
         } catch (Exception e) {
             throw new RuntimeException("Init failed: " + e.getMessage(), e);
