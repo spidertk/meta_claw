@@ -1,18 +1,17 @@
 package meta.claw.cli;
 
 import lombok.extern.slf4j.Slf4j;
-import meta.claw.core.model.GlobalConfig;
-import meta.claw.core.model.ProviderConfig;
-import meta.claw.core.runtime.ExpertRuntime;
 import meta.claw.core.runtime.SpringAiLlmClient;
 import meta.claw.core.spi.llm.LlmClientFactoryManager;
 import meta.claw.core.spi.llm.SpiChatRequest;
 import meta.claw.core.spi.llm.SpiChatResponse;
 import meta.claw.core.spi.llm.SpiMessage;
 import meta.claw.core.spi.llm.SpiProviderMeta;
-import meta.claw.vessel.GlobalConfigLoader;
+import meta.claw.core.spi.llm.SpiStreamingCallback;
+import meta.claw.core.spi.llm.SpiToolCall;
+import meta.claw.vessel.ResolvedVesselConfig;
 import meta.claw.vessel.VesselConfig;
-import meta.claw.vessel.VesselConfigLoader;
+import meta.claw.vessel.VesselConfigResolver;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Component;
 import picocli.CommandLine.Command;
@@ -42,29 +41,18 @@ public class ChatCommand implements Runnable {
     @Override
     public void run() {
         Path configDir = Paths.get(System.getProperty("user.dir"), ".meta-claw");
-
-        // 1. Load global config
-        GlobalConfigLoader globalLoader = new GlobalConfigLoader();
-        GlobalConfig globalConfig = globalLoader.load(configDir);
-
-        if (globalConfig == null || globalConfig.getProviders() == null || globalConfig.getProviders().isEmpty()) {
-            System.err.println("Provider config not found.");
-            System.err.println("Run 'meta-claw config set providers.<name>.api_key <key>' to set up.");
+        VesselConfigResolver resolver = new VesselConfigResolver();
+        ResolvedVesselConfig resolved;
+        try {
+            resolved = resolver.resolve(configDir, expertName);
+        } catch (IllegalStateException | IllegalArgumentException e) {
+            System.err.println(e.getMessage());
             return;
         }
 
-        String providerName = globalConfig.getDefaultProvider();
-        if (providerName == null || providerName.isBlank()) {
-            providerName = globalConfig.getProviders().keySet().iterator().next();
-        }
-
-        log.info("Using provider: {}", providerName);
-
-        ProviderConfig providerConfig = globalConfig.getProviders().get(providerName);
-        if (providerConfig == null) {
-            System.err.println("Provider not found: " + providerName);
-            return;
-        }
+        String providerName = resolved.getProviderName();
+        meta.claw.core.model.ProviderConfig providerConfig = resolved.getProviderConfig();
+        VesselConfig vesselConfig = resolved.getVesselConfig();
 
         String apiKey = providerConfig.getApiKey();
         if (apiKey == null || apiKey.isBlank() || "your-api-key".equals(apiKey)) {
@@ -73,28 +61,18 @@ public class ChatCommand implements Runnable {
             return;
         }
 
+        String model = providerConfig.getModel();
+        if (model == null || model.isBlank()) {
+            System.err.println("Model not set for provider '" + providerName + "'.");
+            System.err.println("Run 'meta-claw config set providers." + providerName + ".model <model-name>' to configure.");
+            return;
+        }
+
+        log.info("Using provider: {}", providerName);
         log.info("Provider config - baseUrl: {}, model: {}",
                 providerConfig.getBaseUrl(),
                 providerConfig.getModel());
 
-        // 2. Load vessel config
-        Path vesselPath = configDir.resolve("vessels").resolve(expertName).resolve("vessel.md");
-        VesselConfigLoader vesselLoader = new VesselConfigLoader();
-        VesselConfig vesselConfig = vesselLoader.loadSingle(vesselPath);
-
-        if (vesselConfig == null) {
-            System.err.println("Vessel not found: " + expertName);
-            System.err.println("Run 'meta-claw init' to create default vessel.");
-            return;
-        }
-
-        // 3. Determine model (vessel overrides provider)
-        String model = vesselConfig.getModel();
-        if (model == null || model.isBlank()) {
-            model = providerConfig.getModel();
-        }
-
-        // 4. Build ChatClient via factory manager (dynamic routing by provider name)
         ChatClient chatClient = factoryManager.create(providerName, providerConfig, model);
 
         SpiProviderMeta meta = SpiProviderMeta.builder()
@@ -104,7 +82,6 @@ public class ChatCommand implements Runnable {
                 .build();
 
         SpringAiLlmClient llmClient = new SpringAiLlmClient(chatClient, meta);
-        ExpertRuntime runtime = new ExpertRuntime(null, chatClient);
 
         String displayName = vesselConfig.getName() != null ? vesselConfig.getName() : expertName;
         String emoji = vesselConfig.getEmoji() != null ? vesselConfig.getEmoji() : "🤖";
@@ -154,11 +131,37 @@ public class ChatCommand implements Runnable {
                 SpiChatRequest request = SpiChatRequest.builder().messages(history).build();
 
                 System.out.print("AI: ");
-                SpiChatResponse response = llmClient.chat(request);
-                System.out.println(response.content());
-                System.out.println();
+                StringBuilder responseBuffer = new StringBuilder();
+                llmClient.chatStream(request, new SpiStreamingCallback() {
+                    @Override
+                    public void onStart() {
+                        // no-op
+                    }
 
-                history.add(SpiMessage.assistant(response.content()));
+                    @Override
+                    public void onChunk(String chunk) {
+                        System.out.print(chunk);
+                        System.out.flush();
+                        responseBuffer.append(chunk);
+                    }
+
+                    @Override
+                    public void onToolCall(SpiToolCall toolCall) {
+                        // no-op
+                    }
+
+                    @Override
+                    public void onComplete(SpiChatResponse response) {
+                        System.out.println();
+                    }
+
+                    @Override
+                    public void onError(Throwable error) {
+                        System.err.println("\nError: " + error.getMessage());
+                    }
+                });
+
+                history.add(SpiMessage.assistant(responseBuffer.toString()));
             }
         } catch (Exception e) {
             log.error("Chat error", e);
