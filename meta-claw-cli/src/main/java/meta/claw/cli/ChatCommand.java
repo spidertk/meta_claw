@@ -12,12 +12,15 @@ import meta.claw.core.spi.llm.SpiToolCall;
 import meta.claw.vessel.ResolvedVesselConfig;
 import meta.claw.vessel.VesselConfig;
 import meta.claw.vessel.VesselConfigResolver;
+import org.jline.terminal.Terminal;
+import org.jline.terminal.TerminalBuilder;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Component;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Parameters;
 
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -40,6 +43,17 @@ public class ChatCommand implements Runnable {
 
     @Override
     public void run() {
+        Terminal terminal;
+        try {
+            terminal = TerminalBuilder.builder()
+                    .system(true)
+                    .dumb(true)
+                    .build();
+        } catch (IOException e) {
+            System.err.println("Failed to initialize terminal: " + e.getMessage());
+            return;
+        }
+
         Path configDir = Paths.get(System.getProperty("user.dir"), ".meta-claw");
         VesselConfigResolver resolver = new VesselConfigResolver();
         ResolvedVesselConfig resolved;
@@ -88,21 +102,22 @@ public class ChatCommand implements Runnable {
         String description = vesselConfig.getDescription() != null ? vesselConfig.getDescription() : "A general-purpose AI assistant.";
 
         // Welcome screen (inspired by expert_cli/cli.py print_welcome)
-        System.out.println();
-        System.out.println("╔══════════════════════════════════════════════════════════════════╗");
-        System.out.println("║                                                                  ║");
-        System.out.println(String.format("║   %-60s ║", emoji + "  " + displayName));
-        System.out.println("║                                                                  ║");
-        System.out.println(String.format("║   %-60s ║", description));
-        System.out.println("║                                                                  ║");
-        System.out.println(String.format("║   Model: %-54s ║", model));
-        System.out.println(String.format("║   Provider: %-51s ║", providerName));
-        System.out.println("║                                                                  ║");
-        System.out.println("╚══════════════════════════════════════════════════════════════════╝");
-        System.out.println();
-        System.out.println("Commands: /exit  /clear");
-        System.out.println("Press Ctrl+D to quit");
-        System.out.println();
+        terminal.writer().println();
+        terminal.writer().println("╔══════════════════════════════════════════════════════════════════╗");
+        terminal.writer().println("║                                                                  ║");
+        terminal.writer().println(String.format("║   %-60s ║", emoji + "  " + displayName));
+        terminal.writer().println("║                                                                  ║");
+        terminal.writer().println(String.format("║   %-60s ║", description));
+        terminal.writer().println("║                                                                  ║");
+        terminal.writer().println(String.format("║   Model: %-54s ║", model));
+        terminal.writer().println(String.format("║   Provider: %-51s ║", providerName));
+        terminal.writer().println("║                                                                  ║");
+        terminal.writer().println("╚══════════════════════════════════════════════════════════════════╝");
+        terminal.writer().println();
+        terminal.writer().println("Commands: /exit  /clear");
+        terminal.writer().println("Press Ctrl+D to quit");
+        terminal.writer().println();
+        terminal.flush();
 
         BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
         List<SpiMessage> history = new ArrayList<>();
@@ -113,7 +128,8 @@ public class ChatCommand implements Runnable {
 
         try {
             while (true) {
-                System.out.print("> ");
+                terminal.writer().print("> ");
+                terminal.flush();
                 String input = reader.readLine();
                 if (input == null || "/exit".equalsIgnoreCase(input.trim())) {
                     break;
@@ -123,14 +139,16 @@ public class ChatCommand implements Runnable {
                     if (systemPrompt != null && !systemPrompt.isBlank()) {
                         history.add(SpiMessage.system(systemPrompt));
                     }
-                    System.out.println("History cleared.");
+                    terminal.writer().println("History cleared.");
+                    terminal.flush();
                     continue;
                 }
 
                 history.add(SpiMessage.user(input));
                 SpiChatRequest request = SpiChatRequest.builder().messages(history).build();
 
-                System.out.print("AI: ");
+                terminal.writer().print("AI: ");
+                terminal.flush();
                 StringBuilder responseBuffer = new StringBuilder();
                 llmClient.chatStream(request, new SpiStreamingCallback() {
                     @Override
@@ -140,8 +158,8 @@ public class ChatCommand implements Runnable {
 
                     @Override
                     public void onChunk(String chunk) {
-                        System.out.print(chunk);
-                        System.out.flush();
+                        terminal.writer().print(chunk);
+                        terminal.flush();
                         responseBuffer.append(chunk);
                     }
 
@@ -152,12 +170,14 @@ public class ChatCommand implements Runnable {
 
                     @Override
                     public void onComplete(SpiChatResponse response) {
-                        System.out.println();
+                        terminal.writer().println();
+                        terminal.flush();
                     }
 
                     @Override
                     public void onError(Throwable error) {
-                        System.err.println("\nError: " + error.getMessage());
+                        terminal.writer().println("\nError: " + error.getMessage());
+                        terminal.flush();
                     }
                 });
 
@@ -168,6 +188,7 @@ public class ChatCommand implements Runnable {
             System.err.println("Error: " + e.getMessage());
         }
 
-        System.out.println("Goodbye!");
+        terminal.writer().println("Goodbye!");
+        terminal.flush();
     }
 }

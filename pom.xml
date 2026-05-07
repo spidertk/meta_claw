@@ -51,6 +51,8 @@
         <guava.version>32.1.3-jre</guava.version>
         <!-- Lombok 版本 -->
         <lombok.version>1.18.30</lombok.version>
+        <!-- JLine3 版本 -->
+        <jline.version>3.25.1</jline.version>
     </properties>
 
     <!-- 依赖版本管理：子模块可引用而不必指定版本 -->
@@ -136,6 +138,12 @@
                 <groupId>org.projectlombok</groupId>
                 <artifactId>lombok</artifactId>
                 <version>${lombok.version}</version>
+            </dependency>
+            <!-- JLine3：终端控制库 -->
+            <dependency>
+                <groupId>org.jline</groupId>
+                <artifactId>jline-terminal</artifactId>
+                <version>${jline.version}</version>
             </dependency>
             <!-- OpenILink SDK：微信 iLink 协议 Java SDK（本地子模块） -->
             <dependency>
