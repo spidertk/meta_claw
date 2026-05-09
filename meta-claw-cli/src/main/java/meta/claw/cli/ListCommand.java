@@ -1,6 +1,7 @@
 package meta.claw.cli;
 
-import meta.claw.vessel.VesselConfig;
+import meta.claw.core.model.VesselConfig;
+import meta.claw.vessel.ProjectRootFinder;
 import meta.claw.vessel.VesselConfigLoader;
 import org.springframework.stereotype.Component;
 import picocli.CommandLine.Command;
@@ -26,7 +27,7 @@ public class ListCommand implements Runnable {
 
     @Override
     public void run() {
-        Path vesselsDir = Paths.get(System.getProperty("user.dir"), ".meta-claw", "vessels");
+        Path vesselsDir = ProjectRootFinder.getMetaClawDir().resolve("vessels");
 
         if (!vesselsDir.toFile().exists()) {
             System.err.println("Vessels directory not found. Run 'meta-claw init' first.");
@@ -41,9 +42,9 @@ public class ListCommand implements Runnable {
             return;
         }
 
-        System.out.println("┌──────────────┬──────────────────────────────┬──────────────────────────────┬────────────────────┐");
-        System.out.println(String.format("│ %-12s │ %-28s │ %-28s │ %-18s │", "ID", "Name", "Description", "Model"));
-        System.out.println("├──────────────┼──────────────────────────────┼──────────────────────────────┼────────────────────┤");
+        System.out.println("┌──────────────────────────────┬──────────────────────────────┬────────────────────┐");
+        System.out.println(String.format("│ %-28s │ %-28s │ %-18s │", "Name", "Description", "Model"));
+        System.out.println("├──────────────────────────────┼──────────────────────────────┼────────────────────┤");
 
         for (VesselConfig vessel : vessels) {
             String id = vessel.getId() != null ? vessel.getId() : "N/A";
@@ -59,9 +60,9 @@ public class ListCommand implements Runnable {
             desc = desc.length() > 28 ? desc.substring(0, 25) + "..." : desc;
             model = model.length() > 18 ? model.substring(0, 15) + "..." : model;
 
-            System.out.println(String.format("│ %-12s │ %-28s │ %-28s │ %-18s │", id, name, desc, model));
+            System.out.println(String.format("│ %-28s │ %-28s │ %-18s │", name, desc, model));
         }
-        System.out.println("└──────────────┴──────────────────────────────┴──────────────────────────────┴────────────────────┘");
+        System.out.println("└──────────────────────────────┴──────────────────────────────┴────────────────────┘");
         System.out.println("\nUse 'meta-claw chat <id>' to start chatting.");
     }
 }

@@ -10,7 +10,8 @@ import meta.claw.core.spi.llm.SpiProviderMeta;
 import meta.claw.core.spi.llm.SpiStreamingCallback;
 import meta.claw.core.spi.llm.SpiToolCall;
 import meta.claw.vessel.ResolvedVesselConfig;
-import meta.claw.vessel.VesselConfig;
+import meta.claw.core.model.VesselConfig;
+import meta.claw.vessel.ProjectRootFinder;
 import meta.claw.vessel.VesselConfigResolver;
 import org.jline.terminal.Terminal;
 import org.jline.terminal.TerminalBuilder;
@@ -29,7 +30,7 @@ import java.util.List;
 
 @Slf4j
 @Component
-@Command(name = "chat", description = "Chat with an expert")
+@Command(name = "chat", description = "Chat with a vessel")
 public class ChatCommand implements Runnable {
 
     private final LlmClientFactoryManager factoryManager;
@@ -38,8 +39,8 @@ public class ChatCommand implements Runnable {
         this.factoryManager = factoryManager;
     }
 
-    @Parameters(index = "0", defaultValue = "default", description = "Expert name")
-    private String expertName;
+    @Parameters(index = "0", defaultValue = "default", description = "Vessel name")
+    private String vesselName;
 
     @Override
     public void run() {
@@ -54,11 +55,11 @@ public class ChatCommand implements Runnable {
             return;
         }
 
-        Path configDir = Paths.get(System.getProperty("user.dir"), ".meta-claw");
+        Path configDir = ProjectRootFinder.getMetaClawDir();
         VesselConfigResolver resolver = new VesselConfigResolver();
         ResolvedVesselConfig resolved;
         try {
-            resolved = resolver.resolve(configDir, expertName);
+            resolved = resolver.resolve(configDir, vesselName);
         } catch (IllegalStateException | IllegalArgumentException e) {
             System.err.println(e.getMessage());
             return;
@@ -97,7 +98,7 @@ public class ChatCommand implements Runnable {
 
         SpringAiLlmClient llmClient = new SpringAiLlmClient(chatClient, meta);
 
-        String displayName = vesselConfig.getName() != null ? vesselConfig.getName() : expertName;
+        String displayName = vesselConfig.getName() != null ? vesselConfig.getName() : vesselName;
         String emoji = vesselConfig.getEmoji() != null ? vesselConfig.getEmoji() : "🤖";
         String description = vesselConfig.getDescription() != null ? vesselConfig.getDescription() : "A general-purpose AI assistant.";
 
@@ -129,7 +130,7 @@ public class ChatCommand implements Runnable {
         try {
             while (true) {
                 terminal.writer().print("> ");
-                terminal.flush();
+                terminal.writer().flush();
                 String input = reader.readLine();
                 if (input == null || "/exit".equalsIgnoreCase(input.trim())) {
                     break;
@@ -148,7 +149,7 @@ public class ChatCommand implements Runnable {
                 SpiChatRequest request = SpiChatRequest.builder().messages(history).build();
 
                 terminal.writer().print("AI: ");
-                terminal.flush();
+                terminal.writer().flush();
                 StringBuilder responseBuffer = new StringBuilder();
                 llmClient.chatStream(request, new SpiStreamingCallback() {
                     @Override
@@ -159,7 +160,7 @@ public class ChatCommand implements Runnable {
                     @Override
                     public void onChunk(String chunk) {
                         terminal.writer().print(chunk);
-                        terminal.flush();
+                        terminal.writer().flush();
                         responseBuffer.append(chunk);
                     }
 
@@ -171,17 +172,17 @@ public class ChatCommand implements Runnable {
                     @Override
                     public void onComplete(SpiChatResponse response) {
                         terminal.writer().println();
-                        terminal.flush();
+                        terminal.writer().flush();
+                        // 在 onComplete 回调中添加历史消息，确保 responseBuffer 已完整填充
+                        history.add(SpiMessage.assistant(responseBuffer.toString()));
                     }
 
                     @Override
                     public void onError(Throwable error) {
                         terminal.writer().println("\nError: " + error.getMessage());
-                        terminal.flush();
+                        terminal.writer().flush();
                     }
                 });
-
-                history.add(SpiMessage.assistant(responseBuffer.toString()));
             }
         } catch (Exception e) {
             log.error("Chat error", e);
@@ -189,6 +190,6 @@ public class ChatCommand implements Runnable {
         }
 
         terminal.writer().println("Goodbye!");
-        terminal.flush();
+        terminal.writer().flush();
     }
 }

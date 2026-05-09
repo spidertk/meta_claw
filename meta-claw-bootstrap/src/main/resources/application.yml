@@ -26,7 +26,5 @@ meta:
       # Expert 配置目录，系统启动时会扫描该目录下的子目录及 expert.yaml 文件
       dir: ./experts
 
-logging:
-  level:
-    # Meta-Claw 包下所有类的日志级别设为 DEBUG，便于开发调试和问题排查
-    meta.claw: DEBUG
+# 日志级别由 ~/.meta-claw/config.yaml 中的 log.debug 控制
+# 仅在 log.debug: true 时，meta.claw 包才会输出 DEBUG 级别日志

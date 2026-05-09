@@ -42,3 +42,4 @@ knowledge
 *.lst
 */.meta-claw/
 target/*
+logs

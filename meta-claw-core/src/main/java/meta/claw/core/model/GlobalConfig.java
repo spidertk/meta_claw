@@ -13,4 +13,5 @@ import java.util.Map;
 public class GlobalConfig {
     private String defaultProvider;
     private Map<String, ProviderConfig> providers;
+    private Boolean logDebug;
 }

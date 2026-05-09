@@ -35,6 +35,13 @@
             <groupId>org.springframework.ai</groupId>
             <artifactId>spring-ai-openai</artifactId>
         </dependency>
+        <!-- reactor-netty-http: 为 WebClient 提供真正的异步流式传输能力。
+             缺失时 WebClient 会回退到 JDK HttpClient，导致 SSE 流式响应被缓冲，
+             所有 chunk 一次性到达，失去实时流式效果。 -->
+        <dependency>
+            <groupId>io.projectreactor.netty</groupId>
+            <artifactId>reactor-netty-http</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.yaml</groupId>
             <artifactId>snakeyaml</artifactId>

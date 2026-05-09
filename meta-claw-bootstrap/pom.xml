@@ -2,7 +2,7 @@
 <!-- 
     Meta-Claw Bootstrap 模块 POM
     作用：系统启动入口模块，整合 web 服务相关子模块并对外提供可运行的 Spring Boot 应用
-    依赖：meta-claw-core、meta-claw-session、meta-claw-gateway、meta-claw-gateway-weixin
+    依赖：meta-claw-core、meta-claw-store、meta-claw-gateway、meta-claw-gateway-weixin
           + Spring Boot 启动器 + Spring AI OpenAI 启动器
     注意：此模块为可执行 jar 的打包入口
 -->
@@ -30,10 +30,10 @@
             <groupId>com.meta</groupId>
             <artifactId>meta-claw-core</artifactId>
         </dependency>
-        <!-- 依赖会话管理模块 -->
+        <!-- 依赖数据存储模块 -->
         <dependency>
             <groupId>com.meta</groupId>
-            <artifactId>meta-claw-session</artifactId>
+            <artifactId>meta-claw-store</artifactId>
         </dependency>
         <!-- 依赖通用网关模块 -->
         <dependency>

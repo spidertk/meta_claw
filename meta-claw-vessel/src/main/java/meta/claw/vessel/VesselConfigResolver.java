@@ -1,6 +1,8 @@
 package meta.claw.vessel;
 
 import lombok.extern.slf4j.Slf4j;
+import meta.claw.core.config.GlobalConfigLoader;
+import meta.claw.core.model.VesselConfig;
 import meta.claw.core.model.GlobalConfig;
 import meta.claw.core.model.ProviderConfig;
 

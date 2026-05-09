@@ -23,7 +23,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 /**
- * 基于 Spring AI 2.0 ChatClient 的 SpiLlmClient 实现。
+ * 基于 Spring AI 1.0.6 ChatClient 的 SpiLlmClient 实现。
  */
 @Slf4j
 public class SpringAiLlmClient implements SpiLlmClient {
@@ -68,29 +68,75 @@ public class SpringAiLlmClient implements SpiLlmClient {
 
     @Override
     public void chatStream(SpiChatRequest request, SpiStreamingCallback callback) {
+        long startTime = System.currentTimeMillis();
+        
         List<Message> springMessages = request.messages().stream()
                 .map(this::toSpringMessage)
-                .collect(Collectors.toList());
+                .toList();
         Prompt prompt = new Prompt(springMessages);
 
+        long buildPromptTime = System.currentTimeMillis() - startTime;
+        log.debug("[STREAM] Build prompt took {}ms, messages={}", buildPromptTime, springMessages.size());
+        
+//        log.info("[STREAM] Starting stream request with {} messages", springMessages.size());
         callback.onStart();
         StringBuilder contentBuilder = new StringBuilder();
+        
         try {
+            long[] firstChunkTime = {-1};
+            int[] chunkCount = {0};
+            long[] lastChunkTime = {startTime};
+            
+            log.debug("[STREAM] Calling chatClient.stream() at {}ms", System.currentTimeMillis() - startTime);
+            
             chatClient.prompt(prompt).stream().content()
-                    .doOnNext(chunk -> {
-                        contentBuilder.append(chunk);
-                        callback.onChunk(chunk);
-                    })
-                    .blockLast();
-
-            SpiChatResponse response = SpiChatResponse.builder()
-                    .content(contentBuilder.toString())
-                    .toolCalls(null)
-                    .usage(null)
-                    .metadata(null)
-                    .build();
-            callback.onComplete(response);
+                .doOnSubscribe(s -> {
+                    log.debug("[STREAM-SUBSCRIBE] Subscribed at {}ms", System.currentTimeMillis() - startTime);
+                })
+                .doOnNext(chunk -> {
+                    chunkCount[0]++;
+                    long elapsed = System.currentTimeMillis() - startTime;
+                    long gap = elapsed - lastChunkTime[0];
+                    lastChunkTime[0] = elapsed;
+                    
+                    if (firstChunkTime[0] == -1) {
+                        firstChunkTime[0] = elapsed;
+                        log.debug("[STREAM] First chunk received after {}ms (TTFB)", elapsed);
+                    } else {
+                        log.debug("[STREAM-CHUNK #{}] at {}ms (gap: {}ms): len={}",
+                            chunkCount[0], elapsed, gap, chunk.length());
+                    }
+                    
+                    contentBuilder.append(chunk);
+                    callback.onChunk(chunk);
+                })
+                .doOnError(error -> {
+                    long totalTime = System.currentTimeMillis() - startTime;
+                    log.error("[STREAM] Error occurred after {}ms: {}", totalTime, error.getMessage(), error);
+                    callback.onError(error);
+                })
+                .doOnComplete(() -> {
+                    long totalTime = System.currentTimeMillis() - startTime;
+                    log.debug("[STREAM] Completed: totalChunks={}, totalTime={}ms, firstChunkAt={}ms, avgGap={}ms, totalLength={}",
+                        chunkCount[0], 
+                        totalTime, 
+                        firstChunkTime[0],
+                        chunkCount[0] > 1 ? (totalTime - firstChunkTime[0]) / (chunkCount[0] - 1) : 0,
+                        contentBuilder.length());
+                    
+                    SpiChatResponse response = SpiChatResponse.builder()
+                            .content(contentBuilder.toString())
+                            .toolCalls(null)
+                            .usage(null)
+                            .metadata(null)
+                            .build();
+                    callback.onComplete(response);
+                })
+                .blockLast(); // 阻塞等待流完成，但每个chunk会实时回调
+                
         } catch (Exception e) {
+            long totalTime = System.currentTimeMillis() - startTime;
+            log.error("[STREAM] Exception after {}ms: {}", totalTime, e.getMessage(), e);
             callback.onError(e);
         }
     }

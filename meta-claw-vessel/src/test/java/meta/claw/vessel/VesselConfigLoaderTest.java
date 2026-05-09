@@ -1,5 +1,6 @@
 package meta.claw.vessel;
 
+import meta.claw.core.model.VesselConfig;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -24,7 +25,7 @@ class VesselConfigLoaderTest {
                 name: Test Vessel
                 model: kimi-k2.5
                 system_prompt: You are a test assistant.
-                memory_enabled: true
+                preferences_enabled: true
                 ---
                 """;
         Files.writeString(vesselDir.resolve("vessel.md"), content);
@@ -36,7 +37,7 @@ class VesselConfigLoaderTest {
         assertEquals("test-vessel", config.getId());
         assertEquals("Test Vessel", config.getName());
         assertEquals("kimi-k2.5", config.getModel());
-        assertTrue(config.isMemoryEnabled());
+        assertTrue(config.isPreferencesEnabled());
     }
 
     @Test

@@ -6,11 +6,11 @@ import meta.claw.gateway.channel.ChannelRegistry;
 import meta.claw.gateway.weixin.WeixinChannel;
 import meta.claw.gateway.weixin.WeixinConfig;
 import meta.claw.core.runtime.AgentLoop;
-import meta.claw.core.runtime.ExpertManager;
-import meta.claw.core.runtime.ExpertRuntime;
-import meta.claw.core.model.ExpertConfig;
-import meta.claw.session.SessionManager;
-import meta.claw.session.storage.InMemorySessionStorage;
+import meta.claw.core.runtime.VesselManager;
+import meta.claw.core.runtime.VesselRuntime;
+import meta.claw.core.model.VesselConfig;
+import meta.claw.core.session.InMemorySessionStorage;
+import meta.claw.core.session.SessionManager;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -19,7 +19,7 @@ import org.springframework.context.annotation.Configuration;
 /**
  * Meta-Claw 核心配置类
  * <p>
- * 负责手动装配系统中所有核心 Bean，包括事件总线、会话管理、网关、Expert 管理及渠道等组件。
+ * 负责手动装配系统中所有核心 Bean，包括事件总线、会话管理、网关、Vessel 管理及渠道等组件。
  * 所有 Bean 均采用显式声明方式，便于集中管理和调试。
  * </p>
  */
@@ -33,16 +33,16 @@ public class AppConfig {
     private String weixinToken;
 
     /**
-     * Expert 配置目录路径，从 application.yml 中读取
+     * Vessel 配置目录路径，从 application.yml 中读取
      */
-    @Value("${meta.claw.experts.dir}")
-    private String expertsDir;
+    @Value("${meta.claw.vessels.dir}")
+    private String vesselsDir;
 
     /**
      * 事件总线包装器 Bean
      * <p>
      * 基于 Guava AsyncEventBus 实现，为系统各模块提供异步事件发布与订阅能力。
-     * 是 Expert、Gateway、AgentLoop 等组件间解耦通信的核心基础设施。
+     * 是 Vessel、Gateway、AgentLoop 等组件间解耦通信的核心基础设施。
      * </p>
      *
      * @return EventBusWrapper 实例
@@ -69,7 +69,7 @@ public class AppConfig {
     /**
      * 内存会话存储 Bean
      * <p>
-     * 基于 ConcurrentHashMap 实现的会话存储，适用于单机部署或开发测试环境。
+     * 基于 ConcurrentHashMap 实现的会话状态存储，适用于单机部署或开发测试环境。
      * 提供会话的增删改查及过期清理能力。
      * </p>
      *
@@ -98,8 +98,8 @@ public class AppConfig {
     /**
      * 网关中央控制器 Bean
      * <p>
-     * 作为系统消息出入口的核心协调者，负责渠道注册、入站消息处理及 Expert 回复路由。
-     * 初始化时自动注册为 EventBus 订阅者，监听 ExpertResponseReady 事件。
+     * 作为系统消息出入口的核心协调者，负责渠道注册、入站消息处理及 Vessel 回复路由。
+     * 初始化时自动注册为 EventBus 订阅者，监听 VesselResponseReady 事件。
      * </p>
      *
      * @param registry 渠道注册表
@@ -112,36 +112,36 @@ public class AppConfig {
     }
 
     /**
-     * Expert 管理器 Bean
+     * Vessel 管理器 Bean
      * <p>
-     * 负责扫描并加载 experts/ 目录下的所有 Expert 配置（expert.yaml），
-     * 维护 Expert 配置及运行时实例的注册与查询。
-     * Bean 创建时立即调用 loadExperts() 完成配置加载。
+     * 负责扫描并加载 vessels/ 目录下的所有 Vessel 配置（vessel.md），
+     * 维护 Vessel 配置及运行时实例的注册与查询。
+     * Bean 创建时立即调用 loadVessels() 完成配置加载。
      * </p>
      *
-     * @return ExpertManager 实例
+     * @return VesselManager 实例
      */
     @Bean
-    public ExpertManager expertManager() {
-        ExpertManager manager = new ExpertManager(expertsDir);
-        manager.loadExperts();
+    public VesselManager vesselManager() {
+        VesselManager manager = new VesselManager(vesselsDir);
+        manager.loadVessels();
         return manager;
     }
 
     /**
      * Agent 事件循环处理器 Bean
      * <p>
-     * 订阅 EventBus 上的 UserMessageReceived 事件，负责调度 Expert 处理用户消息，
-     * 并将 Expert 生成的回复通过 ExpertResponseReady 事件发布给 Gateway 发送。
+     * 订阅 EventBus 上的 UserMessageReceived 事件，负责调度 Vessel 处理用户消息，
+     * 并将 Vessel 生成的回复通过 VesselResponseReady 事件发布给 Gateway 发送。
      * </p>
      *
      * @param eventBus      事件总线包装器
-     * @param expertManager Expert 管理器
+     * @param vesselManager Vessel 管理器
      * @return AgentLoop 实例
      */
     @Bean
-    public AgentLoop agentLoop(EventBusWrapper eventBus, ExpertManager expertManager) {
-        return new AgentLoop(eventBus, expertManager);
+    public AgentLoop agentLoop(EventBusWrapper eventBus, VesselManager vesselManager) {
+        return new AgentLoop(eventBus, vesselManager);
     }
 
     /**
@@ -162,20 +162,20 @@ public class AppConfig {
     }
 
     /**
-     * 初始化所有 Expert 的运行时实例
+     * 初始化所有 Vessel 的运行时实例
      * <p>
-     * 遍历 ExpertManager 中已加载的所有 Expert 配置，为每个 Expert 创建独立的 ExpertRuntime。
-     * ExpertRuntime 封装 Spring AI ChatClient，提供独立的 AI 对话能力。
-     * 创建完成后将运行时实例注册回 ExpertManager，供 AgentLoop 调度使用。
+     * 遍历 VesselManager 中已加载的所有 Vessel 配置，为每个 Vessel 创建独立的 VesselRuntime。
+     * VesselRuntime 封装 Spring AI ChatClient，提供独立的 AI 对话能力。
+     * 创建完成后将运行时实例注册回 VesselManager，供 AgentLoop 调度使用。
      * </p>
      *
-     * @param expertManager Expert 管理器，包含已加载的 Expert 配置
+     * @param vesselManager Vessel 管理器，包含已加载的 Vessel 配置
      * @param chatClient    Spring AI ChatClient，底层 AI 模型对话客户端
      */
-    public void initializeRuntimes(ExpertManager expertManager, ChatClient chatClient) {
-        for (ExpertConfig config : expertManager.listAvailableExperts()) {
-            ExpertRuntime runtime = new ExpertRuntime(config, chatClient);
-            expertManager.registerRuntime(config.getId(), runtime);
+    public void initializeRuntimes(VesselManager vesselManager, ChatClient chatClient) {
+        for (VesselConfig config : vesselManager.listAvailableVessels()) {
+            VesselRuntime runtime = new VesselRuntime(config, chatClient);
+            vesselManager.registerRuntime(config.getId(), runtime);
         }
     }
 }

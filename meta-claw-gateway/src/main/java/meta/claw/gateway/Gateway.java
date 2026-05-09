@@ -3,7 +3,7 @@ package meta.claw.gateway;
 import com.google.common.eventbus.Subscribe;
 import lombok.extern.slf4j.Slf4j;
 import meta.claw.core.eventbus.EventBusWrapper;
-import meta.claw.core.events.ExpertResponseReady;
+import meta.claw.core.events.VesselResponseReady;
 import meta.claw.core.events.UserMessageReceived;
 import meta.claw.core.model.Context;
 import meta.claw.core.model.ContextType;
@@ -16,7 +16,7 @@ import meta.claw.gateway.channel.ChatMessage;
  * 作为系统消息出入口的核心协调者，负责：
  * 1. 管理所有 Channel 实例的注册与生命周期；
  * 2. 接收外部入站消息，构造上下文并发布 UserMessageReceived 事件；
- * 3. 订阅 ExpertResponseReady 事件，将 Expert 生成的回复路由到对应渠道发送。
+ * 3. 订阅 VesselResponseReady 事件，将 Vessel 生成的回复路由到对应渠道发送。
  */
 @Slf4j
 public class Gateway {
@@ -33,7 +33,7 @@ public class Gateway {
 
     /**
      * 构造函数
-     * 初始化 Gateway 并自动将自身注册为事件总线的订阅者，以便接收 ExpertResponseReady 事件。
+     * 初始化 Gateway 并自动将自身注册为事件总线的订阅者，以便接收 VesselResponseReady 事件。
      *
      * @param registry 渠道注册表实例
      * @param eventBus 事件总线封装器实例
@@ -41,7 +41,7 @@ public class Gateway {
     public Gateway(ChannelRegistry registry, EventBusWrapper eventBus) {
         this.registry = registry;
         this.eventBus = eventBus;
-        // 将 Gateway 自身注册为 EventBus 订阅者，订阅 ExpertResponseReady 等事件
+        // 将 Gateway 自身注册为 EventBus 订阅者，订阅 VesselResponseReady 等事件
         this.eventBus.register(this);
         log.info("[Gateway] Gateway 已初始化并注册为 EventBus 订阅者");
     }
@@ -81,7 +81,7 @@ public class Gateway {
         // 将原始 ChatMessage 存入扩展参数，供下游处理流程使用
         context.getKwargs().put("msg", msg);
 
-        // 发布用户消息接收事件，触发后续 Expert 处理流程
+        // 发布用户消息接收事件，触发后续 Vessel 处理流程
         eventBus.post(new UserMessageReceived(context, msg.getOtherUserId(), channelType));
         log.debug("[Gateway] 入站消息已发布事件, channelType={}, sessionId={}", channelType, msg.getOtherUserId());
     }
@@ -107,14 +107,14 @@ public class Gateway {
     }
 
     /**
-     * 订阅 Expert 回复就绪事件
-     * 当 Expert 模块完成消息处理并生成回复后触发，Gateway 根据事件中的渠道类型
+     * 订阅 Vessel 回复就绪事件
+     * 当 Vessel 模块完成消息处理并生成回复后触发，Gateway 根据事件中的渠道类型
      * 从 ChannelRegistry 查找对应渠道，并调用其 send 方法将回复发送给用户。
      *
-     * @param event Expert 回复就绪领域事件，包含回复内容、上下文及目标渠道类型
+     * @param event Vessel 回复就绪领域事件，包含回复内容、上下文及目标渠道类型
      */
     @Subscribe
-    public void onResponseReady(ExpertResponseReady event) {
+    public void onResponseReady(VesselResponseReady event) {
         String channelType = event.getChannelType();
         Channel channel = registry.get(channelType);
 

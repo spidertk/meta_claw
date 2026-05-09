@@ -6,7 +6,7 @@ import lombok.Setter;
 /**
  * 会话配置类
  * <p>
- * 用于定义 Expert 的会话存储方式与持久化路径。
+ * 用于定义 Vessel 的会话存储方式与持久化路径。
  * </p>
  */
 @Getter

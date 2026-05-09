@@ -8,7 +8,7 @@ import picocli.CommandLine.Parameters;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
+import meta.claw.vessel.ProjectRootFinder;
 import java.util.Comparator;
 import java.util.Scanner;
 import java.util.stream.Stream;
@@ -32,7 +32,7 @@ public class DeleteCommand implements Runnable {
 
     @Override
     public void run() {
-        Path vesselDir = Paths.get(System.getProperty("user.dir"), ".meta-claw", "vessels", vesselName);
+        Path vesselDir = ProjectRootFinder.getMetaClawDir().resolve("vessels").resolve(vesselName);
 
         if (!Files.exists(vesselDir)) {
             System.err.println("Vessel not found: " + vesselName);
