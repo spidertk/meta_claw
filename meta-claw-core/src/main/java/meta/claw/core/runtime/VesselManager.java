@@ -1,18 +1,13 @@
 package meta.claw.core.runtime;
 
 import lombok.extern.slf4j.Slf4j;
+import meta.claw.core.config.VesselConfigLoader;
 import meta.claw.core.model.VesselConfig;
-import meta.claw.core.model.SessionConfig;
-import org.yaml.snakeyaml.Yaml;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.InputStream;
+import java.nio.file.Path;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
 
 /**
  * Vessel 管理器
@@ -73,111 +68,14 @@ public class VesselManager {
      * </p>
      */
     public void loadVessels() {
-        File dir = new File(vesselsDir);
-        if (!dir.exists() || !dir.isDirectory()) {
-            log.warn("Vessels 目录不存在或不是有效目录: {}", vesselsDir);
-            return;
-        }
-
-        File[] subDirs = dir.listFiles(File::isDirectory);
-        if (subDirs == null) {
-            return;
-        }
-
-        Yaml yaml = new Yaml();
-        for (File subDir : subDirs) {
-            File configFile = new File(subDir, VESSEL_CONFIG_FILE);
-            if (!configFile.exists()) {
-                log.debug("跳过目录 {}，未找到 {}", subDir.getName(), VESSEL_CONFIG_FILE);
-                continue;
-            }
-
-            try (InputStream input = new FileInputStream(configFile)) {
-                Map<String, Object> map = yaml.load(input);
-                if (map == null) {
-                    log.warn("配置文件为空: {}", configFile.getAbsolutePath());
-                    continue;
-                }
-
-                VesselConfig config = mapToVesselConfig(map);
-                if (config.getId() == null || config.getId().isEmpty()) {
-                    log.warn("Vessel 配置缺少 id 字段，跳过: {}", configFile.getAbsolutePath());
-                    continue;
-                }
-
+        VesselConfigLoader loader = new VesselConfigLoader();
+        List<VesselConfig> loaded = loader.loadFromDirectory(Path.of(vesselsDir));
+        for (VesselConfig config : loaded) {
+            if (config.getId() != null && !config.getId().isEmpty()) {
                 vessels.put(config.getId(), config);
                 log.info("成功加载 Vessel 配置: {} ({})", config.getId(), config.getName());
-            } catch (Exception e) {
-                log.error("加载 Vessel 配置失败: {}", configFile.getAbsolutePath(), e);
             }
         }
-    }
-
-    /**
-     * 将 YAML 解析后的 Map 转换为 VesselConfig 对象
-     *
-     * @param map SnakeYAML 解析得到的 Map
-     * @return 转换后的 VesselConfig 实例
-     */
-    @SuppressWarnings("unchecked")
-    public VesselConfig mapToVesselConfig(Map<String, Object> map) {
-        VesselConfig config = new VesselConfig();
-        config.setId(getString(map, "id"));
-        config.setName(getString(map, "name"));
-        config.setDescription(getString(map, "description"));
-        config.setEmoji(getString(map, "emoji"));
-        config.setModel(getString(map, "model"));
-        config.setSystemPrompt(getString(map, "systemPrompt"));
-        config.setPreferencesEnabled(getBoolean(map, "preferencesEnabled"));
-        config.setKnowledgeDir(getString(map, "knowledgeDir"));
-        config.setExcludeTools(getStringList(map, "excludeTools"));
-
-        return config;
-    }
-
-    /**
-     * 从 Map 中安全获取字符串值
-     *
-     * @param map Map 对象
-     * @param key 键名
-     * @return 字符串值，若不存在则返回 null
-     */
-    private String getString(Map<String, Object> map, String key) {
-        Object value = map.get(key);
-        return value != null ? value.toString() : null;
-    }
-
-    /**
-     * 从 Map 中安全获取布尔值
-     *
-     * @param map Map 对象
-     * @param key 键名
-     * @return 布尔值，若不存在则返回 false
-     */
-    private boolean getBoolean(Map<String, Object> map, String key) {
-        Object value = map.get(key);
-        if (value instanceof Boolean) {
-            return (Boolean) value;
-        }
-        return false;
-    }
-
-    /**
-     * 从 Map 中安全获取字符串列表
-     *
-     * @param map Map 对象
-     * @param key 键名
-     * @return 字符串列表，若不存在则返回空列表
-     */
-    @SuppressWarnings("unchecked")
-    private List<String> getStringList(Map<String, Object> map, String key) {
-        Object value = map.get(key);
-        if (value instanceof List) {
-            return ((List<?>) value).stream()
-                    .map(Object::toString)
-                    .collect(Collectors.toList());
-        }
-        return Collections.emptyList();
     }
 
     /**
