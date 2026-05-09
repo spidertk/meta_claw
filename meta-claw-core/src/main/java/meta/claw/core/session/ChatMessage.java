@@ -1,7 +1,9 @@
 package meta.claw.core.session;
 
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.time.LocalDateTime;
@@ -12,6 +14,8 @@ import java.util.Map;
  * 封装单条聊天消息的内容、角色、时间戳及相关元数据
  */
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 @Getter
 @Setter
 public class ChatMessage {
