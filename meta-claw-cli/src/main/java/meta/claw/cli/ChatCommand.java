@@ -20,13 +20,18 @@ import org.springframework.stereotype.Component;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Parameters;
 
+import meta.claw.core.session.ChatMessage;
+import meta.claw.store.conversation.JsonlConversationStore;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 @Slf4j
 @Component
@@ -41,6 +46,9 @@ public class ChatCommand implements Runnable {
 
     @Parameters(index = "0", defaultValue = "default", description = "Vessel name")
     private String vesselName;
+
+    private JsonlConversationStore conversationStore;
+    private String sessionKey;
 
     @Override
     public void run() {
@@ -88,7 +96,7 @@ public class ChatCommand implements Runnable {
                 providerConfig.getBaseUrl(),
                 providerConfig.getModel());
 
-        ChatClient chatClient = factoryManager.create(providerName, providerConfig);
+        ChatClient chatClient = factoryManager.create(providerName, providerConfig, model);
 
         SpiProviderMeta meta = SpiProviderMeta.builder()
                 .name(providerName)
@@ -97,6 +105,11 @@ public class ChatCommand implements Runnable {
                 .build();
 
         SpringAiLlmClient llmClient = new SpringAiLlmClient(chatClient, meta);
+
+        // Initialize conversation store and session
+        Path vesselsDir = configDir.resolve("vessels");
+        this.conversationStore = new JsonlConversationStore(vesselsDir);
+        this.sessionKey = UUID.randomUUID().toString();
 
         String displayName = vesselConfig.getName() != null ? vesselConfig.getName() : vesselName;
         String emoji = vesselConfig.getEmoji() != null ? vesselConfig.getEmoji() : "🤖";
@@ -140,12 +153,32 @@ public class ChatCommand implements Runnable {
                     if (systemPrompt != null && !systemPrompt.isBlank()) {
                         history.add(SpiMessage.system(systemPrompt));
                     }
+                    try {
+                        conversationStore.clearHistory(sessionKey);
+                    } catch (Exception e) {
+                        log.warn("Failed to clear persisted history for session {}", sessionKey, e);
+                    }
                     terminal.writer().println("History cleared.");
                     terminal.flush();
                     continue;
                 }
 
                 history.add(SpiMessage.user(input));
+
+                // Persist user message
+                try {
+                    ChatMessage userMsg = ChatMessage.builder()
+                            .sessionKey(sessionKey)
+                            .role("user")
+                            .content(input)
+                            .vesselName(vesselName)
+                            .timestamp(LocalDateTime.now())
+                            .build();
+                    conversationStore.appendMessage(sessionKey, userMsg);
+                } catch (Exception e) {
+                    log.error("Failed to persist user message", e);
+                }
+
                 SpiChatRequest request = SpiChatRequest.builder().messages(history).build();
 
                 terminal.writer().print("AI: ");
@@ -173,8 +206,22 @@ public class ChatCommand implements Runnable {
                     public void onComplete(SpiChatResponse response) {
                         terminal.writer().println();
                         terminal.writer().flush();
-                        // 在 onComplete 回调中添加历史消息，确保 responseBuffer 已完整填充
-                        history.add(SpiMessage.assistant(responseBuffer.toString()));
+                        String responseText = responseBuffer.toString();
+                        history.add(SpiMessage.assistant(responseText));
+
+                        // Persist assistant message
+                        try {
+                            ChatMessage assistantMsg = ChatMessage.builder()
+                                    .sessionKey(sessionKey)
+                                    .role("assistant")
+                                    .content(responseText)
+                                    .vesselName(vesselName)
+                                    .timestamp(LocalDateTime.now())
+                                    .build();
+                            conversationStore.appendMessage(sessionKey, assistantMsg);
+                        } catch (Exception e) {
+                            log.error("Failed to persist assistant message", e);
+                        }
                     }
 
                     @Override
