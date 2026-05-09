@@ -34,16 +34,15 @@ class VesselConfigResolverTest {
         Files.createDirectories(vesselDir);
 
         String vesselMd = """
-                ---
-                id: default
-                name: Default Vessel
-                model: vessel-md-model
-                system_prompt: You are a test assistant.
-                ---
+                # Default Vessel
                 """;
         Files.writeString(vesselDir.resolve("vessel.md"), vesselMd);
 
         String vesselYaml = """
+                id: default
+                name: Default Vessel
+                model: vessel-md-model
+                system_prompt: You are a test assistant.
                 provider: moonshot
                 model: override-model
                 temperature: 0.5
@@ -79,12 +78,15 @@ class VesselConfigResolverTest {
         Files.createDirectories(vesselDir);
 
         String vesselMd = """
-                ---
-                id: default
-                name: Default Vessel
-                ---
+                # Default Vessel
                 """;
         Files.writeString(vesselDir.resolve("vessel.md"), vesselMd);
+
+        String vesselYaml = """
+                id: default
+                name: Default Vessel
+                """;
+        Files.writeString(vesselDir.resolve("config.yaml"), vesselYaml);
 
         VesselConfigResolver resolver = new VesselConfigResolver();
         ResolvedVesselConfig resolved = resolver.resolve(tempDir, "default");
@@ -109,12 +111,15 @@ class VesselConfigResolverTest {
         Files.createDirectories(vesselDir);
 
         String vesselMd = """
-                ---
-                id: default
-                model: vessel-model
-                ---
+                # Default Vessel
                 """;
         Files.writeString(vesselDir.resolve("vessel.md"), vesselMd);
+
+        String vesselYaml = """
+                id: default
+                model: vessel-model
+                """;
+        Files.writeString(vesselDir.resolve("config.yaml"), vesselYaml);
 
         VesselConfigResolver resolver = new VesselConfigResolver();
         ResolvedVesselConfig resolved = resolver.resolve(tempDir, "default");
