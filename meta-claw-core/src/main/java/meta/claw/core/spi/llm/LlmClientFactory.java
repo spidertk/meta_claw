@@ -16,10 +16,9 @@ public interface LlmClientFactory {
      * 创建 ChatClient
      *
      * @param providerConfig 全局 provider 配置（apiKey, baseUrl 等）
-     * @param model          实际使用的模型名称（vessel 可覆盖 provider 默认值）
      * @return Spring AI ChatClient 实例
      */
-    ChatClient create(ProviderConfig providerConfig, String model);
+    ChatClient create(ProviderConfig providerConfig);
 
     /**
      * 是否支持该 provider

@@ -34,9 +34,10 @@ import java.time.Duration;
 public class OpenAiChatClientFactory implements LlmClientFactory {
 
     @Override
-    public ChatClient create(ProviderConfig providerConfig, String model) {
+    public ChatClient create(ProviderConfig providerConfig) {
         String apiKey = providerConfig.getApiKey();
         String baseUrl = normalizeBaseUrl(providerConfig.getBaseUrl());
+        String model = providerConfig.getModel();
     
         log.info("Creating ChatClient - apiKey prefix: {}, baseUrl: {}, model: {}",
                 apiKey != null && apiKey.length() > 8 ? apiKey.substring(0, 8) + "..." : "null",

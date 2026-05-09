@@ -1,0 +1,59 @@
+# 基本信息 ================================
+# Vessel 标识（英文/数字/下划线，唯一标识）
+id: {name}
+
+# Vessel 名称
+name: {name}
+
+# 创建时间（自动生成）
+created_at: {created_at}
+
+# 描述（Vessel 的功能说明）
+description: {description}
+
+# 显示名称（群聊中展示的中文名或友好名称）
+# display_name: ""
+
+# ================================ LLM 配置 ================================
+# 指定 LLM 提供商（从全局 config.yaml 的 providers 中选择）
+# 可选: doubao, qwen, deepseek, moonshot, ollama 等
+# 如注释掉或未设置，使用全局 default_provider
+model: moonshot
+
+# ================================ 展示配置 ================================
+# 表情图标（用于消息展示）
+emoji: 🤖
+
+# System Prompt（系统指令，覆盖 vessel.md 中的 Identity）
+# 如未设置，将使用 vessel.md 的 Identity section
+system_prompt: ""
+
+# ================================ 群聊配置 ================================
+# 角色（影响群聊中的消息路由）
+# - teamleader: 团队负责人，接收所有消息
+# - member: 普通成员，只响应直接@提及的消息
+role: member
+
+# ================================ 服务配置 ================================
+# 自动启动（运行 serve 无参数时是否自动启动此 Vessel）
+auto_serve: false
+
+# 偏好记忆（是否记录用户偏好）
+preferences_enabled: true
+
+# ================================ 工具配置 ================================
+# 排除的工具列表（可选）
+# 支持精确匹配或通配符模式:
+#   - lark_parser       # 排除 Lark 解析工具
+#   - mcp_*             # 排除所有 MCP 工具
+exclude_tools:
+  []
+
+# ================================ Provider 覆盖配置（可选） ================================
+# 此文件中非空字段会覆盖全局 config.yaml 中对应 provider 的配置
+# 留空或删除则表示完全使用全局配置
+provider: ""       # 指定使用全局 providers 下的哪个 provider
+api_key: ""        # 覆盖 API Key
+base_url: ""       # 覆盖 Base URL
+temperature: ""    # 覆盖温度参数
+timeout: ""        # 覆盖超时（秒）

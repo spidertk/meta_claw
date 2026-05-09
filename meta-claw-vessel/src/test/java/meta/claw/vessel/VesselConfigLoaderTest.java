@@ -16,39 +16,65 @@ class VesselConfigLoaderTest {
     Path tempDir;
 
     @Test
-    void testLoadSingle() throws Exception {
+    void testLoadFromVesselDir() throws Exception {
         Path vesselDir = tempDir.resolve("default");
         Files.createDirectories(vesselDir);
-        String content = """
-                ---
+
+        // config.yaml 包含 frontmatter 字段
+        String configYaml = """
                 id: test-vessel
                 name: Test Vessel
                 model: kimi-k2.5
                 system_prompt: You are a test assistant.
                 preferences_enabled: true
-                ---
+                role: member
+                auto_serve: false
                 """;
-        Files.writeString(vesselDir.resolve("vessel.md"), content);
+        Files.writeString(vesselDir.resolve("config.yaml"), configYaml);
+
+        // vessel.md 包含 Markdown body sections
+        String vesselMd = """
+                # Test Vessel
+
+                ## Identity
+
+                Test identity
+
+                ## Soul
+
+                Test soul
+                """;
+        Files.writeString(vesselDir.resolve("vessel.md"), vesselMd);
 
         VesselConfigLoader loader = new VesselConfigLoader();
-        VesselConfig config = loader.loadSingle(vesselDir.resolve("vessel.md"));
+        VesselConfig config = loader.loadFromVesselDir(vesselDir);
 
         assertNotNull(config);
         assertEquals("test-vessel", config.getId());
         assertEquals("Test Vessel", config.getName());
         assertEquals("kimi-k2.5", config.getModel());
         assertTrue(config.isPreferencesEnabled());
+        assertEquals("member", config.getRole());
+        assertEquals("Test identity", config.getIdentity());
+        assertEquals("Test soul", config.getSoul());
     }
 
     @Test
     void testLoadFromDirectory() throws Exception {
         Path vesselDir = tempDir.resolve("default");
         Files.createDirectories(vesselDir);
-        Files.writeString(vesselDir.resolve("vessel.md"), """
-                ---
+
+        Files.writeString(vesselDir.resolve("config.yaml"), """
                 id: default
                 name: Default
-                ---
+                model: moonshot
+                """);
+        Files.writeString(vesselDir.resolve("vessel.md"), """
+                # Default
+
+                ## Identity
+
+                Default vessel
                 """);
 
         VesselConfigLoader loader = new VesselConfigLoader();
@@ -56,5 +82,6 @@ class VesselConfigLoaderTest {
 
         assertEquals(1, configs.size());
         assertEquals("default", configs.get(0).getId());
+        assertEquals("Default", configs.get(0).getName());
     }
 }

@@ -34,9 +34,9 @@ public class VesselConfigResolver {
             throw new IllegalStateException("全局配置未找到或 providers 为空: " + baseDir.resolve("config.yaml"));
         }
 
-        // 2. 加载 vessel.md
+        // 2. 加载 Vessel 配置（config.yaml + vessel.md）
         Path vesselDir = baseDir.resolve("vessels").resolve(vesselName);
-        VesselConfig vesselConfig = vesselConfigLoader.loadSingle(vesselDir.resolve("vessel.md"));
+        VesselConfig vesselConfig = vesselConfigLoader.loadFromVesselDir(vesselDir);
 
         // 3. 加载 vessel 级覆盖配置
         VesselProfileConfig profile = profileLoader.load(vesselDir);

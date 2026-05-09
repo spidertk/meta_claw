@@ -67,8 +67,8 @@ class SpringAiLlmClientIntegrationTest {
         OpenAiChatClientFactory factory = new OpenAiChatClientFactory();
         String model = providerConfig.getModel() != null && !providerConfig.getModel().isBlank() 
                 ? providerConfig.getModel() : "kimi-k2.6";
-        
-        ChatClient chatClient = factory.create(providerConfig, model);
+        providerConfig.setModel(model);
+        ChatClient chatClient = factory.create(providerConfig);
         
         SpiProviderMeta meta = SpiProviderMeta.builder()
                 .name("moonshot")
@@ -229,8 +229,8 @@ class SpringAiLlmClientIntegrationTest {
         OpenAiChatClientFactory factory = new OpenAiChatClientFactory();
         String model = providerConfig.getModel() != null && !providerConfig.getModel().isBlank() 
                 ? providerConfig.getModel() : "kimi-k2.6";
-        
-        ChatClient chatClient = factory.create(providerConfig, model);
+        providerConfig.setModel(model);
+        ChatClient chatClient = factory.create(providerConfig);
         
         SpiProviderMeta meta = SpiProviderMeta.builder()
                 .name("moonshot")

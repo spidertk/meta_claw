@@ -30,15 +30,14 @@ public class LlmClientFactoryManager {
      *
      * @param providerName   provider 名称，如 "moonshot", "openai"
      * @param providerConfig provider 配置
-     * @param model          模型名称
      * @return ChatClient 实例
      * @throws IllegalArgumentException 如果没有找到支持该 provider 的工厂
      */
-    public ChatClient create(String providerName, ProviderConfig providerConfig, String model) {
+    public ChatClient create(String providerName, ProviderConfig providerConfig) {
         for (LlmClientFactory factory : factories) {
             if (factory.supports(providerName)) {
                 log.debug("Routing provider '{}' to factory: {}", providerName, factory.getClass().getSimpleName());
-                return factory.create(providerConfig, model);
+                return factory.create(providerConfig);
             }
         }
         throw new IllegalArgumentException(

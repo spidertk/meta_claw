@@ -5,6 +5,7 @@ import meta.claw.core.model.VesselConfig;
 import org.yaml.snakeyaml.Yaml;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collections;
@@ -16,7 +17,8 @@ import java.util.stream.Stream;
 @Slf4j
 public class VesselConfigLoader {
 
-    private static final String CONFIG_FILE = "vessel.md";
+    private static final String VESSEL_MD = "vessel.md";
+    private static final String CONFIG_YAML = "config.yaml";
     private final Yaml yaml = new Yaml();
 
     public List<VesselConfig> loadFromDirectory(Path dir) {
@@ -27,10 +29,7 @@ public class VesselConfigLoader {
         try (Stream<Path> paths = Files.list(dir)) {
             return paths
                     .filter(Files::isDirectory)
-                    .map(sub -> sub.resolve(CONFIG_FILE))
-                    .filter(Files::exists)
-                    .map(this::loadSingle)
-//                    .filter(config -> config != null && config.getId() != null)
+                    .map(this::loadFromVesselDir)
                     .collect(Collectors.toList());
         } catch (IOException e) {
             log.error("扫描 Vessel 配置目录失败: {}", dir, e);
@@ -38,65 +37,63 @@ public class VesselConfigLoader {
         }
     }
 
-    public VesselConfig loadSingle(Path path) {
+    /**
+     * 从 Vessel 目录加载完整配置：config.yaml（frontmatter）+ vessel.md（body sections）
+     */
+    public VesselConfig loadFromVesselDir(Path vesselDir) {
+        VesselConfig config = loadConfigYaml(vesselDir.resolve(CONFIG_YAML));
+        parseVesselMd(vesselDir.resolve(VESSEL_MD), config);
+        return config;
+    }
+
+    private VesselConfig loadConfigYaml(Path path) {
+        VesselConfig config = new VesselConfig();
+        if (!Files.exists(path)) {
+            log.warn("Vessel config.yaml 不存在: {}", path);
+            return config;
+        }
+        try (InputStream input = Files.newInputStream(path)) {
+            Map<String, Object> map = yaml.load(input);
+            if (map == null) {
+                log.warn("Vessel config.yaml 解析为空: {}", path);
+                return config;
+            }
+            return mapToConfig(map);
+        } catch (IOException e) {
+            log.error("加载 Vessel config.yaml 失败: {}", path, e);
+            return config;
+        }
+    }
+
+    private void parseVesselMd(Path path, VesselConfig config) {
+        if (!Files.exists(path)) {
+            log.warn("Vessel vessel.md 不存在: {}", path);
+            return;
+        }
         try {
             String content = Files.readString(path);
-            String yamlContent = extractYamlFrontmatter(content);
-            if (yamlContent == null || yamlContent.isBlank()) {
-                log.warn("vessel.md 中没有 YAML frontmatter: {}", path);
-                return null;
-            }
-            Map<String, Object> map = yaml.load(yamlContent);
-            if (map == null) {
-                log.warn("YAML frontmatter 解析为空: {}", path);
-                return null;
-            }
-            VesselConfig config = mapToConfig(map);
-            // 解析 Markdown body section
-            parseMarkdownSections(config, content);
-            return config;
-        } catch (IOException e) {
-            log.error("加载 Vessel 配置失败: {}", path, e);
-            return null;
-        }
-    }
+            String[] lines = content.split("\n");
+            String currentSection = null;
+            StringBuilder currentContent = new StringBuilder();
 
-    private String extractYamlFrontmatter(String content) {
-        int first = content.indexOf("---");
-        if (first == -1) return null;
-        int second = content.indexOf("---", first + 3);
-        if (second == -1) return null;
-        return content.substring(first + 3, second).trim();
-    }
-
-    private void parseMarkdownSections(VesselConfig config, String content) {
-        int secondDelimiter = content.indexOf("---", content.indexOf("---") + 3);
-        if (secondDelimiter == -1) return;
-
-        String body = content.substring(secondDelimiter + 3).trim();
-        if (body.isBlank()) return;
-
-        String[] lines = body.split("\n");
-        String currentSection = null;
-        StringBuilder currentContent = new StringBuilder();
-
-        for (String line : lines) {
-            String trimmed = line.trim();
-            if (trimmed.startsWith("## ")) {
-                // 保存上一个 section
-                if (currentSection != null) {
-                    setSection(config, currentSection, currentContent.toString().trim());
+            for (String line : lines) {
+                String trimmed = line.trim();
+                if (trimmed.startsWith("## ")) {
+                    if (currentSection != null) {
+                        setSection(config, currentSection, currentContent.toString().trim());
+                    }
+                    currentSection = trimmed.substring(3).trim().toLowerCase();
+                    currentContent = new StringBuilder();
+                } else if (currentSection != null) {
+                    currentContent.append(line).append("\n");
                 }
-                currentSection = trimmed.substring(3).trim().toLowerCase();
-                currentContent = new StringBuilder();
-            } else if (currentSection != null) {
-                currentContent.append(line).append("\n");
             }
-        }
 
-        // 保存最后一个 section
-        if (currentSection != null) {
-            setSection(config, currentSection, currentContent.toString().trim());
+            if (currentSection != null) {
+                setSection(config, currentSection, currentContent.toString().trim());
+            }
+        } catch (IOException e) {
+            log.error("解析 Vessel vessel.md 失败: {}", path, e);
         }
     }
 

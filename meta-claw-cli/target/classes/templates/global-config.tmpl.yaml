@@ -1,0 +1,10 @@
+# 是否开启 DEBUG 级别日志，仅在设置为 true 时 meta.claw 包才会输出 debug 日志
+log.debug: false
+default_provider: moonshot
+providers:
+  moonshot:
+    api_key: "your-api-key"
+    base_url: "https://api.moonshot.cn/"
+    model: "kimi-k2.5"
+    temperature: 1
+    timeout: 60.0
