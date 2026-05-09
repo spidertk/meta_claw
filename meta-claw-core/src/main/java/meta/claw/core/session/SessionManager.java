@@ -7,7 +7,7 @@ import java.util.List;
 
 /**
  * 会话管理器
- * 负责用户会话的生命周期管理，包括会话的获取、创建、模式切换、目标专家解析以及过期清理等核心逻辑
+ * 负责用户会话的生命周期管理，包括会话的获取、创建、模式切换、目标 Vessel 解析以及过期清理等核心逻辑
  */
 public class SessionManager {
 
@@ -85,11 +85,11 @@ public class SessionManager {
     }
 
     /**
-     * 设置会话为单聊模式，并绑定目标专家
+     * 设置会话为单聊模式，并绑定目标 Vessel
      *
      * @param userId     用户唯一标识
      * @param source     来源渠道
-     * @param vesselName 目标专家名称
+     * @param vesselName 目标 Vessel 名称
      * @param agentId    代理标识
      */
     public void setSingleMode(String userId, String source, String vesselName, String agentId) {
@@ -115,15 +115,15 @@ public class SessionManager {
     }
 
     /**
-     * 根据当前会话模式获取目标专家列表
+     * 根据当前会话模式获取目标 Vessel 列表
      * <ul>
-     *   <li>单聊模式：返回已绑定的专家（若未绑定则回退返回可用专家列表中的第一个）</li>
-     *   <li>群聊模式：返回所有可用专家</li>
+     *   <li>单聊模式：返回已绑定的 Vessel（若未绑定则回退返回可用 Vessel 列表中的第一个）</li>
+     *   <li>群聊模式：返回所有可用 Vessel</li>
      * </ul>
      *
      * @param session          当前用户会话
-     * @param availableVessels 可用专家列表
-     * @return 目标专家列表，不会返回 null
+     * @param availableVessels 可用 Vessel 列表
+     * @return 目标 Vessel 列表，不会返回 null
      */
     public List<String> getTargetVessels(UserSession session, List<String> availableVessels) {
         if (session == null || availableVessels == null || availableVessels.isEmpty()) {
@@ -131,18 +131,18 @@ public class SessionManager {
         }
 
         if (session.getMode() == ChatMode.GROUP) {
-            // 群聊模式：返回所有可用专家
+            // 群聊模式：返回所有可用 Vessel
             return new ArrayList<>(availableVessels);
         }
 
         // 单聊模式
         String targetVessel = session.getTargetVessel();
         if (targetVessel != null && !targetVessel.isBlank()) {
-            // 已绑定专家，返回该专家
+            // 已绑定 Vessel，返回该 Vessel
             return Collections.singletonList(targetVessel);
         }
 
-        // 未绑定专家，回退返回第一个可用专家
+        // 未绑定 Vessel，回退返回第一个可用 Vessel
         return Collections.singletonList(availableVessels.get(0));
     }
 

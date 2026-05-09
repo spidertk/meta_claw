@@ -6,12 +6,12 @@ package meta.claw.core.session;
  */
 public enum ChatMode {
     /**
-     * 单聊模式：用户与单个专家代理一对一对话
+     * 单聊模式：用户与单个数字员工一对一对话
      */
     SINGLE,
 
     /**
-     * 群聊模式：用户在群组会话中与多个专家代理互动
+     * 群聊模式：用户在群组会话中与多个数字员工互动
      */
     GROUP
 }

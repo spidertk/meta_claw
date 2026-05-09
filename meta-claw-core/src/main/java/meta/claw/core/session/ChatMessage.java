@@ -61,7 +61,7 @@ public class ChatMessage {
     private String replyTo;
 
     /**
-     * 关联的专家/代理名称
+     * 关联的数字员工/Vessel 名称
      */
     private String vesselName;
 

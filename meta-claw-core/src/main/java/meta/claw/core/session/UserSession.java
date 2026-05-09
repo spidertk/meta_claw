@@ -8,7 +8,7 @@ import java.time.LocalDateTime;
 
 /**
  * 用户会话实体
- * 封装了用户在系统中的完整会话状态，包括会话标识、用户身份、聊天模式、关联专家等信息
+ * 封装了用户在系统中的完整会话状态，包括会话标识、用户身份、聊天模式、关联 Vessel 等信息
  */
 @Builder
 @Getter
@@ -41,7 +41,7 @@ public class UserSession {
     private ChatMode mode;
 
     /**
-     * 目标专家标识，单聊模式下有效
+     * 目标 Vessel 标识，单聊模式下有效
      */
     private String targetVessel;
 
@@ -84,7 +84,7 @@ public class UserSession {
 
     /**
      * 设置为群聊模式
-     * 同时将单聊目标专家字段清空
+     * 同时将单聊目标 Vessel 字段清空
      */
     public void setGroupMode() {
         this.mode = ChatMode.GROUP;

@@ -46,7 +46,7 @@ public class GatewayMessage {
     private String contentType;
 
     /**
-     * 当前消息关联的代理（Agent）标识，用于路由到特定专家或工作流
+     * 当前消息关联的代理（Agent）标识，用于路由到特定 Vessel 或工作流
      */
     private String agentId;
 }

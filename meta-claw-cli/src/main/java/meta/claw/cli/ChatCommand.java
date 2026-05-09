@@ -115,7 +115,7 @@ public class ChatCommand implements Runnable {
         String emoji = vesselConfig.getEmoji() != null ? vesselConfig.getEmoji() : "🤖";
         String description = vesselConfig.getDescription() != null ? vesselConfig.getDescription() : "A general-purpose AI assistant.";
 
-        // Welcome screen (inspired by expert_cli/cli.py print_welcome)
+        // Welcome screen (inspired by vessel_cli/cli.py print_welcome)
         terminal.writer().println();
         terminal.writer().println("╔══════════════════════════════════════════════════════════════════╗");
         terminal.writer().println("║                                                                  ║");
