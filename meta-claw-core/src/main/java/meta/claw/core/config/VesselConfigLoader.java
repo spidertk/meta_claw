@@ -1,4 +1,4 @@
-package meta.claw.vessel;
+package meta.claw.core.config;
 
 import lombok.extern.slf4j.Slf4j;
 import meta.claw.core.model.VesselConfig;

@@ -1,4 +1,4 @@
-package meta.claw.vessel;
+package meta.claw.core.config;
 
 import meta.claw.core.model.VesselConfig;
 import org.junit.jupiter.api.Test;
