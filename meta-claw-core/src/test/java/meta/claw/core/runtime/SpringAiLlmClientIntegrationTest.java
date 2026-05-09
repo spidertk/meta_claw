@@ -279,13 +279,12 @@ class SpringAiLlmClientIntegrationTest {
         System.out.println("Total chunks: " + chunkSizes.size());
         
         // 按大小分组统计
-        Map<String, Integer> sizeGroups = Map.of(
-                "1-5 chars", 0,
-                "6-10 chars", 0,
-                "11-20 chars", 0,
-                "21-50 chars", 0,
-                "50+ chars", 0
-        );
+        Map<String, Integer> sizeGroups = new java.util.HashMap<>();
+        sizeGroups.put("1-5 chars", 0);
+        sizeGroups.put("6-10 chars", 0);
+        sizeGroups.put("11-20 chars", 0);
+        sizeGroups.put("21-50 chars", 0);
+        sizeGroups.put("50+ chars", 0);
         
         for (int size : chunkSizes) {
             if (size <= 5) sizeGroups.put("1-5 chars", sizeGroups.get("1-5 chars") + 1);

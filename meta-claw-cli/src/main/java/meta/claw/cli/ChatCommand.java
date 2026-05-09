@@ -96,7 +96,7 @@ public class ChatCommand implements Runnable {
                 providerConfig.getBaseUrl(),
                 providerConfig.getModel());
 
-        ChatClient chatClient = factoryManager.create(providerName, providerConfig, model);
+        ChatClient chatClient = factoryManager.create(providerName, providerConfig);
 
         SpiProviderMeta meta = SpiProviderMeta.builder()
                 .name(providerName)
