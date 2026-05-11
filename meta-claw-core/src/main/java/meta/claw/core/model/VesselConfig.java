@@ -35,4 +35,8 @@ public class VesselConfig {
     private String guidelines;       // ## Guidelines
     private String preferences;      // ## Preferences
 
+    // Phase 2: 上下文窗口管理配置
+    private Integer maxHistoryRounds = 20;
+    private Integer maxTokens = 4096;
+
 }

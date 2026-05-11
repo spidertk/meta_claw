@@ -4,9 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import lombok.extern.slf4j.Slf4j;
-import meta.claw.core.session.ChatMessage;
-import meta.claw.core.session.ConversationInfo;
-import meta.claw.core.session.ConversationStore;
+import meta.claw.core.session.*;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -16,16 +14,23 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
  * 基于 JSONL 文件的对话历史存储实现
- * 每个会话的消息以 JSON Lines 格式追加写入文件，支持流式读取和线程安全
+ * 每个会话的消息以 JSON Lines 格式追加写入文件，支持流式读取、过滤查询、统计和媒体存储
  */
 @Slf4j
 public class JsonlConversationStore implements ConversationStore {
+
+    private static final Pattern BASE64_PATTERN = Pattern.compile(
+            "data:([^;]+);base64,[A-Za-z0-9+/=]{200,}"
+    );
 
     private final Path baseDir;
     private final ObjectMapper objectMapper;
@@ -46,18 +51,18 @@ public class JsonlConversationStore implements ConversationStore {
         return lockMap.computeIfAbsent(sessionKey, k -> new ReentrantReadWriteLock());
     }
 
-    private Path getHistoryFilePath(String vesselId, String sessionKey) {
+    private Path getSessionDir(String vesselId, String sessionKey) {
         return baseDir.resolve(vesselId)
                 .resolve("conversations")
-                .resolve(sessionKey)
-                .resolve("history.jsonl");
+                .resolve(sessionKey);
+    }
+
+    private Path getHistoryFilePath(String vesselId, String sessionKey) {
+        return getSessionDir(vesselId, sessionKey).resolve("history.jsonl");
     }
 
     private Path getMediaDirPath(String vesselId, String sessionKey) {
-        return baseDir.resolve(vesselId)
-                .resolve("conversations")
-                .resolve(sessionKey)
-                .resolve("media");
+        return getSessionDir(vesselId, sessionKey).resolve("media");
     }
 
     @Override
@@ -68,6 +73,9 @@ public class JsonlConversationStore implements ConversationStore {
         try {
             Path filePath = getHistoryFilePath(vesselId, sessionKey);
             Files.createDirectories(filePath.getParent());
+
+            String safeContent = stripBase64(message.getContent());
+            message.setContent(safeContent);
 
             String jsonLine = objectMapper.writeValueAsString(message) + "\n";
             Files.writeString(filePath, jsonLine,
@@ -85,6 +93,11 @@ public class JsonlConversationStore implements ConversationStore {
 
     @Override
     public List<ChatMessage> getHistory(String sessionKey, int limit) {
+        return getHistory(sessionKey, limit, null);
+    }
+
+    @Override
+    public List<ChatMessage> getHistory(String sessionKey, int limit, MessageFilter filter) {
         String vesselId = resolveVesselId(sessionKey);
         Path filePath = getHistoryFilePath(vesselId, sessionKey);
         if (!Files.exists(filePath)) {
@@ -98,6 +111,7 @@ public class JsonlConversationStore implements ConversationStore {
                     .filter(line -> !line.isBlank())
                     .map(this::parseMessage)
                     .filter(msg -> msg != null)
+                    .filter(msg -> matchesFilter(msg, filter))
                     .collect(Collectors.toList());
 
             if (limit > 0 && messages.size() > limit) {
@@ -110,6 +124,20 @@ public class JsonlConversationStore implements ConversationStore {
         } finally {
             lock.readLock().unlock();
         }
+    }
+
+    private boolean matchesFilter(ChatMessage msg, MessageFilter filter) {
+        if (filter == null) return true;
+        if (filter.getRole() != null && !filter.getRole().equalsIgnoreCase(msg.getRole())) return false;
+        if (filter.getUserId() != null && !filter.getUserId().equals(msg.getUserId())) return false;
+        if (filter.getMessageType() != null && !filter.getMessageType().equals(msg.getMessageType())) return false;
+        if (filter.getAfter() != null) {
+            if (msg.getTimestamp() == null || msg.getTimestamp().isBefore(filter.getAfter())) return false;
+        }
+        if (filter.getBefore() != null) {
+            if (msg.getTimestamp() == null || msg.getTimestamp().isAfter(filter.getBefore())) return false;
+        }
+        return true;
     }
 
     @Override
@@ -180,9 +208,7 @@ public class JsonlConversationStore implements ConversationStore {
     @Override
     public boolean deleteConversation(String sessionKey) {
         String vesselId = resolveVesselId(sessionKey);
-        Path sessionDir = baseDir.resolve(vesselId)
-                .resolve("conversations")
-                .resolve(sessionKey);
+        Path sessionDir = getSessionDir(vesselId, sessionKey);
         ReentrantReadWriteLock lock = getLock(sessionKey);
         lock.writeLock().lock();
         try {
@@ -203,6 +229,73 @@ public class JsonlConversationStore implements ConversationStore {
     public boolean conversationExists(String sessionKey) {
         String vesselId = resolveVesselId(sessionKey);
         return Files.exists(getHistoryFilePath(vesselId, sessionKey));
+    }
+
+    @Override
+    public ConversationStats getStats(String sessionKey) {
+        String vesselId = resolveVesselId(sessionKey);
+        Path filePath = getHistoryFilePath(vesselId, sessionKey);
+        if (!Files.exists(filePath)) return null;
+
+        List<ChatMessage> history = getHistory(sessionKey);
+        if (history.isEmpty()) {
+            try {
+                long size = Files.size(filePath);
+                return ConversationStats.builder().messageCount(0).fileSizeBytes(size).build();
+            } catch (IOException e) { return null; }
+        }
+
+        Map<String, Long> roleCounts = history.stream()
+                .collect(Collectors.groupingBy(
+                        msg -> msg.getRole() != null ? msg.getRole().toLowerCase() : "unknown",
+                        Collectors.counting()
+                ));
+
+        long fileSize;
+        try { fileSize = Files.size(filePath); } catch (IOException e) { fileSize = 0; }
+
+        return ConversationStats.builder()
+                .messageCount(history.size())
+                .userMessages(roleCounts.getOrDefault("user", 0L).intValue())
+                .assistantMessages(roleCounts.getOrDefault("assistant", 0L).intValue())
+                .systemMessages(roleCounts.getOrDefault("system", 0L).intValue())
+                .firstMessage(history.get(0).getTimestamp())
+                .lastMessage(history.get(history.size() - 1).getTimestamp())
+                .fileSizeBytes(fileSize)
+                .build();
+    }
+
+    @Override
+    public MediaReference saveMedia(String sessionKey, byte[] data, String filename, String mediaType) {
+        String vesselId = resolveVesselId(sessionKey);
+        ReentrantReadWriteLock lock = getLock(sessionKey);
+        lock.writeLock().lock();
+        try {
+            Path mediaDir = getMediaDirPath(vesselId, sessionKey);
+            Files.createDirectories(mediaDir);
+
+            String uniqueName = UUID.randomUUID().toString().substring(0, 8) + "_" + filename;
+            Path dest = mediaDir.resolve(uniqueName);
+            Files.write(dest, data);
+
+            String relativePath = "media/" + uniqueName;
+            return MediaReference.builder()
+                    .absolutePath(dest.toString())
+                    .relativePath(relativePath)
+                    .mediaType(mediaType)
+                    .build();
+        } catch (IOException e) {
+            log.error("Save media failed for session {}: {}", sessionKey, e.getMessage());
+            throw new RuntimeException("Media save failed", e);
+        } finally {
+            lock.writeLock().unlock();
+        }
+    }
+
+    @Override
+    public Path getMediaPath(String sessionKey, String relativePath) {
+        String vesselId = resolveVesselId(sessionKey);
+        return getSessionDir(vesselId, sessionKey).resolve(relativePath);
     }
 
     private ChatMessage parseMessage(String jsonLine) {
@@ -237,6 +330,16 @@ public class JsonlConversationStore implements ConversationStore {
             }
         }
         Files.delete(dir);
+    }
+
+    private String stripBase64(String content) {
+        if (content == null || !content.contains("data:") || !content.contains(";base64,")) {
+            return content;
+        }
+        return BASE64_PATTERN.matcher(content).replaceAll(match -> {
+            String mime = match.group(1);
+            return "[media:" + mime + ":base64:<stripped>]";
+        });
     }
 
     /**
