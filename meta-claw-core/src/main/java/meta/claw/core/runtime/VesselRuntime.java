@@ -4,12 +4,17 @@ import lombok.extern.slf4j.Slf4j;
 import meta.claw.core.model.Reply;
 import meta.claw.core.model.ReplyType;
 import meta.claw.core.model.VesselConfig;
+import meta.claw.core.prompt.PromptContext;
+import meta.claw.core.prompt.PromptContextFactory;
+import meta.claw.core.prompt.SystemPromptBuilder;
+import meta.claw.core.prompt.TemplateLoader;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.prompt.Prompt;
 
+import java.nio.file.Path;
 import java.util.List;
 
 /**
@@ -45,9 +50,25 @@ public class VesselRuntime {
         if (config != null) {
             log.info("VesselRuntime 初始化完成: vesselId={}, model={}, systemPromptLength={}",
                     config.getId(), config.getModel(),
-                    config.getSystemPrompt() != null ? config.getSystemPrompt().length() : 0);
+                    resolveSystemPrompt(config) != null ? resolveSystemPrompt(config).length() : 0);
         } else {
             log.info("VesselRuntime 初始化完成: config=null");
+        }
+    }
+
+    private String resolveSystemPrompt(VesselConfig config) {
+        if (config.getSystemPrompt() != null && !config.getSystemPrompt().isBlank()) {
+            return config.getSystemPrompt();
+        }
+        // Phase 2: Fall back to SystemPromptBuilder if no static systemPrompt configured
+        try {
+            PromptContextFactory factory = new PromptContextFactory();
+            PromptContext ctx = factory.create(config, Path.of("."), null);
+            SystemPromptBuilder builder = new SystemPromptBuilder(new TemplateLoader());
+            return builder.build(ctx);
+        } catch (Exception e) {
+            log.warn("Failed to build dynamic system prompt for vessel {}, fallback to null", config.getId(), e);
+            return null;
         }
     }
 
@@ -70,9 +91,10 @@ public class VesselRuntime {
             // 通过 ChatClient 调用 AI 模型获取回复内容
             // 若配置了 systemPrompt，则先注入 SystemMessage
             String response;
-            if (config != null && config.getSystemPrompt() != null && !config.getSystemPrompt().isBlank()) {
+            String systemPrompt = resolveSystemPrompt(config);
+            if (systemPrompt != null && !systemPrompt.isBlank()) {
                 Prompt prompt = new Prompt(List.of(
-                        new SystemMessage(config.getSystemPrompt()),
+                        new SystemMessage(systemPrompt),
                         new UserMessage(userMessage)
                 ));
                 ChatResponse chatResponse = chatClient.prompt(prompt).call().chatResponse();
