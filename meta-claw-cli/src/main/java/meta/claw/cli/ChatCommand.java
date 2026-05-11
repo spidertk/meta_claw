@@ -1,6 +1,11 @@
 package meta.claw.cli;
 
 import lombok.extern.slf4j.Slf4j;
+import meta.claw.core.prompt.MemoryManager;
+import meta.claw.core.prompt.PromptContext;
+import meta.claw.core.prompt.PromptContextFactory;
+import meta.claw.core.prompt.SystemPromptBuilder;
+import meta.claw.core.prompt.TemplateLoader;
 import meta.claw.core.runtime.SpringAiLlmClient;
 import meta.claw.core.spi.llm.LlmClientFactoryManager;
 import meta.claw.core.spi.llm.SpiChatRequest;
@@ -133,9 +138,19 @@ public class ChatCommand implements Runnable {
         terminal.writer().println();
         terminal.flush();
 
+        // Phase 2: Build dynamic system prompt via SystemPromptBuilder
+        PromptContextFactory contextFactory = new PromptContextFactory();
+        PromptContext promptContext = contextFactory.create(vesselConfig, configDir, null);
+        TemplateLoader templateLoader = new TemplateLoader();
+        SystemPromptBuilder promptBuilder = new SystemPromptBuilder(templateLoader);
+        String systemPrompt = promptBuilder.build(promptContext);
+
+        MemoryManager memoryManager = new MemoryManager();
+        int maxHistoryRounds = vesselConfig.getMaxHistoryRounds() != null
+                ? vesselConfig.getMaxHistoryRounds() : 20;
+
         BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
         List<SpiMessage> history = new ArrayList<>();
-        String systemPrompt = vesselConfig.getSystemPrompt();
         if (systemPrompt != null && !systemPrompt.isBlank()) {
             history.add(SpiMessage.system(systemPrompt));
         }
@@ -179,7 +194,9 @@ public class ChatCommand implements Runnable {
                     log.error("Failed to persist user message", e);
                 }
 
-                SpiChatRequest request = SpiChatRequest.builder().messages(history).build();
+                // Phase 2: Truncate history before sending to LLM
+                List<SpiMessage> truncatedHistory = memoryManager.truncateByRound(history, maxHistoryRounds);
+                SpiChatRequest request = SpiChatRequest.builder().messages(truncatedHistory).build();
 
                 terminal.writer().print("AI: ");
                 terminal.writer().flush();
