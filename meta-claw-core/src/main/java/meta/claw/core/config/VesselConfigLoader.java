@@ -14,6 +14,9 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+/**
+ *  数字员工模版内的个性化数据加载
+ */
 @Slf4j
 public class VesselConfigLoader {
 
@@ -127,6 +130,18 @@ public class VesselConfigLoader {
         Object excludeTools = map.get("exclude_tools");
         if (excludeTools instanceof List) {
             config.setExcludeTools(((List<?>) excludeTools).stream().map(Object::toString).collect(Collectors.toList()));
+        }
+        // Vessel 级 provider 覆盖配置
+        config.setProvider(getString(map, "provider"));
+        config.setApiKey(getString(map, "api_key"));
+        config.setBaseUrl(getString(map, "base_url"));
+        Object temperature = map.get("temperature");
+        if (temperature instanceof Number) {
+            config.setTemperature(((Number) temperature).doubleValue());
+        }
+        Object timeout = map.get("timeout");
+        if (timeout instanceof Number) {
+            config.setTimeout(((Number) timeout).doubleValue());
         }
         return config;
     }

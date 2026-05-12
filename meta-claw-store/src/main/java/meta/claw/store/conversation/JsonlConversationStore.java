@@ -7,6 +7,9 @@ import lombok.extern.slf4j.Slf4j;
 import meta.claw.core.session.*;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
@@ -78,8 +81,12 @@ public class JsonlConversationStore implements ConversationStore {
             message.setContent(safeContent);
 
             String jsonLine = objectMapper.writeValueAsString(message) + "\n";
-            Files.writeString(filePath, jsonLine,
-                    StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+            byte[] bytes = jsonLine.getBytes(StandardCharsets.UTF_8);
+            try (FileChannel channel = FileChannel.open(
+                    filePath, StandardOpenOption.CREATE, StandardOpenOption.APPEND, StandardOpenOption.WRITE)) {
+                channel.write(ByteBuffer.wrap(bytes));
+                channel.force(true); // fsync 强制落盘，保证数据在系统崩溃后不丢失
+            }
         } catch (JsonProcessingException e) {
             log.error("Failed to serialize chat message for session {}: {}", sessionKey, e.getMessage());
             throw new RuntimeException("Message serialization failed", e);

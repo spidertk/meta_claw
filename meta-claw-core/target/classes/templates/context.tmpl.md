@@ -1,15 +1,5 @@
-{workspace_section}
+<WORKSPACE_SECTION/>
 
-{runtime_section}
+<RUNTIME_SECTION/>
 
-{knowledge_section}
-
-{memory_section}
-
-### Environment
-
-### Current Time
-{current_time}
-
-### Current Location
-{location}
+<MEMORY_SECTION/>

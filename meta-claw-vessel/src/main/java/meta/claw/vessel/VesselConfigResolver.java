@@ -2,30 +2,53 @@ package meta.claw.vessel;
 
 import lombok.extern.slf4j.Slf4j;
 import meta.claw.core.config.GlobalConfigLoader;
+import org.springframework.stereotype.Component;
 import meta.claw.core.config.VesselConfigLoader;
 import meta.claw.core.model.VesselConfig;
 import meta.claw.core.model.GlobalConfig;
 import meta.claw.core.model.ProviderConfig;
+import org.apache.commons.lang3.StringUtils;
 
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Collections;
+import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Slf4j
+@Component
 public class VesselConfigResolver {
 
     private final GlobalConfigLoader globalConfigLoader;
-    private final VesselProfileLoader profileLoader;
     private final VesselConfigLoader vesselConfigLoader;
 
     public VesselConfigResolver() {
-        this(new GlobalConfigLoader(), new VesselProfileLoader(), new VesselConfigLoader());
+        this(new GlobalConfigLoader(), new VesselConfigLoader());
     }
 
     public VesselConfigResolver(GlobalConfigLoader globalConfigLoader,
-                                 VesselProfileLoader profileLoader,
                                  VesselConfigLoader vesselConfigLoader) {
         this.globalConfigLoader = globalConfigLoader;
-        this.profileLoader = profileLoader;
         this.vesselConfigLoader = vesselConfigLoader;
+    }
+
+    public List<ResolvedVesselConfig> resolveAll(Path baseDir) {
+        Path vesselsDir = baseDir.resolve("vessels");
+        if (!Files.exists(vesselsDir) || !Files.isDirectory(vesselsDir)) {
+            log.warn("Vessel 配置目录不存在: {}", vesselsDir);
+            return Collections.emptyList();
+        }
+        try (Stream<Path> paths = Files.list(vesselsDir)) {
+            return paths
+                    .filter(Files::isDirectory)
+                    .map(p -> resolve(baseDir, p.getFileName().toString()))
+                    .collect(Collectors.toList());
+        } catch (IOException e) {
+            log.error("扫描 Vessel 配置目录失败: {}", vesselsDir, e);
+            return Collections.emptyList();
+        }
     }
 
     public ResolvedVesselConfig resolve(Path baseDir, String vesselName) {
@@ -35,16 +58,13 @@ public class VesselConfigResolver {
             throw new IllegalStateException("全局配置未找到或 providers 为空: " + baseDir.resolve("config.yaml"));
         }
 
-        // 2. 加载 Vessel 配置（config.yaml + vessel.md）
+        // 2. 加载 Vessel 配置（config.yaml + vessel.md，含 vessel 级 provider 覆盖）
         Path vesselDir = baseDir.resolve("vessels").resolve(vesselName);
         VesselConfig vesselConfig = vesselConfigLoader.loadFromVesselDir(vesselDir);
 
-        // 3. 加载 vessel 级覆盖配置
-        VesselProfileConfig profile = profileLoader.load(vesselDir);
-
-        // 4. 确定 providerName
-        String providerName = (profile != null && profile.getProvider() != null && !profile.getProvider().isBlank())
-                ? profile.getProvider()
+        // 3. 确定 providerName
+        String providerName = (vesselConfig != null && vesselConfig.getProvider() != null && !vesselConfig.getProvider().isBlank())
+                ? vesselConfig.getProvider()
                 : globalConfig.getDefaultProvider();
         if (providerName == null || providerName.isBlank()) {
             providerName = globalConfig.getProviders().keySet().iterator().next();
@@ -58,32 +78,27 @@ public class VesselConfigResolver {
             );
         }
 
-        // 6. 深拷贝 + 合并
+        // 6. 代理配置，通过员工配置覆盖
         ProviderConfig merged = copyProviderConfig(baseProviderConfig);
-        if (profile != null) {
-            if (profile.getApiKey() != null && !profile.getApiKey().isBlank()) {
-                merged.setApiKey(profile.getApiKey());
-            }
-            if (profile.getBaseUrl() != null && !profile.getBaseUrl().isBlank()) {
-                merged.setBaseUrl(profile.getBaseUrl());
-            }
-            if (profile.getModel() != null && !profile.getModel().isBlank()) {
-                merged.setModel(profile.getModel());
-            }
-            if (profile.getTemperature() != null) {
-                merged.setTemperature(profile.getTemperature());
-            }
-            if (profile.getTimeout() != null) {
-                merged.setTimeout(profile.getTimeout());
-            }
-        }
 
-        // 7. vessel.md 的 model 作为最低优先级覆盖
-        if (vesselConfig != null && vesselConfig.getModel() != null && !vesselConfig.getModel().isBlank()) {
-            if (merged.getModel() == null || merged.getModel().isBlank()) {
-                merged.setModel(vesselConfig.getModel());
-            }
-        }
+        merged.setApiKey(vesselConfig != null && !StringUtils.isBlank(vesselConfig.getApiKey())
+                ? vesselConfig.getApiKey()
+                : merged.getApiKey());
+        merged.setBaseUrl(vesselConfig != null && !StringUtils.isBlank(vesselConfig.getBaseUrl())
+                ? vesselConfig.getBaseUrl()
+                : merged.getBaseUrl());
+        merged.setModel(vesselConfig != null && !StringUtils.isBlank(vesselConfig.getModel())
+                ? vesselConfig.getModel()
+                : merged.getModel());
+        merged.setTemperature(vesselConfig != null && vesselConfig.getTemperature() != null
+                ? vesselConfig.getTemperature()
+                : merged.getTemperature());
+        merged.setTimeout(vesselConfig != null && vesselConfig.getTimeout() != null
+                ? vesselConfig.getTimeout()
+                : merged.getTimeout());
+        merged.setProvider(vesselConfig != null && !StringUtils.isBlank(vesselConfig.getProvider())
+                ? vesselConfig.getProvider()
+                : merged.getProvider());
 
         ResolvedVesselConfig result = new ResolvedVesselConfig();
         result.setProviderName(providerName);

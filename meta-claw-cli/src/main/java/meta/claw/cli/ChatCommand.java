@@ -44,9 +44,11 @@ import java.util.UUID;
 public class ChatCommand implements Runnable {
 
     private final LlmClientFactoryManager factoryManager;
+    private final VesselConfigResolver resolver;
 
-    public ChatCommand(LlmClientFactoryManager factoryManager) {
+    public ChatCommand(LlmClientFactoryManager factoryManager, VesselConfigResolver resolver) {
         this.factoryManager = factoryManager;
+        this.resolver = resolver;
     }
 
     @Parameters(index = "0", defaultValue = "default", description = "Vessel name")
@@ -69,7 +71,6 @@ public class ChatCommand implements Runnable {
         }
 
         Path configDir = ProjectRootFinder.getMetaClawDir();
-        VesselConfigResolver resolver = new VesselConfigResolver();
         ResolvedVesselConfig resolved;
         try {
             resolved = resolver.resolve(configDir, vesselName);

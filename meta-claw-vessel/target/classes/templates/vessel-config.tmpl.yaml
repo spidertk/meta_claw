@@ -18,7 +18,7 @@ description: {description}
 # 指定 LLM 提供商（从全局 config.yaml 的 providers 中选择）
 # 可选: doubao, qwen, deepseek, moonshot, ollama 等
 # 如注释掉或未设置，使用全局 default_provider
-model: moonshot
+provider: "moonshot"       # 指定使用全局 providers 下的哪个 provider
 
 # ================================ 展示配置 ================================
 # 表情图标（用于消息展示）
@@ -52,8 +52,8 @@ exclude_tools:
 # ================================ Provider 覆盖配置（可选） ================================
 # 此文件中非空字段会覆盖全局 config.yaml 中对应 provider 的配置
 # 留空或删除则表示完全使用全局配置
-provider: ""       # 指定使用全局 providers 下的哪个 provider
 api_key: ""        # 覆盖 API Key
 base_url: ""       # 覆盖 Base URL
 temperature: ""    # 覆盖温度参数
 timeout: ""        # 覆盖超时（秒）
+model: "" #模型配置

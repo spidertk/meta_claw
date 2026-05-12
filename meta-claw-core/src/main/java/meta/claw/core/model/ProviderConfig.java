@@ -9,6 +9,7 @@ import lombok.Setter;
 @Getter
 @Setter
 public class ProviderConfig {
+    private String provider;
     private String apiKey;
     private String baseUrl;
     private String model;

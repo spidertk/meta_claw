@@ -2,7 +2,8 @@ package meta.claw.cli;
 
 import meta.claw.core.model.VesselConfig;
 import meta.claw.vessel.ProjectRootFinder;
-import meta.claw.core.config.VesselConfigLoader;
+import meta.claw.vessel.ResolvedVesselConfig;
+import meta.claw.vessel.VesselConfigResolver;
 import org.springframework.stereotype.Component;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -21,6 +22,12 @@ import java.util.List;
 @Command(name = "list", description = "List all vessels")
 public class ListCommand implements Runnable {
 
+    private final VesselConfigResolver resolver;
+
+    public ListCommand(VesselConfigResolver resolver) {
+        this.resolver = resolver;
+    }
+
     @Option(names = {"--all", "-a"}, description = "Include hidden vessels")
     private boolean includeHidden;
 
@@ -33,10 +40,9 @@ public class ListCommand implements Runnable {
             return;
         }
 
-        VesselConfigLoader loader = new VesselConfigLoader();
-        List<VesselConfig> vessels = loader.loadFromDirectory(vesselsDir);
+        List<ResolvedVesselConfig> resolvedList = resolver.resolveAll(ProjectRootFinder.getMetaClawDir());
 
-        if (vessels.isEmpty()) {
+        if (resolvedList.isEmpty()) {
             System.out.println("No vessels found. Run 'meta-claw init' to create the default vessel.");
             return;
         }
@@ -47,7 +53,8 @@ public class ListCommand implements Runnable {
                 "ID", "Name", "Description", "Emoji", "Model", "Role", "AutoServe", "Preferences"));
         System.out.println("├──────────────┼──────────────┼──────────────────────────────┼──────┼────────────────────┼────────┼───────────┼─────────────┤");
 
-        for (VesselConfig vessel : vessels) {
+        for (ResolvedVesselConfig resolved : resolvedList) {
+            VesselConfig vessel = resolved.getVesselConfig();
             String id = vessel.getId() != null ? vessel.getId() : "N/A";
             if (id.startsWith(".") && !includeHidden) {
                 continue;
@@ -55,7 +62,7 @@ public class ListCommand implements Runnable {
             String name = vessel.getName() != null ? vessel.getName() : id;
             String desc = vessel.getDescription() != null ? vessel.getDescription() : "";
             String emoji = vessel.getEmoji() != null ? vessel.getEmoji() : "";
-            String model = vessel.getModel() != null ? vessel.getModel() : "";
+            String model = vessel.getModel() != null ? vessel.getModel()  : "";
             String role = vessel.getRole() != null ? vessel.getRole() : "";
             String autoServe = vessel.isAutoServe() ? "true" : "false";
             String preferences = vessel.isPreferencesEnabled() ? "true" : "false";

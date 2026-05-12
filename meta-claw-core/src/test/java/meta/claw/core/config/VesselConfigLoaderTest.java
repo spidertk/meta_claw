@@ -29,6 +29,11 @@ class VesselConfigLoaderTest {
                 preferences_enabled: true
                 role: member
                 auto_serve: false
+                provider: moonshot
+                api_key: sk-test123
+                base_url: https://api.moonshot.cn/v1
+                temperature: 0.7
+                timeout: 30.0
                 """;
         Files.writeString(vesselDir.resolve("config.yaml"), configYaml);
 
@@ -57,6 +62,11 @@ class VesselConfigLoaderTest {
         assertEquals("member", config.getRole());
         assertEquals("Test identity", config.getIdentity());
         assertEquals("Test soul", config.getSoul());
+        assertEquals("moonshot", config.getProvider());
+        assertEquals("sk-test123", config.getApiKey());
+        assertEquals("https://api.moonshot.cn/v1", config.getBaseUrl());
+        assertEquals(0.7, config.getTemperature());
+        assertEquals(30.0, config.getTimeout());
     }
 
     @Test
