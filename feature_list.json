@@ -1,6 +1,6 @@
 {
-  "project": "替换成你的项目名",
-  "last_updated": "YYYY-MM-DD",
+  "project": "meta-claw",
+  "last_updated": "2026-05-15",
   "rules": {
     "single_active_feature": true,
     "passing_requires_evidence": true,
@@ -14,51 +14,143 @@
   },
   "features": [
     {
-      "id": "chat-001",
+      "id": "repo-001",
       "priority": 1,
-      "area": "chat",
-      "title": "创建新会话",
-      "user_visible_behavior": "用户点击 New Chat 后，可以看到一个新的空白对话。",
-      "status": "not_started",
+      "area": "repository-hygiene",
+      "title": "恢复统一启动与验证入口",
+      "user_visible_behavior": "下一轮会话可以从仓库根目录直接运行标准入口，完成依赖准备与基础验证，而不是先人工猜测该怎么启动项目。",
+      "status": "in_progress",
       "verification": [
-        "打开应用。",
-        "点击 New Chat。",
-        "确认侧边栏出现一个新会话。",
-        "确认主面板显示空白对话状态。"
+        "从仓库根目录运行 ./init.sh。",
+        "确认脚本使用与当前 Java/Maven 仓库匹配的命令，而不是 npm 模板命令。",
+        "确认基础验证真实执行成功。",
+        "确认 git status 中没有由错误启动流程意外生成的未解释文件。"
       ],
-      "evidence": [],
-      "notes": ""
+      "evidence": [
+        {
+          "date": "2026-05-15",
+          "result": "failed",
+          "detail": "./init.sh 执行 npm install 后失败：仓库根目录没有 package.json。"
+        },
+        {
+          "date": "2026-05-15",
+          "result": "failed",
+          "detail": "mvn test 无法执行：当前环境返回 mvn: command not found。"
+        }
+      ],
+      "notes": "这是继续叠加任何新功能前的最高优先级事项；当前 blocker 已同步到 claude-progress.md 与 clean-state-checklist.md。"
     },
     {
-      "id": "chat-002",
+      "id": "vessel-001",
       "priority": 2,
-      "area": "chat",
-      "title": "在当前会话里发送消息",
-      "user_visible_behavior": "用户提交一条消息后，可以在当前线程中看到它。",
-      "status": "not_started",
+      "area": "vessel",
+      "title": "统一 Vessel 配置加载主链路",
+      "user_visible_behavior": "系统从 vessels 目录加载数字员工时，使用 config.yaml + vessel.md 的统一模型，而不是残留的旧 expert 解析路径。",
+      "status": "passing",
       "verification": [
-        "打开一个已有会话。",
-        "在输入框中输入消息。",
-        "提交消息。",
-        "确认线程中出现这条新消息。"
+        "检查 VesselManager.loadVessels() 是否复用 VesselConfigLoader。",
+        "检查 VesselConfigLoader 是否读取 config.yaml 与 vessel.md。",
+        "确认已有测试报告覆盖 VesselManagerTest 与 VesselConfigLoaderTest。"
       ],
-      "evidence": [],
-      "notes": ""
+      "evidence": [
+        {
+          "date": "2026-05-15",
+          "result": "code_reviewed",
+          "detail": "VesselManager.loadVessels() 当前调用 meta.claw.core.config.VesselConfigLoader.loadFromDirectory(Path.of(vesselsDir))。"
+        },
+        {
+          "date": "2026-05-15",
+          "result": "historical_test_report",
+          "detail": "target/surefire-reports 显示 VesselManagerTest 4/4、VesselConfigLoaderTest 2/2 通过。"
+        }
+      ],
+      "notes": "该能力按当前代码可视为已实现；但本轮没有重新执行 Maven 测试。"
     },
     {
-      "id": "chat-003",
+      "id": "prompt-001",
       "priority": 3,
-      "area": "chat",
-      "title": "持久化保存会话列表",
-      "user_visible_behavior": "应用重启后，用户仍能看到之前创建的会话。",
+      "area": "prompt-engineering",
+      "title": "构建动态系统提示与记忆窗口",
+      "user_visible_behavior": "CLI 与运行时可以基于 Vessel 配置、模板和上下文生成系统提示，并按轮数裁剪历史消息。",
+      "status": "passing",
+      "verification": [
+        "检查 SystemPromptBuilder、TemplateLoader、PromptContextFactory、MemoryManager 是否存在并被调用。",
+        "确认 ChatCommand 与 VesselRuntime 已接入动态提示构建。",
+        "确认已有测试报告覆盖 prompt 与 memory 组件。"
+      ],
+      "evidence": [
+        {
+          "date": "2026-05-15",
+          "result": "code_reviewed",
+          "detail": "ChatCommand 已接入 PromptContextFactory、SystemPromptBuilder、MemoryManager；最近提交含 prompt/runtime 集成。"
+        },
+        {
+          "date": "2026-05-15",
+          "result": "historical_test_report",
+          "detail": "target/surefire-reports 显示 SystemPromptBuilderTest 11/11、PromptContextFactoryTest 5/5、MemoryManagerTest 8/8 通过。"
+        }
+      ],
+      "notes": "这是 2026-05-09 审计后新增的真实进展，旧进度文档仍把该批次写成 0%。"
+    },
+    {
+      "id": "store-001",
+      "priority": 4,
+      "area": "storage",
+      "title": "落盘保存 CLI 对话消息",
+      "user_visible_behavior": "用户在 CLI 对话中的消息与回复会被写入 JSONL 存储。",
+      "status": "passing",
+      "verification": [
+        "检查 ChatCommand 是否在 user/assistant 消息后调用 JsonlConversationStore.appendMessage()。",
+        "确认 JsonlConversationStore 与 FilePreferenceStore 存在测试报告。"
+      ],
+      "evidence": [
+        {
+          "date": "2026-05-15",
+          "result": "code_reviewed",
+          "detail": "ChatCommand 当前会为 user 与 assistant 消息构造 ChatMessage 并追加到 JsonlConversationStore。"
+        },
+        {
+          "date": "2026-05-15",
+          "result": "historical_test_report",
+          "detail": "target/surefire-reports 显示 JsonlConversationStoreTest 8/8、JsonlConversationStoreEnhancedTest 9/9、FilePreferenceStoreTest 8/8 通过。"
+        }
+      ],
+      "notes": "这里只能证明“落盘追加”已经实现；不能扩大解释为“重启后自动恢复历史”，因为 ChatCommand 目前每次启动仍生成新的 sessionKey。"
+    },
+    {
+      "id": "semantic-001",
+      "priority": 5,
+      "area": "semantic-cleanup",
+      "title": "彻底清理 Expert 遗留语义",
+      "user_visible_behavior": "代码、测试和资源注释都统一使用 Vessel/数字员工，不再混杂旧的 Expert/专家 术语。",
       "status": "not_started",
       "verification": [
-        "创建两个会话。",
-        "重启应用。",
-        "确认两个会话仍显示在侧边栏中。"
+        "运行 rg -n \"Expert|专家\" 作用于生产代码、测试和资源目录。",
+        "确认只保留历史设计文档中的必要说明，不再有活跃代码或配置残留。"
+      ],
+      "evidence": [
+        {
+          "date": "2026-05-15",
+          "result": "failed",
+          "detail": "仍在 meta-claw-bootstrap/src/main/resources/application.yml 与 SessionManagerTest 中发现 Expert/专家 残留。"
+        }
+      ],
+      "notes": "核心运行代码已基本完成语义迁移，但还不能把“全仓清理完成”记为 passing。"
+    },
+    {
+      "id": "chat-001",
+      "priority": 6,
+      "area": "chat",
+      "title": "重启后恢复同一会话历史",
+      "user_visible_behavior": "用户重新进入同一 CLI 会话后，系统能继续使用此前历史，而不是每次生成全新上下文。",
+      "status": "not_started",
+      "verification": [
+        "启动 chat 并发送至少一轮消息。",
+        "退出后重新进入同一会话。",
+        "确认系统加载先前 history.jsonl，而不是生成新的孤立 sessionKey。"
       ],
       "evidence": [],
-      "notes": ""
+      "notes": "当前 ChatCommand 每次运行都会 UUID.randomUUID() 生成新 sessionKey；因此不能把现有落盘能力误记为历史恢复。"
     }
   ]
 }
