@@ -5,14 +5,15 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT_DIR"
 
-# 按你的项目实际情况替换这些命令。
-INSTALL_CMD=(npm install)
-VERIFY_CMD=(npm test)
-START_CMD=(npm run dev)
+VERIFY_CMD=(mvn clean test)
+START_CMD=(mvn spring-boot:run -pl meta-claw-bootstrap -DskipTests)
 
 echo "==> 当前目录: $PWD"
-echo "==> 同步依赖"
-"${INSTALL_CMD[@]}"
+echo "==> 检查 Maven"
+if ! command -v mvn >/dev/null 2>&1; then
+  echo "错误：未找到 mvn。请先安装 Maven，再重新运行 ./init.sh。" >&2
+  exit 127
+fi
 
 echo "==> 运行基础验证"
 "${VERIFY_CMD[@]}"
