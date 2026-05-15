@@ -36,9 +36,19 @@
           "date": "2026-05-15",
           "result": "failed",
           "detail": "mvn test 无法执行：当前环境返回 mvn: command not found。"
+        },
+        {
+          "date": "2026-05-15",
+          "result": "code_fixed",
+          "detail": "init.sh 已改为检查 mvn、执行 mvn clean test，并在 RUN_START_COMMAND=1 时启动 meta-claw-bootstrap。"
+        },
+        {
+          "date": "2026-05-15",
+          "result": "verified_failure_boundary",
+          "detail": "./init.sh 现在会快速报出“未找到 mvn”，且不再调用 npm。"
         }
       ],
-      "notes": "这是继续叠加任何新功能前的最高优先级事项；当前 blocker 已同步到 claude-progress.md 与 clean-state-checklist.md。"
+      "notes": "入口脚本逻辑已修正，但在 Maven 可执行且真实验证通过前，仍保持 in_progress。"
     },
     {
       "id": "vessel-001",
