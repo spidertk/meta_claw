@@ -188,6 +188,38 @@
         }
       ],
       "notes": "显式恢复已按 Vessel 作用域实现；恢复时重建当前 system prompt，并只回放 user/assistant/tool 历史消息。"
+    },
+    {
+      "id": "memory-001",
+      "priority": 7,
+      "area": "memory",
+      "title": "建立独立 Memory 领域边界",
+      "user_visible_behavior": "系统把短期会话历史与长期偏好作为 Memory 的不同分支管理，提示词也明确区分偏好与会话历史。",
+      "status": "passing",
+      "verification": [
+        "检查 core.memory.shortterm / core.memory.longterm 与 store.memory.shortterm / store.memory.longterm 是否存在。",
+        "确认 session 包只保留会话生命周期类。",
+        "运行提示词、store、CLI 相关测试。",
+        "运行 ./init.sh。"
+      ],
+      "evidence": [
+        {
+          "date": "2026-05-16",
+          "result": "passing",
+          "detail": "已建立 memory shortterm/longterm 包结构；ConversationHistoryManager、偏好接口与 store 实现均迁入 memory 域。"
+        },
+        {
+          "date": "2026-05-16",
+          "result": "verified",
+          "detail": "mvn test -pl meta-claw-store,meta-claw-cli -am 通过；prompt 测试确认 User Preferences 与 Conversation History 分离。"
+        },
+        {
+          "date": "2026-05-16",
+          "result": "verified",
+          "detail": "./init.sh 全量通过，9 个 reactor 模块全部 SUCCESS。"
+        }
+      ],
+      "notes": "当前长期记忆已实现子类型只有 Preferences；后续 facts、summaries、relationships 可沿 longterm 分支扩展。"
     }
   ]
 }

@@ -1,4 +1,4 @@
-# Meta-Claw Phase 2: Prompt Engineering + MemoryManager 设计文档
+# Meta-Claw Phase 2: Prompt Engineering + Memory Domain 设计文档
 
 > 日期：2026-05-09
 > 目标：实现模板驱动的系统提示组装、上下文窗口管理，以及 Store 层的增强
@@ -11,14 +11,14 @@
 
 ### 1.1 目标
 
-将 Vessel 的系统提示从静态 `config.systemPrompt` 升级为**模板驱动、上下文感知的动态组装**。同时引入 `MemoryManager` 管理对话历史截断，并增强 `JsonlConversationStore` 以支持过滤、统计和媒体存储。
+将 Vessel 的系统提示从静态 `config.systemPrompt` 升级为**模板驱动、上下文感知的动态组装**。同时引入 `ConversationHistoryManager` 管理短期记忆中的对话历史截断，并增强 `JsonlConversationStore` 以支持过滤、统计和媒体存储。
 
 ### 1.2 架构决策
 
 - **SystemPromptBuilder**：采用"手动 section 构建 + `String.replace("<SECTION/>", content)`"模式（参考 `prompts.py`），不引入通用模板引擎
 - **TemplateLoader**：仅负责从 classpath 加载模板文件内容
 - **PromptContext**：承载所有构建系统提示所需的数据
-- **MemoryManager**：提供最近 N 轮 / Token 估算两种截断策略
+- **ConversationHistoryManager**：提供最近 N 轮 / Token 估算两种截断策略
 - **JsonlConversationStore**：参考 `file_storage.py` 增强过滤查询、统计信息、媒体存储、base64 剥离
 
 ### 1.3 范围边界
@@ -28,7 +28,7 @@
 - `TemplateLoader`：classpath 模板加载
 - `SystemPromptBuilder`：section 构建 + 模板替换
 - `PromptContext` + `PromptContextFactory`：数据载体 + 构建工厂
-- `MemoryManager`：截断策略（最近 N 轮 + Token 估算）
+- `ConversationHistoryManager`：短期记忆截断策略（最近 N 轮 + Token 估算）
 - `JsonlConversationStore` 增强：过滤、统计、媒体、base64 剥离
 - `VesselRuntime` / `ChatCommand` 集成
 - `VesselConfig` 新增 `maxHistoryRounds`、`maxTokens`
@@ -70,7 +70,9 @@
 
 <RUNTIME_SECTION/>
 
-<MEMORY_SECTION/>
+<PREFERENCES_SECTION/>
+
+<CONVERSATION_HISTORY_SECTION/>
 ```
 
 ### 2.3 占位符标记说明
@@ -83,7 +85,8 @@
 | `<KNOWLEDGE_SECTION/>` | `buildKnowledgeSection()` | ⏳ 返回空字符串 |
 | `<WORKSPACE_SECTION/>` | `buildWorkspaceSection()` | ✅ |
 | `<RUNTIME_SECTION/>` | `buildRuntimeSection()` | ✅ |
-| `<MEMORY_SECTION/>` | `buildMemorySection()` | ✅ |
+| `<PREFERENCES_SECTION/>` | `buildPreferencesSection()` | ✅ |
+| `<CONVERSATION_HISTORY_SECTION/>` | `buildConversationHistorySection()` | ✅ |
 
 **清理规则**：section 构建器返回空字符串时，`SystemPromptBuilder` 会连同该 section 的 Markdown 标题一起移除，避免空 section 污染 prompt。
 
@@ -149,7 +152,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import meta.claw.core.session.ChatMessage;
+import meta.claw.core.memory.shortterm.ChatMessage;
 
 import java.nio.file.Path;
 import java.util.Collections;
@@ -221,8 +224,8 @@ package meta.claw.core.prompt;
 
 import lombok.extern.slf4j.Slf4j;
 import meta.claw.core.model.VesselConfig;
-import meta.claw.core.session.PreferenceEntry;
-import meta.claw.core.session.UserPreferenceStore;
+import meta.claw.core.memory.longterm.PreferenceEntry;
+import meta.claw.core.memory.longterm.UserPreferenceStore;
 
 import java.nio.file.Path;
 import java.time.LocalDateTime;
@@ -341,7 +344,9 @@ public class SystemPromptBuilder {
         String result = template;
         result = replaceSection(result, "<WORKSPACE_SECTION/>", buildWorkspaceSection());
         result = replaceSection(result, "<RUNTIME_SECTION/>", buildRuntimeSection());
-        result = replaceSection(result, "<MEMORY_SECTION/>", buildMemorySection());
+        result = replaceSection(result, "<PREFERENCES_SECTION/>
+
+<CONVERSATION_HISTORY_SECTION/>", buildPreferencesSection());
         return result;
     }
     
@@ -454,31 +459,48 @@ public class SystemPromptBuilder {
         return sb.toString();
     }
     
-    private String buildMemorySection() {
+    private String buildPreferencesSection() {
         if (context.getPreferences() == null || context.getPreferences().isBlank()) {
             return "";
         }
         return "## User Preferences\n\n" + context.getPreferences();
+    }
+
+    private String buildConversationHistorySection() {
+        if ((context.getConversationSummary() == null || context.getConversationSummary().isBlank())
+                && (context.getRecentMessages() == null || context.getRecentMessages().isEmpty())) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder("## Conversation History\n\n");
+        if (context.getConversationSummary() != null && !context.getConversationSummary().isBlank()) {
+            sb.append("### Conversation Summary\n\n")
+                    .append(context.getConversationSummary())
+                    .append("\n\n");
+        }
+        if (context.getRecentMessages() != null && !context.getRecentMessages().isEmpty()) {
+            sb.append("### Recent Messages\n\n");
+        }
+        return sb.toString().trim();
     }
 }
 ```
 
 ---
 
-## 六、MemoryManager
+## 六、ConversationHistoryManager
 
-**路径**：`meta-claw-core/src/main/java/meta/claw/core/prompt/MemoryManager.java`
+**路径**：`meta-claw-core/src/main/java/meta/claw/core/memory/shortterm/ConversationHistoryManager.java`
 
 ```java
-package meta.claw.core.prompt;
+package meta.claw.core.memory.shortterm;
 
-import meta.claw.core.session.ChatMessage;
+import meta.claw.core.memory.shortterm.ChatMessage;
 import meta.claw.core.spi.llm.SpiMessage;
 
 import java.util.ArrayList;
 import java.util.List;
 
-public class MemoryManager {
+public class ConversationHistoryManager {
     
     public List<SpiMessage> truncateByRound(List<SpiMessage> history, int maxRounds) {
         if (maxRounds <= 0 || history == null || history.isEmpty()) {
@@ -649,7 +671,7 @@ public class MediaReference {
 ### 7.3 增强实现
 
 ```java
-package meta.claw.store.conversation;
+package meta.claw.store.memory.shortterm;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -877,14 +899,14 @@ private Integer maxTokens = 4096;
 | SystemPromptBuilder | 给定 VesselConfig 生成包含 Identity/Workspace/Runtime 的系统提示 | 单元测试 + 手动查看输出 |
 | SystemPromptBuilder | 空 section 自动移除（不渲染空标题） | 单元测试 |
 | PromptContextFactory | current_time 和 location 正确生成 | 单元测试 |
-| MemoryManager | truncateByRound(20) 正确保留最近 20 轮 | 单元测试 |
-| MemoryManager | truncateByToken(4096) 正确截断 | 单元测试 |
+| ConversationHistoryManager | truncateByRound(20) 正确保留最近 20 轮 | 单元测试 |
+| ConversationHistoryManager | truncateByToken(4096) 正确截断 | 单元测试 |
 | JsonlConversationStore | getHistory with MessageFilter 按 role 过滤 | 单元测试 |
 | JsonlConversationStore | getStats 返回正确计数和文件大小 | 单元测试 |
 | JsonlConversationStore | saveMedia 文件写入 media/ 子目录 | 单元测试 |
 | JsonlConversationStore | stripBase64 正确替换 data URL | 单元测试 |
 | VesselRuntime | 使用 SystemPromptBuilder 替代硬编码 systemPrompt | 集成测试 |
-| ChatCommand | 对话前调用 MemoryManager.truncateByRound | 手动验证 |
+| ChatCommand | 对话前调用 ConversationHistoryManager.truncateByRound | 手动验证 |
 | 全量 | `mvn clean test` 全量通过 | 全量构建 |
 
 ---
@@ -897,7 +919,7 @@ meta-claw-core/src/main/java/meta/claw/core/prompt/TemplateLoader.java
 meta-claw-core/src/main/java/meta/claw/core/prompt/SystemPromptBuilder.java
 meta-claw-core/src/main/java/meta/claw/core/prompt/PromptContext.java
 meta-claw-core/src/main/java/meta/claw/core/prompt/PromptContextFactory.java
-meta-claw-core/src/main/java/meta/claw/core/prompt/MemoryManager.java
+meta-claw-core/src/main/java/meta/claw/core/memory/shortterm/ConversationHistoryManager.java
 meta-claw-core/src/main/java/meta/claw/core/prompt/ToolInfo.java
 meta-claw-core/src/main/java/meta/claw/core/prompt/SkillInfo.java
 meta-claw-core/src/main/java/meta/claw/core/session/MessageFilter.java
@@ -906,7 +928,7 @@ meta-claw-core/src/main/java/meta/claw/core/session/MediaReference.java
 meta-claw-core/src/main/resources/templates/system.tmpl.md
 meta-claw-core/src/main/resources/templates/context.tmpl.md
 meta-claw-core/src/test/java/meta/claw/core/prompt/SystemPromptBuilderTest.java
-meta-claw-core/src/test/java/meta/claw/core/prompt/MemoryManagerTest.java
+meta-claw-core/src/test/java/meta/claw/core/memory/shortterm/ConversationHistoryManagerTest.java
 meta-claw-store/src/test/java/meta/claw/store/conversation/JsonlConversationStoreEnhancedTest.java
 ```
 

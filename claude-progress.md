@@ -20,8 +20,8 @@
 - Vessel 模板中的 `provider` 字段已正确存在
 - CLI 基础命令已存在：`init`、`create`、`list`、`delete`、`config`、`chat`
 - Prompt Engineering Phase 2 的主件已存在：`PromptContext`、`TemplateLoader`、`SystemPromptBuilder`、`PromptContextFactory`
-- `MemoryManager` 已存在并被 `ChatCommand` 使用
-- `meta-claw-store` 已存在，含 `JsonlConversationStore` 与 `FilePreferenceStore`
+- `Memory` 已成为独立领域：短期记忆位于 `core.memory.shortterm`，长期偏好位于 `core.memory.longterm`
+- `meta-claw-store` 已按 Memory 边界拆为 `store.memory.shortterm.JsonlConversationStore` 与 `store.memory.longterm.FilePreferenceStore`
 - `ChatCommand` 已把用户/assistant 消息追加到 `JsonlConversationStore`
 
 ### 仍未完成或不能算完成
@@ -187,3 +187,21 @@
   - 目前仍未做手动 CLI 交互验收；当前证据来自自动化测试与全量构建
 - 下一步最佳动作：
   1. 由用户决定下一项功能优先级
+
+### Session 006
+
+- 日期：2026-05-16
+- 本轮目标：把 Memory 从混合命名升级为独立领域边界
+- 已完成：
+  - 明确 `Memory = Short-term Memory + Long-term Memory`
+  - 将会话历史相关模型与管理器迁入 `core.memory.shortterm`
+  - 将偏好接口迁入 `core.memory.longterm`
+  - 将存储实现迁入 `store.memory.shortterm` / `store.memory.longterm`
+  - 将 prompt context 拆为显式 `User Preferences` 与 `Conversation History`
+- 运行过的验证：
+  - `mvn test -pl meta-claw-store,meta-claw-cli -am` → 成功
+  - `./init.sh` → 成功，9 个 reactor 模块全部 `SUCCESS`
+- 已知风险或未解决问题：
+  - 当前无新增 blocker；后续长期记忆扩展仍待单独设计
+- 下一步最佳动作：
+  1. 由用户决定下一项优先级
