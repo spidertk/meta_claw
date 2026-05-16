@@ -6,7 +6,7 @@
 - 当前架构基线：Java 21 + Maven 多模块仓库；已存在 `meta-claw-core`、`meta-claw-vessel`、`meta-claw-store`、`meta-claw-cli`、`meta-claw-gateway*`、`meta-claw-bootstrap`
 - 标准启动路径：`./init.sh`
 - 标准验证路径：`./init.sh` 内部执行 `mvn clean test`
-- 最近已通过证据：2026-05-16 在真实 Maven 环境中执行 `./init.sh`，9 个 reactor 模块全部 `SUCCESS`
+- 最近已通过证据：2026-05-17 在真实 Maven 环境中执行 `./init.sh`，9 个 reactor 模块全部 `SUCCESS`
 - 当前最高优先级未完成功能：暂无新的已选定功能
 - 当前 blocker：
   1. 当前无 blocker
@@ -20,14 +20,17 @@
 - Vessel 模板中的 `provider` 字段已正确存在
 - CLI 基础命令已存在：`init`、`create`、`list`、`delete`、`config`、`chat`
 - Prompt Engineering Phase 2 的主件已存在：`PromptContext`、`TemplateLoader`、`SystemPromptBuilder`、`PromptContextFactory`
-- `Memory` 已成为独立领域：短期记忆位于 `core.memory.shortterm`，长期偏好位于 `core.memory.longterm`
-- `meta-claw-store` 已按 Memory 边界拆为 `store.memory.shortterm.JsonlConversationStore` 与 `store.memory.longterm.FilePreferenceStore`
-- `ChatCommand` 已把用户/assistant 消息追加到 `JsonlConversationStore`
+- `Memory` 已成为独立领域：短期记忆位于 `core.memory.shortterm`，长期记忆位于 `core.memory.longterm`
+- `core.session` 与 `core.model` 已移除；配置模型归入 `core.config`，消息流模型归入 `core.message`
+- `ShortMemoryManager` / `LongMemoryManager` 已成为配置驱动的编排入口，`ConversationHistoryManager` 退回 short-term 窗口策略
+- `meta-claw-store` 已按 Memory 边界拆为 `store.memory.shortterm.JsonlShortMemoryStore` 与 `store.memory.longterm.FileLongMemoryStore`
+- `VesselConfigLoader` 已支持读取 `memory.short_term_store` / `memory.long_term_store`
+- `ChatCommand` 已通过 `MemoryManagerFactory` 追加短期消息，并通过 `LongMemoryManager` 把长期偏好接回 prompt context
 
 ### 仍未完成或不能算完成
 
 - `./init.sh` 已迁移到当前 Java/Maven 实际启动路径，并已于 2026-05-16 完整跑通
-- `ChatCommand` 每次启动生成新 `sessionKey`，当前代码虽会落盘消息，但未体现“重启后自动恢复历史”
+- `ChatCommand` 默认仍会创建新 `sessionKey`，但已支持 `sessions <vessel>` 与 `chat <vessel> --resume <session-id>` 的显式恢复
 - `serve/start/stop/restart/status/logs`、工具引擎、MCP、Skill 系统仍未实现
 
 ## 会话记录
@@ -203,5 +206,40 @@
   - `./init.sh` → 成功，9 个 reactor 模块全部 `SUCCESS`
 - 已知风险或未解决问题：
   - 当前无新增 blocker；后续长期记忆扩展仍待单独设计
+- 下一步最佳动作：
+  1. 由用户决定下一项优先级
+
+### Session 007
+
+- 日期：2026-05-17
+- 本轮目标：删除旧 session/model 杂质，并把 Memory 扶正为“Manager 编排 + Store Backend”架构
+- 已完成：
+  - 删除未进入主链路的 `core.session` 与对应单测
+  - 将配置对象迁入 `core.config`，将消息流对象迁入 `core.message`
+  - 统一 short-term memory 的公开消息模型为 `SpiMessage`
+  - 新增 `MemoryConfig`、`ShortMemoryManager`、`LongMemoryManager`
+  - 将 store concrete implementation 改为 `JsonlShortMemoryStore` / `FileLongMemoryStore`
+  - 新增 `MemoryManagerFactory`，让 CLI 调用层不再直接依赖具体文件后端
+  - 为 Vessel 配置与模板增加 `memory.short_term_store` / `memory.long_term_store`
+  - 将长期偏好重新接回 `ChatCommand` 的 prompt context
+- 运行过的验证：
+  - `mvn test -pl meta-claw-core,meta-claw-store,meta-claw-cli -am -Dtest=VesselConfigLoaderTest,ConversationHistoryManagerTest,ShortMemoryManagerTest,LongMemoryManagerTest,PromptContextFactoryTest,JsonlShortMemoryStoreTest,FileLongMemoryStoreTest,ChatCommandTest,SessionsCommandTest -Dsurefire.failIfNoSpecifiedTests=false` → 成功
+  - `./init.sh` → 成功，9 个 reactor 模块全部 `SUCCESS`
+- 已记录证据：
+  - `ShortMemoryManagerTest` 与 `LongMemoryManagerTest` 覆盖配置驱动 backend 选择
+  - `VesselConfigLoaderTest` 覆盖 memory 配置读取
+  - `PromptContextFactory` 继续只依赖 `UserPreferenceStore` 语义，`ChatCommand` 当前传入 `LongMemoryManager`
+- 更新过的文件或工件：
+  - `meta-claw-core/src/main/java/meta/claw/core/config/*`
+  - `meta-claw-core/src/main/java/meta/claw/core/message/*`
+  - `meta-claw-core/src/main/java/meta/claw/core/memory/*`
+  - `meta-claw-store/src/main/java/meta/claw/store/memory/*`
+  - `meta-claw-cli/src/main/java/meta/claw/cli/{ChatCommand,SessionsCommand}.java`
+  - `meta-claw-vessel/src/main/resources/templates/vessel-config.tmpl.yaml`
+  - `.meta-claw/vessels/default/config.yaml`
+  - 长期状态文件
+- 已知风险或未解决问题：
+  - `SpringAiLlmClientIntegrationTest` 仍会访问真实外部 provider，标准验证依赖网络与有效配置
+  - `MemoryManagerFactory` 当前只注册 JSONL / file 两个默认 backend；后续若增加新 backend，需要同时补充装配与配置文档
 - 下一步最佳动作：
   1. 由用户决定下一项优先级

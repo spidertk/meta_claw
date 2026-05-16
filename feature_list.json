@@ -1,6 +1,6 @@
 {
   "project": "meta-claw",
-  "last_updated": "2026-05-16",
+  "last_updated": "2026-05-17",
   "rules": {
     "single_active_feature": true,
     "passing_requires_evidence": true,
@@ -89,23 +89,23 @@
       "user_visible_behavior": "CLI 与运行时可以基于 Vessel 配置、模板和上下文生成系统提示，并按轮数裁剪历史消息。",
       "status": "passing",
       "verification": [
-        "检查 SystemPromptBuilder、TemplateLoader、PromptContextFactory、MemoryManager 是否存在并被调用。",
+        "检查 SystemPromptBuilder、TemplateLoader、PromptContextFactory、ShortMemoryManager 是否存在并被调用。",
         "确认 ChatCommand 与 VesselRuntime 已接入动态提示构建。",
-        "确认已有测试报告覆盖 prompt 与 memory 组件。"
+        "确认提示词测试覆盖 User Preferences 与 Conversation History。"
       ],
       "evidence": [
         {
-          "date": "2026-05-15",
-          "result": "code_reviewed",
-          "detail": "ChatCommand 已接入 PromptContextFactory、SystemPromptBuilder、MemoryManager；最近提交含 prompt/runtime 集成。"
+          "date": "2026-05-17",
+          "result": "verified",
+          "detail": "SystemPromptBuilder 继续生成动态系统提示；PromptContextFactory 通过 UserPreferenceStore 加载偏好，ChatCommand 现已接入 LongMemoryManager。"
         },
         {
-          "date": "2026-05-15",
-          "result": "historical_test_report",
-          "detail": "target/surefire-reports 显示 SystemPromptBuilderTest 11/11、PromptContextFactoryTest 5/5、MemoryManagerTest 8/8 通过。"
+          "date": "2026-05-17",
+          "result": "passing",
+          "detail": "./init.sh 全量通过；SystemPromptBuilderTest 10/10、PromptContextFactoryTest 5/5 通过。"
         }
       ],
-      "notes": "这是 2026-05-09 审计后新增的真实进展，旧进度文档仍把该批次写成 0%。"
+      "notes": "当前提示词已显式区分 User Preferences 与 Conversation History；偏好来自长期记忆链路，历史窗口来自短期记忆链路。"
     },
     {
       "id": "store-001",
@@ -115,22 +115,22 @@
       "user_visible_behavior": "用户在 CLI 对话中的消息与回复会被写入 JSONL 存储。",
       "status": "passing",
       "verification": [
-        "检查 ChatCommand 是否在 user/assistant 消息后调用 JsonlConversationStore.appendMessage()。",
-        "确认 JsonlConversationStore 与 FilePreferenceStore 存在测试报告。"
+        "检查 ChatCommand 是否通过 ShortMemoryManager 追加 user/assistant 消息。",
+        "确认 JsonlShortMemoryStore 与 FileLongMemoryStore 的测试真实通过。"
       ],
       "evidence": [
         {
-          "date": "2026-05-15",
-          "result": "code_reviewed",
-          "detail": "ChatCommand 当前会为 user 与 assistant 消息构造 ChatMessage 并追加到 JsonlConversationStore。"
+          "date": "2026-05-17",
+          "result": "verified",
+          "detail": "ChatCommand 当前通过 ShortMemoryManager 追加 SpiMessage；底层默认 short-term backend 为 JsonlShortMemoryStore。"
         },
         {
-          "date": "2026-05-15",
-          "result": "historical_test_report",
-          "detail": "target/surefire-reports 显示 JsonlConversationStoreTest 8/8、JsonlConversationStoreEnhancedTest 9/9、FilePreferenceStoreTest 8/8 通过。"
+          "date": "2026-05-17",
+          "result": "passing",
+          "detail": "./init.sh 全量通过；JsonlShortMemoryStoreTest 5/5、FileLongMemoryStoreTest 8/8 通过。"
         }
       ],
-      "notes": "这里只能证明“落盘追加”已经实现；不能扩大解释为“重启后自动恢复历史”，因为 ChatCommand 目前每次启动仍生成新的 sessionKey。"
+      "notes": "这里证明的是短期消息落盘与长期偏好 backend 可用；会话恢复能力由 chat-001 单独覆盖。"
     },
     {
       "id": "semantic-001",
@@ -198,8 +198,8 @@
       "status": "passing",
       "verification": [
         "检查 core.memory.shortterm / core.memory.longterm 与 store.memory.shortterm / store.memory.longterm 是否存在。",
-        "确认 session 包只保留会话生命周期类。",
-        "运行提示词、store、CLI 相关测试。",
+        "确认 core.session 已移除，Memory 不再借旧 session 域表达。",
+        "运行 memory、store、CLI 相关测试。",
         "运行 ./init.sh。"
       ],
       "evidence": [
@@ -209,17 +209,55 @@
           "detail": "已建立 memory shortterm/longterm 包结构；ConversationHistoryManager、偏好接口与 store 实现均迁入 memory 域。"
         },
         {
-          "date": "2026-05-16",
+          "date": "2026-05-17",
           "result": "verified",
-          "detail": "mvn test -pl meta-claw-store,meta-claw-cli -am 通过；prompt 测试确认 User Preferences 与 Conversation History 分离。"
+          "detail": "core.session 已删除，store concrete implementation 已改为 JsonlShortMemoryStore / FileLongMemoryStore。"
         },
         {
-          "date": "2026-05-16",
+          "date": "2026-05-17",
           "result": "verified",
           "detail": "./init.sh 全量通过，9 个 reactor 模块全部 SUCCESS。"
         }
       ],
-      "notes": "当前长期记忆已实现子类型只有 Preferences；后续 facts、summaries、relationships 可沿 longterm 分支扩展。"
+      "notes": "Memory 已从命名清理升级为真正的领域边界；后续 facts、summaries、relationships 可沿 longterm 分支扩展。"
+    },
+    {
+      "id": "core-001",
+      "priority": 8,
+      "area": "core-architecture",
+      "title": "理顺 Core 领域目录与 Memory 编排层",
+      "user_visible_behavior": "后续开发者面对的是清晰的 config/message/memory 结构；短期记忆与长期偏好由 manager 统一调度，调用层不再被文件后端和旧 session 语义污染。",
+      "status": "passing",
+      "verification": [
+        "确认 meta.claw.core.session 与 meta.claw.core.model 已不存在。",
+        "确认 config/message/memory 三个目录职责清晰，短期记忆公开模型统一为 SpiMessage。",
+        "确认 MemoryConfig 可从 vessel config.yaml 读取 short_term_store / long_term_store。",
+        "确认 ShortMemoryManager / LongMemoryManager 的 backend 选择测试通过。",
+        "运行 ./init.sh。"
+      ],
+      "evidence": [
+        {
+          "date": "2026-05-17",
+          "result": "passing",
+          "detail": "已删除旧 core.session；配置模型迁入 core.config，消息流模型迁入 core.message，short-term memory 对外只使用 SpiMessage。"
+        },
+        {
+          "date": "2026-05-17",
+          "result": "passing",
+          "detail": "新增 MemoryConfig、ShortMemoryManager、LongMemoryManager、MemoryManagerFactory；VesselConfigLoader 支持读取 memory.short_term_store / memory.long_term_store。"
+        },
+        {
+          "date": "2026-05-17",
+          "result": "verified",
+          "detail": "定向测试通过：ShortMemoryManagerTest、LongMemoryManagerTest、VesselConfigLoaderTest、PromptContextFactoryTest、JsonlShortMemoryStoreTest、FileLongMemoryStoreTest、ChatCommandTest、SessionsCommandTest。"
+        },
+        {
+          "date": "2026-05-17",
+          "result": "verified",
+          "detail": "./init.sh 全量通过，9 个 reactor 模块全部 SUCCESS。"
+        }
+      ],
+      "notes": "ConversationHistoryManager 现在只是 short-term windowing strategy；CLI 通过 MemoryManagerFactory 装配 backend，偏好提示词通过 LongMemoryManager 读取。"
     }
   ]
 }

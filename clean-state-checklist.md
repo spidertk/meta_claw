@@ -1,18 +1,18 @@
 # 干净状态检查清单
 
-> 最后核对：2026-05-16  
+> 最后核对：2026-05-17  
 > 结论：标准入口已恢复，仓库可按约定重新开始工作。
 
 - [x] 标准启动路径仍然可用  
-  证据：2026-05-16 执行 `./init.sh` 成功，脚本完成 Maven 检查与基础验证
+  证据：2026-05-17 执行 `./init.sh` 成功，脚本完成 Maven 检查与基础验证
 - [x] 标准验证路径仍然可运行  
-  证据：2026-05-16 `./init.sh` 内部执行 `mvn clean test`，9 个 reactor 模块全部 `SUCCESS`
+  证据：2026-05-17 `./init.sh` 内部执行 `mvn clean test`，9 个 reactor 模块全部 `SUCCESS`
 - [x] 当前进度已经记录到进度日志  
-  证据：`claude-progress.md` 已于 2026-05-16 更新为当前实现与下一步
+  证据：`claude-progress.md` 已于 2026-05-17 更新为当前实现与下一步
 - [x] 功能状态真实反映了 passing 和未验证的边界  
   证据：`feature_list.json` 已区分已通过的 `repo-001` 与后续未完成功能
 - [x] 没有任何半成品步骤处于未记录状态  
-  证据：Memory 已独立为 short-term / long-term 两支，当前能力边界与后续扩展点均已写入 `feature_list.json`
+  证据：Memory 已独立为 manager/backend 分层，`core-001` 的范围、验证与后续扩展点均已写入 `feature_list.json`
 - [x] 下一轮会话无需人工修复即可继续  
   证据：下一轮可直接运行 `./init.sh`，再进入下一个已记录功能
 
