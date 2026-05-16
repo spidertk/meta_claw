@@ -1,23 +1,40 @@
-# Meta-Claw Memory Model Clarification 设计文档
+# Meta-Claw Memory Domain 重构设计文档
 
 > 日期：2026-05-16
-> 目标：把当前实现中的“记忆 / 会话历史 / 偏好”重新分层，建立可继续扩展的 Memory 模型，并让模板与代码名称反映真实语义。
+> 目标：把 Memory 提升为独立一级领域，拆清短期记忆、长期记忆与会话生命周期，并让 core/store/prompt 三层结构共同反映这套模型。
 
 ---
 
 ## 一、问题定义
 
-当前实现已经具备三类能力，但命名与模板分层混在一起：
+当前仓库已经有“会话历史”“用户偏好”“会话生命周期”三类能力，但它们的代码边界并未按领域组织：
 
-- `MemoryManager` 实际负责的是当前会话历史的裁剪与摘要占位。
-- `UserPreferenceStore` 负责的是跨会话保留的用户偏好。
-- `context.tmpl.md` 使用 `<MEMORY_SECTION/>`，但模板真实需要表达的是若干不同来源的上下文，而不是一个含混的“记忆块”。
+```text
+core/session
+├─ ConversationStore
+├─ ChatMessage
+├─ UserPreferenceStore
+├─ PreferenceEntry
+└─ SessionManager / UserSession / SessionStorage
 
-这种混用会让后来者误以为“记忆 = 会话管理”，也会让未来真正的长期记忆能力无处安放。
+core/prompt
+└─ ConversationHistoryManager（原 MemoryManager）
+
+store/conversation
+└─ JsonlConversationStore
+
+store/preferences
+└─ FilePreferenceStore
+```
+
+这造成两个问题：
+
+1. `Memory` 作为产品概念没有对应的代码边界。
+2. `session` 目录同时承载“会话生命周期”与“会话中保存了什么”，职责被混在一起。
 
 ## 二、目标模型
 
-本次修复保留 `Memory` 作为上位概念，但把层级拆清楚：
+本次重构保留 `Memory` 作为上位概念，并把它正式落为独立领域：
 
 ```text
 Memory
@@ -27,34 +44,71 @@ Memory
    └─ Preferences
 ```
 
-### 2.1 Short-term Memory
+### 2.1 Memory
 
-- 含义：当前会话或恢复中的会话历史。
-- 当前实现：消息回放、按轮数截断、按 token 粗估截断、对话摘要占位。
-- 代码命名：不再把承载该职责的类直接称为笼统的 `MemoryManager`，改用能揭示职责的名称。
+- 是独立一级领域，而不是 prompt 的附属概念。
+- 当前阶段只包含已实现能力，不虚构尚未落地的长期记忆子类型。
 
-### 2.2 Long-term Memory
+### 2.2 Short-term Memory
 
-- 含义：跨会话持续存在的长期信息。
-- 当前实现：只包含 `Preferences`。
-- 未来扩展：可继续承载事实、长期摘要、关系、经验等其他 memory subtype。
+- 表示当前会话或恢复中的消息历史。
+- 当前职责包括：消息模型、历史持久化接口、过滤、统计、媒体引用、历史裁剪与摘要占位。
 
-### 2.3 Preferences
+### 2.3 Long-term Memory
 
-- 含义：长期记忆中的一个明确子类型，不等于全部长期记忆。
-- 当前行为：继续由 `UserPreferenceStore` 读取并注入 prompt。
+- 表示跨会话持续存在的长期信息。
+- 当前已实现子类型只有 `Preferences`。
+- 未来可扩展事实、关系、长期摘要、经验等能力。
 
-## 三、设计决策
+### 2.4 Session
 
-### 3.1 代码命名
+- 仅表示会话生命周期与运行容器。
+- `SessionManager`、`UserSession`、`SessionStorage` 继续保留在 `session` 域。
+- 它们负责“会话如何存在”，不负责“会话记住了什么”。
 
-- 将 `MemoryManager` 重命名为 `ConversationHistoryManager`。
-- 将相关测试同步重命名。
-- 原因：当前类只管理会话历史，而不是整个 Memory 体系；使用职责名比使用抽象总称更精确。
+## 三、目标包结构
 
-### 3.2 Prompt 分层
+### 3.1 core 层
 
-`system` 与 `context` 的职责保持区分：
+```text
+meta.claw.core.memory
+├─ shortterm
+│  ├─ ChatMessage
+│  ├─ ConversationHistoryManager
+│  ├─ ConversationInfo
+│  ├─ ConversationStats
+│  ├─ ConversationStore
+│  ├─ MediaReference
+│  └─ MessageFilter
+└─ longterm
+   ├─ PreferenceEntry
+   └─ UserPreferenceStore
+```
+
+```text
+meta.claw.core.session
+├─ ChatMode
+├─ InMemorySessionStorage
+├─ SessionManager
+├─ SessionStorage
+└─ UserSession
+```
+
+### 3.2 store 层
+
+```text
+meta.claw.store.memory
+├─ shortterm
+│  └─ JsonlConversationStore
+└─ longterm
+   └─ FilePreferenceStore
+```
+
+这样 core 与 store 会共享同一套领域边界，后续扩展不会再在包结构上二次迁移。
+
+## 四、Prompt 分层
+
+Prompt 只消费 memory，不再替 memory 定义概念：
 
 ```text
 System Prompt
@@ -70,13 +124,9 @@ Context
 └─ Conversation History
 ```
 
-- `Domain Knowledge` 只承载 Vessel 的领域知识。
-- `User Preferences` 从长期记忆分支注入，但在 prompt 中以真实名称出现。
-- `Conversation History` 从短期记忆分支注入，明确表示最近对话与摘要。
+### 4.1 模板占位符
 
-### 3.3 模板占位符
-
-将 `context.tmpl.md` 中的笼统占位符拆分为：
+`context.tmpl.md` 使用显式占位符：
 
 ```markdown
 <WORKSPACE_SECTION/>
@@ -88,46 +138,52 @@ Context
 <CONVERSATION_HISTORY_SECTION/>
 ```
 
-- 不再继续使用 `<MEMORY_SECTION/>`，因为它隐藏了不同来源与生命周期。
-- `SystemPromptBuilder` 分别提供 `buildPreferencesSection()` 与 `buildConversationHistorySection()`。
-- 当某个 section 没有内容时，继续返回空字符串，不输出空标题。
+- 不再使用含混的 `<MEMORY_SECTION/>`。
+- `User Preferences` 来自 long-term memory。
+- `Conversation History` 来自 short-term memory。
 
-## 四、范围边界
+## 五、迁移原则
 
-### 4.1 本次包含
+1. **领域先于目录**：只有真正属于 memory 的类型才迁移。
+2. **不扩大 session 语义**：session 继续是生命周期域，不吸收 memory。
+3. **行为保持不变**：CLI 会话恢复、JSONL 存储、偏好读取在重构后维持现有行为。
+4. **包结构镜像**：core 与 store 使用同一套 shortterm / longterm 分层，避免未来再拆。
 
-- Memory 模型的正式分层说明。
-- 代码命名从“泛记忆”收敛到“会话历史”。
-- Prompt 模板与 section builder 的语义纠偏。
-- 相关测试、文档、状态文件同步更新。
+## 六、范围边界
 
-### 4.2 本次不包含
+### 6.1 本次包含
 
-- 不实现新的长期记忆检索、提取、总结或写回能力。
-- 不改变现有 CLI 会话恢复行为。
-- 不引入新的存储结构。
-- 不把 Preferences 扩展成事实库或用户画像系统。
+- 建立独立 memory 域。
+- 将短期记忆、长期偏好相关类型迁入新包。
+- 将 store 实现同步迁入 memory 对应子包。
+- 修正 prompt 模板与 section 命名。
+- 更新相关 import、测试、文档与状态文件。
 
-## 五、验证标准
+### 6.2 本次不包含
 
-1. 活跃代码与模板中，不再用含混的 `MemoryManager` / `<MEMORY_SECTION/>` 表示具体会话历史或偏好加载。
-2. 提示词构建测试能够证明：
-   - `Domain Knowledge` 与 `User Preferences` 分处不同 section；
-   - `User Preferences` 出现在 `Context`；
-   - 最近消息与摘要以 `Conversation History` 命名出现。
-3. 相关测试全部通过。
-4. 标准入口 `./init.sh` 通过，证明主路径未被破坏。
+- 不实现新的长期记忆提取、检索、融合、写回能力。
+- 不改变 CLI 会话恢复产品行为。
+- 不重写 session 生命周期模块。
+- 不更换现有 JSONL / 文件存储格式。
 
-## 六、后续演进
+## 七、验证标准
 
-当真正的长期记忆能力进入实现阶段时，应沿着既有模型扩展，而不是回头复用会话历史概念：
+1. 活跃源码中，memory 能作为独立包结构被清晰识别。
+2. `session` 包只保留生命周期相关类型。
+3. prompt 中明确区分 `User Preferences` 与 `Conversation History`，不再使用含混的 `Memory` section。
+4. `JsonlConversationStore` 与 `FilePreferenceStore` 已迁入 `store.memory.shortterm / longterm`。
+5. 相关单元测试、定向 Maven 测试、标准入口 `./init.sh` 全部通过。
+
+## 八、后续演进
+
+当新的长期记忆能力进入实现阶段时，可直接在既有树下扩展：
 
 ```text
-Long-term Memory
-├─ Preferences
-├─ Facts
-├─ Summaries
-└─ Relationships
+memory/longterm
+├─ preferences
+├─ facts
+├─ summaries
+└─ relationships
 ```
 
-这样 `Memory` 作为产品语言能保持统一，底层实现又不会失去边界。
+这让 Memory 既保留用户易懂的整体概念，也具备继续生长的代码骨架。
