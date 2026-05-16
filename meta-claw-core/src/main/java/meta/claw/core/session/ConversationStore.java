@@ -44,6 +44,14 @@ public interface ConversationStore {
     List<ConversationInfo> listConversations();
 
     /**
+     * 列出指定 Vessel 下的会话概要信息
+     *
+     * @param vesselId Vessel 唯一标识
+     * @return 该 Vessel 下的会话信息列表
+     */
+    List<ConversationInfo> listConversations(String vesselId);
+
+    /**
      * 清除指定会话的所有历史消息
      *
      * @param sessionKey 会话唯一标识键

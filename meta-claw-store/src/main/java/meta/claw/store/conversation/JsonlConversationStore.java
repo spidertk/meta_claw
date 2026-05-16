@@ -36,6 +36,7 @@ public class JsonlConversationStore implements ConversationStore {
     );
 
     private final Path baseDir;
+    private final String boundVesselId;
     private final ObjectMapper objectMapper;
     private final ConcurrentHashMap<String, ReentrantReadWriteLock> lockMap = new ConcurrentHashMap<>();
 
@@ -45,7 +46,18 @@ public class JsonlConversationStore implements ConversationStore {
      * @param baseDir 存储根目录，通常指向 vessels 目录，如 ~/.meta-claw/vessels/
      */
     public JsonlConversationStore(Path baseDir) {
+        this(baseDir, null);
+    }
+
+    /**
+     * 构造绑定到指定 Vessel 的 JSONL 对话存储
+     *
+     * @param baseDir  存储根目录，通常指向 vessels 目录
+     * @param vesselId 当前存储实例绑定的 Vessel；为 null 时保留旧版自动解析行为
+     */
+    public JsonlConversationStore(Path baseDir, String vesselId) {
         this.baseDir = baseDir;
+        this.boundVesselId = vesselId;
         this.objectMapper = new ObjectMapper();
         this.objectMapper.registerModule(new JavaTimeModule());
     }
@@ -186,6 +198,43 @@ public class JsonlConversationStore implements ConversationStore {
             });
         } catch (IOException e) {
             log.error("Failed to list vessels in base dir: {}", e.getMessage());
+        }
+
+        result.sort((a, b) -> b.getUpdatedAt().compareTo(a.getUpdatedAt()));
+        return result;
+    }
+
+    @Override
+    public List<ConversationInfo> listConversations(String vesselId) {
+        List<ConversationInfo> result = new ArrayList<>();
+        Path convDir = baseDir.resolve(vesselId).resolve("conversations");
+        if (!Files.exists(convDir)) {
+            return result;
+        }
+
+        try {
+            Files.list(convDir).forEach(sessionDir -> {
+                String sessionId = sessionDir.getFileName().toString();
+                Path historyFile = sessionDir.resolve("history.jsonl");
+                if (!Files.exists(historyFile)) return;
+
+                List<ChatMessage> history = getHistoryForVessel(vesselId, sessionId);
+                LocalDateTime createdAt = history.isEmpty()
+                        ? getFileCreateTime(historyFile)
+                        : history.get(0).getTimestamp();
+                LocalDateTime updatedAt = history.isEmpty()
+                        ? createdAt
+                        : history.get(history.size() - 1).getTimestamp();
+
+                result.add(ConversationInfo.builder()
+                        .sessionId(sessionId)
+                        .createdAt(createdAt)
+                        .updatedAt(updatedAt)
+                        .messageCount(history.size())
+                        .build());
+            });
+        } catch (IOException e) {
+            log.warn("Failed to list conversations for vessel {}", vesselId);
         }
 
         result.sort((a, b) -> b.getUpdatedAt().compareTo(a.getUpdatedAt()));
@@ -354,6 +403,9 @@ public class JsonlConversationStore implements ConversationStore {
      * 默认策略：取 baseDir 下第一个 vessel 目录名；生产环境应由调用方显式传入 vesselId。
      */
     private String resolveVesselId(String sessionKey) {
+        if (boundVesselId != null && !boundVesselId.isBlank()) {
+            return boundVesselId;
+        }
         try {
             if (Files.exists(baseDir)) {
                 return Files.list(baseDir)
@@ -366,5 +418,22 @@ public class JsonlConversationStore implements ConversationStore {
             log.debug("Failed to resolve vesselId from baseDir, fallback to default");
         }
         return "default";
+    }
+
+    private List<ChatMessage> getHistoryForVessel(String vesselId, String sessionKey) {
+        Path filePath = getHistoryFilePath(vesselId, sessionKey);
+        if (!Files.exists(filePath)) {
+            return Collections.emptyList();
+        }
+        try {
+            return Files.lines(filePath)
+                    .filter(line -> !line.isBlank())
+                    .map(this::parseMessage)
+                    .filter(msg -> msg != null)
+                    .collect(Collectors.toList());
+        } catch (IOException e) {
+            log.error("Failed to read history for session {}: {}", sessionKey, e.getMessage());
+            return Collections.emptyList();
+        }
     }
 }

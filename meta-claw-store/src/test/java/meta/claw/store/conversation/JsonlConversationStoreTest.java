@@ -140,4 +140,18 @@ class JsonlConversationStoreTest {
         assertEquals(2, conversations.get(0).getMessageCount());
         assertEquals(1, conversations.get(1).getMessageCount());
     }
+
+    @Test
+    void listConversations_withVesselId_shouldOnlyReturnThatVesselsSessions() {
+        JsonlConversationStore vesselAStore = new JsonlConversationStore(tempDir, "vessel-a");
+        JsonlConversationStore vesselBStore = new JsonlConversationStore(tempDir, "vessel-b");
+
+        vesselAStore.appendMessage("session-a", msg("user", "A"));
+        vesselBStore.appendMessage("session-b", msg("user", "B"));
+
+        List<ConversationInfo> conversations = vesselAStore.listConversations("vessel-a");
+
+        assertEquals(1, conversations.size());
+        assertEquals("session-a", conversations.get(0).getSessionId());
+    }
 }

@@ -9,7 +9,7 @@ import picocli.CommandLine.Command;
     mixinStandardHelpOptions = true,
     version = "1.0.0",
     description = "Meta-Claw AI Agent Platform CLI",
-    subcommands = { InitCommand.class, CreateCommand.class, ConfigCommand.class, ChatCommand.class, ListCommand.class, DeleteCommand.class }
+    subcommands = { InitCommand.class, CreateCommand.class, ConfigCommand.class, ChatCommand.class, SessionsCommand.class, ListCommand.class, DeleteCommand.class }
 )
 public class MetaClawCommand implements Runnable {
 

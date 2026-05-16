@@ -23,6 +23,7 @@ import org.jline.terminal.TerminalBuilder;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Component;
 import picocli.CommandLine.Command;
+import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
 
 import meta.claw.core.session.ChatMessage;
@@ -53,6 +54,9 @@ public class ChatCommand implements Runnable {
 
     @Parameters(index = "0", defaultValue = "default", description = "Vessel name")
     private String vesselName;
+
+    @Option(names = "--resume", description = "Resume an existing session id for this vessel")
+    private String resumeSessionId;
 
     private JsonlConversationStore conversationStore;
     private String sessionKey;
@@ -114,8 +118,16 @@ public class ChatCommand implements Runnable {
 
         // Initialize conversation store and session
         Path vesselsDir = configDir.resolve("vessels");
-        this.conversationStore = new JsonlConversationStore(vesselsDir);
-        this.sessionKey = UUID.randomUUID().toString();
+        this.conversationStore = new JsonlConversationStore(vesselsDir, vesselName);
+        if (resumeSessionId != null && !resumeSessionId.isBlank()) {
+            if (!conversationStore.conversationExists(resumeSessionId)) {
+                System.err.println("Session not found for vessel '" + vesselName + "': " + resumeSessionId);
+                return;
+            }
+            this.sessionKey = resumeSessionId;
+        } else {
+            this.sessionKey = UUID.randomUUID().toString();
+        }
 
         String displayName = vesselConfig.getName() != null ? vesselConfig.getName() : vesselName;
         String emoji = vesselConfig.getEmoji() != null ? vesselConfig.getEmoji() : "🤖";
@@ -154,6 +166,9 @@ public class ChatCommand implements Runnable {
         List<SpiMessage> history = new ArrayList<>();
         if (systemPrompt != null && !systemPrompt.isBlank()) {
             history.add(SpiMessage.system(systemPrompt));
+        }
+        if (resumeSessionId != null && !resumeSessionId.isBlank()) {
+            history.addAll(toSpiMessages(conversationStore.getHistory(sessionKey)));
         }
 
         try {
@@ -256,5 +271,23 @@ public class ChatCommand implements Runnable {
 
         terminal.writer().println("Goodbye!");
         terminal.writer().flush();
+    }
+
+    static List<SpiMessage> toSpiMessages(List<ChatMessage> messages) {
+        List<SpiMessage> restored = new ArrayList<>();
+        for (ChatMessage message : messages) {
+            if (message.getRole() == null) {
+                continue;
+            }
+            switch (message.getRole().toLowerCase()) {
+                case "user" -> restored.add(SpiMessage.user(message.getContent()));
+                case "assistant" -> restored.add(SpiMessage.assistant(message.getContent()));
+                case "tool" -> restored.add(SpiMessage.tool(message.getContent()));
+                default -> {
+                    // System prompts are rebuilt from current vessel config when resuming.
+                }
+            }
+        }
+        return restored;
     }
 }
