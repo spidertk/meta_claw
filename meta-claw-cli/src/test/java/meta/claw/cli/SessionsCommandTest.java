@@ -1,6 +1,6 @@
 package meta.claw.cli;
 
-import meta.claw.core.memory.shortterm.ConversationInfo;
+import meta.claw.core.memory.shortterm.SessionSummary;
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayOutputStream;
@@ -19,7 +19,7 @@ class SessionsCommandTest {
         System.setOut(new PrintStream(output));
         try {
             SessionsCommand.printSessions("default", List.of(
-                    ConversationInfo.builder()
+                    SessionSummary.builder()
                             .sessionId("session-default")
                             .updatedAt(LocalDateTime.of(2026, 5, 16, 16, 40))
                             .messageCount(3)

@@ -5,10 +5,10 @@ import lombok.extern.slf4j.Slf4j;
 import meta.claw.core.eventbus.EventBusWrapper;
 import meta.claw.core.events.VesselResponseReady;
 import meta.claw.core.events.UserMessageReceived;
-import meta.claw.core.model.Context;
-import meta.claw.core.model.Reply;
-import meta.claw.core.model.ReplyType;
-import meta.claw.core.model.VesselConfig;
+import meta.claw.core.message.Context;
+import meta.claw.core.message.Reply;
+import meta.claw.core.message.ReplyType;
+import meta.claw.core.config.VesselConfig;
 
 import java.util.List;
 

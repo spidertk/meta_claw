@@ -1,9 +1,9 @@
 package meta.claw.core.runtime;
 
 import lombok.extern.slf4j.Slf4j;
-import meta.claw.core.model.Reply;
-import meta.claw.core.model.ReplyType;
-import meta.claw.core.model.VesselConfig;
+import meta.claw.core.message.Reply;
+import meta.claw.core.message.ReplyType;
+import meta.claw.core.config.VesselConfig;
 import meta.claw.core.prompt.PromptContext;
 import meta.claw.core.prompt.PromptContextFactory;
 import meta.claw.core.prompt.SystemPromptBuilder;

@@ -2,7 +2,7 @@ package meta.claw.core.events;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
-import meta.claw.core.model.Context;
+import meta.claw.core.message.Context;
 
 /**
  * 用户消息接收领域事件

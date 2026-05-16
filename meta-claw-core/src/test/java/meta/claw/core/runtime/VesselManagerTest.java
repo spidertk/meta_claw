@@ -1,6 +1,6 @@
 package meta.claw.core.runtime;
 
-import meta.claw.core.model.VesselConfig;
+import meta.claw.core.config.VesselConfig;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 

@@ -1,7 +1,9 @@
 package meta.claw.cli;
 
-import meta.claw.core.memory.shortterm.ConversationInfo;
-import meta.claw.store.memory.shortterm.JsonlConversationStore;
+import meta.claw.core.config.VesselConfig;
+import meta.claw.core.memory.shortterm.SessionSummary;
+import meta.claw.core.memory.shortterm.ShortMemoryManager;
+import meta.claw.store.memory.MemoryManagerFactory;
 import meta.claw.vessel.ProjectRootFinder;
 import meta.claw.vessel.VesselConfigResolver;
 import org.springframework.stereotype.Component;
@@ -31,17 +33,20 @@ public class SessionsCommand implements Runnable {
     public void run() {
         Path configDir = ProjectRootFinder.getMetaClawDir();
         try {
-            resolver.resolve(configDir, vesselName);
+            var resolved = resolver.resolve(configDir, vesselName);
+            VesselConfig config = resolved.getVesselConfig();
+            MemoryManagerFactory memoryManagerFactory = new MemoryManagerFactory(configDir.resolve("vessels"));
+            ShortMemoryManager memoryManager = memoryManagerFactory.createShortTerm(config.getMemory(), vesselName);
+            printSessions(vesselName, memoryManager.listSessions(vesselName));
+            return;
         } catch (IllegalStateException | IllegalArgumentException e) {
             System.err.println(e.getMessage());
             return;
         }
 
-        JsonlConversationStore store = new JsonlConversationStore(configDir.resolve("vessels"), vesselName);
-        printSessions(vesselName, store.listConversations(vesselName));
     }
 
-    static void printSessions(String vesselName, List<ConversationInfo> sessions) {
+    static void printSessions(String vesselName, List<SessionSummary> sessions) {
         System.out.println("Sessions for vessel '" + vesselName + "'");
         System.out.println();
         if (sessions.isEmpty()) {
@@ -49,7 +54,7 @@ public class SessionsCommand implements Runnable {
             return;
         }
         System.out.println(String.format("%-36s  %-16s  %s", "SESSION ID", "UPDATED AT", "MESSAGES"));
-        for (ConversationInfo session : sessions) {
+        for (SessionSummary session : sessions) {
             String updatedAt = session.getUpdatedAt() != null ? FORMATTER.format(session.getUpdatedAt()) : "";
             System.out.println(String.format("%-36s  %-16s  %d",
                     session.getSessionId(), updatedAt, session.getMessageCount()));

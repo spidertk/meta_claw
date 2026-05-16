@@ -1,8 +1,8 @@
 package meta.claw.core.config;
 
 import lombok.extern.slf4j.Slf4j;
-import meta.claw.core.model.GlobalConfig;
-import meta.claw.core.model.ProviderConfig;
+import meta.claw.core.config.GlobalConfig;
+import meta.claw.core.config.ProviderConfig;
 import org.yaml.snakeyaml.Yaml;
 
 import java.io.IOException;

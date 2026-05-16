@@ -1,9 +1,9 @@
 package meta.claw.gateway.channel;
 
 import lombok.extern.slf4j.Slf4j;
-import meta.claw.core.model.Context;
-import meta.claw.core.model.ContextType;
-import meta.claw.core.model.Reply;
+import meta.claw.core.message.Context;
+import meta.claw.core.message.ContextType;
+import meta.claw.core.message.Reply;
 
 import java.util.Map;
 import java.util.concurrent.*;

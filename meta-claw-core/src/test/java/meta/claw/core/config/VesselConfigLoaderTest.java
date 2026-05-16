@@ -1,6 +1,6 @@
 package meta.claw.core.config;
 
-import meta.claw.core.model.VesselConfig;
+import meta.claw.core.config.VesselConfig;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -34,6 +34,9 @@ class VesselConfigLoaderTest {
                 base_url: https://api.moonshot.cn/v1
                 temperature: 0.7
                 timeout: 30.0
+                memory:
+                  short_term_store: jsonl
+                  long_term_store: file
                 """;
         Files.writeString(vesselDir.resolve("config.yaml"), configYaml);
 
@@ -67,6 +70,8 @@ class VesselConfigLoaderTest {
         assertEquals("https://api.moonshot.cn/v1", config.getBaseUrl());
         assertEquals(0.7, config.getTemperature());
         assertEquals(30.0, config.getTimeout());
+        assertEquals("jsonl", config.getMemory().getShortTermStore());
+        assertEquals("file", config.getMemory().getLongTermStore());
     }
 
     @Test

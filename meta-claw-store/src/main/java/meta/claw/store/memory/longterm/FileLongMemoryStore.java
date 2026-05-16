@@ -5,7 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import lombok.extern.slf4j.Slf4j;
 import meta.claw.core.memory.longterm.PreferenceEntry;
-import meta.claw.core.memory.longterm.UserPreferenceStore;
+import meta.claw.core.memory.longterm.LongMemoryStore;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -22,7 +22,7 @@ import java.util.stream.Collectors;
  * 每个 Vessel 拥有独立的 preferences.jsonl 文件，存储用户偏好、个人习惯等信息
  */
 @Slf4j
-public class FilePreferenceStore implements UserPreferenceStore {
+public class FileLongMemoryStore implements LongMemoryStore {
 
     private final Path baseDir;
     private final ObjectMapper objectMapper;
@@ -32,7 +32,7 @@ public class FilePreferenceStore implements UserPreferenceStore {
      *
      * @param baseDir 存储根目录，通常指向 vessels 目录，如 ~/.meta-claw/vessels/
      */
-    public FilePreferenceStore(Path baseDir) {
+    public FileLongMemoryStore(Path baseDir) {
         this.baseDir = baseDir;
         this.objectMapper = new ObjectMapper();
         this.objectMapper.registerModule(new JavaTimeModule());

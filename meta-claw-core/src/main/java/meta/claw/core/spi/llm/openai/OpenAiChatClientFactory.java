@@ -1,7 +1,7 @@
 package meta.claw.core.spi.llm.openai;
 
 import lombok.extern.slf4j.Slf4j;
-import meta.claw.core.model.ProviderConfig;
+import meta.claw.core.config.ProviderConfig;
 import meta.claw.core.spi.llm.LlmClientFactory;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.openai.OpenAiChatModel;

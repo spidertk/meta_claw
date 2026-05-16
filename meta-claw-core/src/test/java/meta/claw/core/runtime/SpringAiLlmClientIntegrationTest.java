@@ -1,6 +1,6 @@
 package meta.claw.core.runtime;
 
-import meta.claw.core.model.ProviderConfig;
+import meta.claw.core.config.ProviderConfig;
 import meta.claw.core.spi.llm.LlmClientFactoryManager;
 import meta.claw.core.spi.llm.SpiChatRequest;
 import meta.claw.core.spi.llm.SpiChatResponse;

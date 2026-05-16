@@ -1,7 +1,7 @@
 package meta.claw.core.prompt;
 
 import lombok.RequiredArgsConstructor;
-import meta.claw.core.model.VesselConfig;
+import meta.claw.core.config.VesselConfig;
 import meta.claw.core.memory.longterm.PreferenceEntry;
 import meta.claw.core.memory.longterm.UserPreferenceStore;
 

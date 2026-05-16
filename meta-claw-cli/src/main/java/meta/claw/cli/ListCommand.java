@@ -1,6 +1,6 @@
 package meta.claw.cli;
 
-import meta.claw.core.model.VesselConfig;
+import meta.claw.core.config.VesselConfig;
 import meta.claw.vessel.ProjectRootFinder;
 import meta.claw.vessel.ResolvedVesselConfig;
 import meta.claw.vessel.VesselConfigResolver;

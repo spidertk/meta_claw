@@ -105,7 +105,7 @@ public class ConversationHistoryManager {
     /**
      * 对话摘要（Phase 2 占位实现，Phase 3+ 接入 LLM 驱动摘要）。
      */
-    public String summarizeConversation(List<ChatMessage> history) {
+    public String summarizeConversation(List<SpiMessage> history) {
         return "Earlier conversation summarized.";
     }
 }

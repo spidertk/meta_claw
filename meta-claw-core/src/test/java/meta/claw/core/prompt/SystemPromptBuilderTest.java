@@ -1,6 +1,6 @@
 package meta.claw.core.prompt;
 
-import meta.claw.core.memory.shortterm.ChatMessage;
+import meta.claw.core.spi.llm.SpiMessage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -110,10 +110,7 @@ class SystemPromptBuilderTest {
 
     @Test
     void build_shouldSeparateKnowledgePreferencesAndConversationHistory() {
-        ChatMessage msg = ChatMessage.builder()
-                .role("user")
-                .content("Hello")
-                .build();
+        SpiMessage msg = SpiMessage.user("Hello");
         PromptContext ctx = PromptContext.builder()
                 .vesselName("V")
                 .knowledge("Domain: AI agents.")

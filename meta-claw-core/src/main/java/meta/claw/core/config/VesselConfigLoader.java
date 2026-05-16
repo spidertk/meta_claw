@@ -1,7 +1,6 @@
 package meta.claw.core.config;
 
 import lombok.extern.slf4j.Slf4j;
-import meta.claw.core.model.VesselConfig;
 import org.yaml.snakeyaml.Yaml;
 
 import java.io.IOException;
@@ -142,6 +141,19 @@ public class VesselConfigLoader {
         Object timeout = map.get("timeout");
         if (timeout instanceof Number) {
             config.setTimeout(((Number) timeout).doubleValue());
+        }
+        Object memory = map.get("memory");
+        if (memory instanceof Map<?, ?> memoryMap) {
+            MemoryConfig memoryConfig = new MemoryConfig();
+            Object shortTermStore = memoryMap.get("short_term_store");
+            if (shortTermStore != null && !shortTermStore.toString().isBlank()) {
+                memoryConfig.setShortTermStore(shortTermStore.toString());
+            }
+            Object longTermStore = memoryMap.get("long_term_store");
+            if (longTermStore != null && !longTermStore.toString().isBlank()) {
+                memoryConfig.setLongTermStore(longTermStore.toString());
+            }
+            config.setMemory(memoryConfig);
         }
         return config;
     }

@@ -4,9 +4,9 @@ import lombok.extern.slf4j.Slf4j;
 import meta.claw.core.config.GlobalConfigLoader;
 import org.springframework.stereotype.Component;
 import meta.claw.core.config.VesselConfigLoader;
-import meta.claw.core.model.VesselConfig;
-import meta.claw.core.model.GlobalConfig;
-import meta.claw.core.model.ProviderConfig;
+import meta.claw.core.config.VesselConfig;
+import meta.claw.core.config.GlobalConfig;
+import meta.claw.core.config.ProviderConfig;
 import org.apache.commons.lang3.StringUtils;
 
 import java.io.IOException;

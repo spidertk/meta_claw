@@ -1,6 +1,5 @@
 package meta.claw.cli;
 
-import meta.claw.core.memory.shortterm.ChatMessage;
 import meta.claw.core.spi.llm.SpiMessage;
 import org.junit.jupiter.api.Test;
 
@@ -13,9 +12,9 @@ class ChatCommandTest {
     @Test
     void toSpiMessages_shouldRestoreConversationMessagesButSkipSystem() {
         List<SpiMessage> restored = ChatCommand.toSpiMessages(List.of(
-                ChatMessage.builder().role("system").content("old system").build(),
-                ChatMessage.builder().role("user").content("hello").build(),
-                ChatMessage.builder().role("assistant").content("hi").build()
+                SpiMessage.system("old system"),
+                SpiMessage.user("hello"),
+                SpiMessage.assistant("hi")
         ));
 
         assertEquals(2, restored.size());

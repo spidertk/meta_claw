@@ -133,7 +133,7 @@ public class SystemPromptBuilder {
         if (context.getRecentMessages() != null && !context.getRecentMessages().isEmpty()) {
             sb.append("### Recent Messages\n\n");
             context.getRecentMessages().forEach(m -> {
-                sb.append("**").append(m.getRole()).append(":** ").append(orDefault(m.getContent(), "")).append("\n\n");
+                sb.append("**").append(m.role()).append(":** ").append(orDefault(m.content(), "")).append("\n\n");
             });
         }
         return sb.toString().trim();

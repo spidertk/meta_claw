@@ -2,7 +2,7 @@ package meta.claw.cli;
 
 import meta.claw.core.config.GlobalConfigLoader;
 import meta.claw.vessel.ProjectRootFinder;
-import meta.claw.core.model.GlobalConfig;
+import meta.claw.core.config.GlobalConfig;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;

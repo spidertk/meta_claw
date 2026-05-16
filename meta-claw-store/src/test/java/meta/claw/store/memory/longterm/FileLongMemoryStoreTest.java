@@ -11,13 +11,13 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class FilePreferenceStoreTest {
+class FileLongMemoryStoreTest {
 
     @TempDir
     Path tempDir;
 
-    private FilePreferenceStore createStore() {
-        return new FilePreferenceStore(tempDir);
+    private FileLongMemoryStore createStore() {
+        return new FileLongMemoryStore(tempDir);
     }
 
     private PreferenceEntry entry(String id, String content, String category) {
@@ -41,7 +41,7 @@ class FilePreferenceStoreTest {
 
     @Test
     void addAndLookupPreference_shouldMatch() {
-        FilePreferenceStore store = createStore();
+        FileLongMemoryStore store = createStore();
         store.addPreference("vessel-1", entry("p1", "I like Java", "language"));
         store.addPreference("vessel-1", entry("p2", "I prefer Python", "language"));
 
@@ -52,7 +52,7 @@ class FilePreferenceStoreTest {
 
     @Test
     void lookupPreference_noMatch_shouldReturnEmpty() {
-        FilePreferenceStore store = createStore();
+        FileLongMemoryStore store = createStore();
         store.addPreference("vessel-1", entry("p1", "Hello", "greeting"));
 
         List<PreferenceEntry> results = store.lookupPreference("vessel-1", "nonexistent");
@@ -61,7 +61,7 @@ class FilePreferenceStoreTest {
 
     @Test
     void listRecentPreferences_withLimit() {
-        FilePreferenceStore store = createStore();
+        FileLongMemoryStore store = createStore();
         for (int i = 0; i < 10; i++) {
             store.addPreference("vessel-1", entry("p" + i, "Content " + i, "test"));
         }
@@ -74,7 +74,7 @@ class FilePreferenceStoreTest {
 
     @Test
     void listRecentPreferences_unlimited_shouldReturnAll() {
-        FilePreferenceStore store = createStore();
+        FileLongMemoryStore store = createStore();
         store.addPreference("vessel-1", entry("p1", "One", "test"));
 
         List<PreferenceEntry> results = store.listRecentPreferences("vessel-1", 0);
@@ -83,7 +83,7 @@ class FilePreferenceStoreTest {
 
     @Test
     void deletePreference_shouldRemove() {
-        FilePreferenceStore store = createStore();
+        FileLongMemoryStore store = createStore();
         store.addPreference("vessel-1", entry("p1", "To be deleted", "test"));
         store.addPreference("vessel-1", entry("p2", "Keep this", "test"));
 
@@ -96,7 +96,7 @@ class FilePreferenceStoreTest {
 
     @Test
     void clearPreferences_shouldTruncate() {
-        FilePreferenceStore store = createStore();
+        FileLongMemoryStore store = createStore();
         store.addPreference("vessel-1", entry("p1", "Hello", "test"));
         assertTrue(store.clearPreferences("vessel-1"));
 
@@ -106,7 +106,7 @@ class FilePreferenceStoreTest {
 
     @Test
     void addPreference_withMetadata_shouldPreserve() {
-        FilePreferenceStore store = createStore();
+        FileLongMemoryStore store = createStore();
         store.addPreference("vessel-1", entryWithMetadata("p1", "With metadata",
                 Map.of("key1", "value1", "key2", 42)));
 
@@ -119,7 +119,7 @@ class FilePreferenceStoreTest {
 
     @Test
     void lookupPreference_byCategory_shouldMatch() {
-        FilePreferenceStore store = createStore();
+        FileLongMemoryStore store = createStore();
         store.addPreference("vessel-1", entry("p1", "Content", "favorite-color"));
 
         List<PreferenceEntry> results = store.lookupPreference("vessel-1", "favorite-color");

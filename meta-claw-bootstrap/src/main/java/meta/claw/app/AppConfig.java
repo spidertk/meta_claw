@@ -8,9 +8,7 @@ import meta.claw.gateway.weixin.WeixinConfig;
 import meta.claw.core.runtime.AgentLoop;
 import meta.claw.core.runtime.VesselManager;
 import meta.claw.core.runtime.VesselRuntime;
-import meta.claw.core.model.VesselConfig;
-import meta.claw.core.session.InMemorySessionStorage;
-import meta.claw.core.session.SessionManager;
+import meta.claw.core.config.VesselConfig;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -19,7 +17,7 @@ import org.springframework.context.annotation.Configuration;
 /**
  * Meta-Claw 核心配置类
  * <p>
- * 负责手动装配系统中所有核心 Bean，包括事件总线、会话管理、网关、Vessel 管理及渠道等组件。
+ * 负责手动装配系统中所有核心 Bean，包括事件总线、网关、Vessel 管理及渠道等组件。
  * 所有 Bean 均采用显式声明方式，便于集中管理和调试。
  * </p>
  */
@@ -64,35 +62,6 @@ public class AppConfig {
     @Bean
     public ChannelRegistry channelRegistry() {
         return new ChannelRegistry();
-    }
-
-    /**
-     * 内存会话存储 Bean
-     * <p>
-     * 基于 ConcurrentHashMap 实现的会话状态存储，适用于单机部署或开发测试环境。
-     * 提供会话的增删改查及过期清理能力。
-     * </p>
-     *
-     * @return InMemorySessionStorage 实例
-     */
-    @Bean
-    public InMemorySessionStorage inMemorySessionStorage() {
-        return new InMemorySessionStorage();
-    }
-
-    /**
-     * 会话管理器 Bean
-     * <p>
-     * 负责用户会话的生命周期管理，包括获取/创建会话、模式切换、目标 Vessel 解析及过期清理。
-     * 使用内存存储作为底层实现。
-     * </p>
-     *
-     * @param storage 内存会话存储实例
-     * @return SessionManager 实例
-     */
-    @Bean
-    public SessionManager sessionManager(InMemorySessionStorage storage) {
-        return new SessionManager(storage);
     }
 
     /**

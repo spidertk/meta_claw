@@ -2,8 +2,8 @@ package meta.claw.core.events;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
-import meta.claw.core.model.Context;
-import meta.claw.core.model.Reply;
+import meta.claw.core.message.Context;
+import meta.claw.core.message.Reply;
 
 /**
  * Vessel 回复就绪领域事件

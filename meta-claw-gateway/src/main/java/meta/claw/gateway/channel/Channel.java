@@ -1,7 +1,7 @@
 package meta.claw.gateway.channel;
 
-import meta.claw.core.model.Context;
-import meta.claw.core.model.Reply;
+import meta.claw.core.message.Context;
+import meta.claw.core.message.Reply;
 
 /**
  * Channel 接口
