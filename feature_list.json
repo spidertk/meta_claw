@@ -168,15 +168,26 @@
       "area": "chat",
       "title": "列出并恢复已有 CLI 会话",
       "user_visible_behavior": "用户可以先查看某个 Vessel 的历史会话，再显式选择一条会话继续聊天。",
-      "status": "not_started",
+      "status": "passing",
       "verification": [
         "为同一个 Vessel 创建至少两个会话并发送消息。",
         "运行 sessions 命令，确认能列出该 Vessel 的历史会话。",
         "运行 chat <vessel> --resume <session-id>。",
         "确认系统加载被选中的 history.jsonl，并把后续消息追加回同一会话。"
       ],
-      "evidence": [],
-      "notes": "显式恢复比改 sessionKey 生成规则更有产品意义；当前 JsonlConversationStore 已有底层存储能力，但 CLI 尚未暴露 sessions 列表与 --resume 入口。"
+      "evidence": [
+        {
+          "date": "2026-05-16",
+          "result": "passing",
+          "detail": "新增 sessions <vessel> 与 chat <vessel> --resume <session-id>；JsonlConversationStore 支持 Vessel 作用域列表并可绑定到指定 Vessel。"
+        },
+        {
+          "date": "2026-05-16",
+          "result": "verified",
+          "detail": "mvn test -pl meta-claw-store,meta-claw-cli -am 通过；./init.sh 全量通过。"
+        }
+      ],
+      "notes": "显式恢复已按 Vessel 作用域实现；恢复时重建当前 system prompt，并只回放 user/assistant/tool 历史消息。"
     }
   ]
 }

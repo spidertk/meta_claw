@@ -7,7 +7,7 @@
 - 标准启动路径：`./init.sh`
 - 标准验证路径：`./init.sh` 内部执行 `mvn clean test`
 - 最近已通过证据：2026-05-16 在真实 Maven 环境中执行 `./init.sh`，9 个 reactor 模块全部 `SUCCESS`
-- 当前最高优先级未完成功能：`chat-001` 重启后恢复同一会话历史
+- 当前最高优先级未完成功能：暂无新的已选定功能
 - 当前 blocker：
   1. 当前无 blocker
 
@@ -155,3 +155,35 @@
   - 标准验证在受限沙箱内可能因 Mockito 自附加受限而失败，需要允许真实进程附加的环境
 - 下一步最佳动作：
   1. 处理 `chat-001`
+
+### Session 005
+
+- 日期：2026-05-16
+- 本轮目标：实现显式列出并恢复 Vessel 内已有 CLI 会话
+- 已完成：
+  - 将 `chat-001` 重新定义为显式会话发现与恢复
+  - 为 `JsonlConversationStore` 增加 Vessel 绑定能力与 `listConversations(vesselId)`
+  - 新增 `sessions <vessel>` 命令
+  - 为 `chat <vessel>` 增加 `--resume <session-id>`
+  - 恢复时重建当前 system prompt，并仅回放已有对话消息
+- 运行过的验证：
+  - `mvn test -pl meta-claw-store,meta-claw-cli -am` → 成功
+  - `./init.sh` → 成功，9 个 reactor 模块全部 `SUCCESS`
+- 已记录证据：
+  - `JsonlConversationStoreTest` 新增 Vessel 作用域测试
+  - `SessionsCommandTest` 与 `ChatCommandTest` 通过
+  - `sessions` / `--resume` 的产品边界已落到数据层，不再依赖目录顺序猜测 Vessel
+- 提交记录：待提交
+- 更新过的文件或工件：
+  - `meta-claw-core/src/main/java/meta/claw/core/session/ConversationStore.java`
+  - `meta-claw-store/src/main/java/meta/claw/store/conversation/JsonlConversationStore.java`
+  - `meta-claw-store/src/test/java/meta/claw/store/conversation/JsonlConversationStoreTest.java`
+  - `meta-claw-cli/src/main/java/meta/claw/cli/SessionsCommand.java`
+  - `meta-claw-cli/src/main/java/meta/claw/cli/MetaClawCommand.java`
+  - `meta-claw-cli/src/main/java/meta/claw/cli/ChatCommand.java`
+  - `meta-claw-cli/src/test/java/meta/claw/cli/SessionsCommandTest.java`
+  - `meta-claw-cli/src/test/java/meta/claw/cli/ChatCommandTest.java`
+- 已知风险或未解决问题：
+  - 目前仍未做手动 CLI 交互验收；当前证据来自自动化测试与全量构建
+- 下一步最佳动作：
+  1. 由用户决定下一项功能优先级
