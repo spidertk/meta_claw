@@ -1,6 +1,6 @@
 package meta.claw.core.prompt;
 
-import meta.claw.core.session.ChatMessage;
+import meta.claw.core.memory.shortterm.ChatMessage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
