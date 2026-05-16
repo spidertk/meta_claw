@@ -4,7 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import meta.claw.core.session.ChatMessage;
+import meta.claw.core.memory.shortterm.ChatMessage;
 
 import java.nio.file.Path;
 import java.util.Collections;

@@ -1,11 +1,11 @@
-package meta.claw.store.preferences;
+package meta.claw.store.memory.longterm;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import lombok.extern.slf4j.Slf4j;
-import meta.claw.core.session.PreferenceEntry;
-import meta.claw.core.session.UserPreferenceStore;
+import meta.claw.core.memory.longterm.PreferenceEntry;
+import meta.claw.core.memory.longterm.UserPreferenceStore;
 
 import java.io.IOException;
 import java.nio.file.Files;

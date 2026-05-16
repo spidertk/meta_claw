@@ -1,4 +1,4 @@
-package meta.claw.core.session;
+package meta.claw.core.memory.longterm;
 
 import java.util.List;
 

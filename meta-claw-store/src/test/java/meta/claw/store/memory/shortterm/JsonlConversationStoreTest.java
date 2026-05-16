@@ -1,7 +1,7 @@
-package meta.claw.store.conversation;
+package meta.claw.store.memory.shortterm;
 
-import meta.claw.core.session.ChatMessage;
-import meta.claw.core.session.ConversationInfo;
+import meta.claw.core.memory.shortterm.ChatMessage;
+import meta.claw.core.memory.shortterm.ConversationInfo;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 

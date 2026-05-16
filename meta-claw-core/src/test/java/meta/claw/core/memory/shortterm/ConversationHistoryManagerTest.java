@@ -1,4 +1,4 @@
-package meta.claw.core.prompt;
+package meta.claw.core.memory.shortterm;
 
 import meta.claw.core.spi.llm.SpiMessage;
 import org.junit.jupiter.api.Test;
@@ -8,9 +8,9 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class MemoryManagerTest {
+class ConversationHistoryManagerTest {
 
-    private final MemoryManager manager = new MemoryManager();
+    private final ConversationHistoryManager manager = new ConversationHistoryManager();
 
     private SpiMessage sys(String content) {
         return SpiMessage.system(content);

@@ -1,10 +1,15 @@
-package meta.claw.store.conversation;
+package meta.claw.store.memory.shortterm;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import lombok.extern.slf4j.Slf4j;
-import meta.claw.core.session.*;
+import meta.claw.core.memory.shortterm.ChatMessage;
+import meta.claw.core.memory.shortterm.ConversationInfo;
+import meta.claw.core.memory.shortterm.ConversationStats;
+import meta.claw.core.memory.shortterm.ConversationStore;
+import meta.claw.core.memory.shortterm.MediaReference;
+import meta.claw.core.memory.shortterm.MessageFilter;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;

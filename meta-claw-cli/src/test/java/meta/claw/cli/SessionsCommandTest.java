@@ -1,6 +1,6 @@
 package meta.claw.cli;
 
-import meta.claw.core.session.ConversationInfo;
+import meta.claw.core.memory.shortterm.ConversationInfo;
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayOutputStream;

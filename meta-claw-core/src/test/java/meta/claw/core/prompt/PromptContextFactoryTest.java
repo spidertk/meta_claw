@@ -1,8 +1,8 @@
 package meta.claw.core.prompt;
 
 import meta.claw.core.model.VesselConfig;
-import meta.claw.core.session.PreferenceEntry;
-import meta.claw.core.session.UserPreferenceStore;
+import meta.claw.core.memory.longterm.PreferenceEntry;
+import meta.claw.core.memory.longterm.UserPreferenceStore;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Paths;

@@ -1,4 +1,4 @@
-package meta.claw.core.session;
+package meta.claw.core.memory.shortterm;
 
 import lombok.Builder;
 import lombok.Getter;

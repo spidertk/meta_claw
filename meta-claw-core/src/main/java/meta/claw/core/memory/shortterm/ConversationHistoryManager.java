@@ -1,16 +1,15 @@
-package meta.claw.core.prompt;
+package meta.claw.core.memory.shortterm;
 
-import meta.claw.core.session.ChatMessage;
 import meta.claw.core.spi.llm.SpiMessage;
 
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 对话历史内存管理器。
+ * 短期记忆中的会话历史管理器。
  * 提供按轮数截断、按 Token 估算截断两种策略，以及对话摘要占位接口。
  */
-public class MemoryManager {
+public class ConversationHistoryManager {
 
     /**
      * 按对话轮数截断历史，保留最近 maxRounds 轮（以 assistant 消息计数）。

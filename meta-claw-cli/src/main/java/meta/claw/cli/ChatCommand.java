@@ -1,7 +1,7 @@
 package meta.claw.cli;
 
 import lombok.extern.slf4j.Slf4j;
-import meta.claw.core.prompt.MemoryManager;
+import meta.claw.core.memory.shortterm.ConversationHistoryManager;
 import meta.claw.core.prompt.PromptContext;
 import meta.claw.core.prompt.PromptContextFactory;
 import meta.claw.core.prompt.SystemPromptBuilder;
@@ -26,8 +26,8 @@ import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
 
-import meta.claw.core.session.ChatMessage;
-import meta.claw.store.conversation.JsonlConversationStore;
+import meta.claw.core.memory.shortterm.ChatMessage;
+import meta.claw.store.memory.shortterm.JsonlConversationStore;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -158,7 +158,7 @@ public class ChatCommand implements Runnable {
         SystemPromptBuilder promptBuilder = new SystemPromptBuilder(templateLoader);
         String systemPrompt = promptBuilder.build(promptContext);
 
-        MemoryManager memoryManager = new MemoryManager();
+        ConversationHistoryManager memoryManager = new ConversationHistoryManager();
         int maxHistoryRounds = vesselConfig.getMaxHistoryRounds() != null
                 ? vesselConfig.getMaxHistoryRounds() : 20;
 

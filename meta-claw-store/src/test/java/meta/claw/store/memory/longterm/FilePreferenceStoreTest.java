@@ -1,6 +1,6 @@
-package meta.claw.store.preferences;
+package meta.claw.store.memory.longterm;
 
-import meta.claw.core.session.PreferenceEntry;
+import meta.claw.core.memory.longterm.PreferenceEntry;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 

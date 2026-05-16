@@ -1,4 +1,4 @@
-package meta.claw.core.session;
+package meta.claw.core.memory.shortterm;
 
 import java.nio.file.Path;
 import java.util.List;

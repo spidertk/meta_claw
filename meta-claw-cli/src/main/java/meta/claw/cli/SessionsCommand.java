@@ -1,7 +1,7 @@
 package meta.claw.cli;
 
-import meta.claw.core.session.ConversationInfo;
-import meta.claw.store.conversation.JsonlConversationStore;
+import meta.claw.core.memory.shortterm.ConversationInfo;
+import meta.claw.store.memory.shortterm.JsonlConversationStore;
 import meta.claw.vessel.ProjectRootFinder;
 import meta.claw.vessel.VesselConfigResolver;
 import org.springframework.stereotype.Component;

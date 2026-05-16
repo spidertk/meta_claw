@@ -1,6 +1,6 @@
 package meta.claw.cli;
 
-import meta.claw.core.session.ChatMessage;
+import meta.claw.core.memory.shortterm.ChatMessage;
 import meta.claw.core.spi.llm.SpiMessage;
 import org.junit.jupiter.api.Test;
 
