@@ -109,11 +109,17 @@ class SystemPromptBuilderTest {
     }
 
     @Test
-    void build_shouldContainKnowledgeAndPreferences() {
+    void build_shouldSeparateKnowledgePreferencesAndConversationHistory() {
+        ChatMessage msg = ChatMessage.builder()
+                .role("user")
+                .content("Hello")
+                .build();
         PromptContext ctx = PromptContext.builder()
                 .vesselName("V")
                 .knowledge("Domain: AI agents.")
                 .preferences("- User likes dark mode.")
+                .conversationSummary("User asked about Java.")
+                .recentMessages(List.of(msg))
                 .build();
 
         String prompt = builder.build(ctx);
@@ -122,6 +128,13 @@ class SystemPromptBuilderTest {
         assertTrue(prompt.contains("Domain: AI agents."));
         assertTrue(prompt.contains("## User Preferences"));
         assertTrue(prompt.contains("- User likes dark mode."));
+        assertTrue(prompt.contains("## Conversation History"));
+        assertFalse(prompt.contains("## Memory"));
+        assertTrue(prompt.indexOf("## User Preferences") > prompt.indexOf("## Runtime"));
+        assertTrue(prompt.contains("Conversation Summary"));
+        assertTrue(prompt.contains("User asked about Java."));
+        assertTrue(prompt.contains("Recent Messages"));
+        assertTrue(prompt.contains("Hello"));
     }
 
     @Test
@@ -153,27 +166,6 @@ class SystemPromptBuilderTest {
         assertTrue(prompt.contains("Asia/Shanghai"));
         assertTrue(prompt.contains("OS"));
         assertTrue(prompt.contains("macOS"));
-    }
-
-    @Test
-    void build_shouldContainMemorySection() {
-        ChatMessage msg = ChatMessage.builder()
-                .role("user")
-                .content("Hello")
-                .build();
-        PromptContext ctx = PromptContext.builder()
-                .vesselName("V")
-                .conversationSummary("User asked about Java.")
-                .recentMessages(List.of(msg))
-                .build();
-
-        String prompt = builder.build(ctx);
-
-        assertTrue(prompt.contains("## Memory"));
-        assertTrue(prompt.contains("Conversation Summary"));
-        assertTrue(prompt.contains("User asked about Java."));
-        assertTrue(prompt.contains("Recent Messages"));
-        assertTrue(prompt.contains("Hello"));
     }
 
     @Test
