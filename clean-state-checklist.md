@@ -12,7 +12,7 @@
 - [x] 功能状态真实反映了 passing 和未验证的边界  
   证据：`feature_list.json` 已区分已通过的 `repo-001` 与后续未完成功能
 - [x] 没有任何半成品步骤处于未记录状态  
-  证据：`Expert/专家` 残留、`ChatCommand` 未恢复历史等后续边界均已写入 `feature_list.json`
+  证据：活跃工件残留已清空，`ChatCommand` 未恢复历史等后续边界仍已写入 `feature_list.json`
 - [x] 下一轮会话无需人工修复即可继续  
   证据：下一轮可直接运行 `./init.sh`，再进入下一个已记录功能
 

@@ -7,9 +7,9 @@
 - 标准启动路径：`./init.sh`
 - 标准验证路径：`./init.sh` 内部执行 `mvn clean test`
 - 最近已通过证据：2026-05-16 在真实 Maven 环境中执行 `./init.sh`，9 个 reactor 模块全部 `SUCCESS`
-- 当前最高优先级未完成功能：`semantic-001` 彻底清理 Expert 遗留语义
+- 当前最高优先级未完成功能：`chat-001` 重启后恢复同一会话历史
 - 当前 blocker：
-  1. `Expert/专家` 残留仍存在于测试文本与资源配置注释中
+  1. 当前无 blocker
 
 ## 与设计文档对齐后的真实现状
 
@@ -27,7 +27,6 @@
 ### 仍未完成或不能算完成
 
 - `./init.sh` 已迁移到当前 Java/Maven 实际启动路径，并已于 2026-05-16 完整跑通
-- `Expert/专家` 残留仍存在于测试文本与资源配置注释中，不满足“全仓语义完全清理”
 - `ChatCommand` 每次启动生成新 `sessionKey`，当前代码虽会落盘消息，但未体现“重启后自动恢复历史”
 - `serve/start/stop/restart/status/logs`、工具引擎、MCP、Skill 系统仍未实现
 
@@ -122,3 +121,37 @@
 - 下一步最佳动作：
   1. 处理 `semantic-001`
   2. 之后再决定是否把 Maven Wrapper 作为工程化增强单独立项
+
+### Session 004
+
+- 日期：2026-05-16
+- 本轮目标：清理仍会误导后来者的活跃工件遗留项
+- 已完成：
+  - 新增活跃工件清理设计与计划
+  - 更新 README、根 POM、模块 POM、运行配置注释与 `SessionManagerTest` 文案
+  - 将当前活跃工件统一到 `Vessel` / `数字员工` 语义
+- 运行过的验证：
+  - 活跃工件扫描：`rg -n "Expert|专家|meta-claw-session|ExpertRuntime|targetExpert|expertName" README.md pom.xml meta-claw-* --glob '!**/target/**'` → 无结果
+  - `./init.sh`（沙箱内）→ 因 Mockito/ByteBuddy 自附加限制失败
+  - `./init.sh`（沙箱外）→ 成功，9 个 reactor 模块全部 `SUCCESS`
+- 已记录证据：
+  - 活跃工件扫描为空
+  - 2026-05-16 标准入口再次真实通过
+- 提交记录：待提交
+- 更新过的文件或工件：
+  - `README.md`
+  - `pom.xml`
+  - `meta-claw-core/pom.xml`
+  - `meta-claw-cli/pom.xml`
+  - `meta-claw-bootstrap/pom.xml`
+  - `meta-claw-bootstrap/src/main/resources/application.yml`
+  - `meta-claw-core/src/test/java/meta/claw/core/session/SessionManagerTest.java`
+  - `claude-progress.md`
+  - `clean-state-checklist.md`
+  - `evaluator-rubric.md`
+  - `feature_list.json`
+- 已知风险或未解决问题：
+  - 历史设计文档仍保留 `Expert → Vessel` 迁移语境，这是有意保留的历史证据
+  - 标准验证在受限沙箱内可能因 Mockito 自附加受限而失败，需要允许真实进程附加的环境
+- 下一步最佳动作：
+  1. 处理 `chat-001`

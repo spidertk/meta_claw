@@ -138,7 +138,7 @@
       "area": "semantic-cleanup",
       "title": "彻底清理 Expert 遗留语义",
       "user_visible_behavior": "代码、测试和资源注释都统一使用 Vessel/数字员工，不再混杂旧的 Expert/专家 术语。",
-      "status": "not_started",
+      "status": "passing",
       "verification": [
         "运行 rg -n \"Expert|专家\" 作用于生产代码、测试和资源目录。",
         "确认只保留历史设计文档中的必要说明，不再有活跃代码或配置残留。"
@@ -148,9 +148,19 @@
           "date": "2026-05-15",
           "result": "failed",
           "detail": "仍在 meta-claw-bootstrap/src/main/resources/application.yml 与 SessionManagerTest 中发现 Expert/专家 残留。"
+        },
+        {
+          "date": "2026-05-16",
+          "result": "passing",
+          "detail": "活跃工件扫描已清空；README、POM、application.yml 与 SessionManagerTest 已统一为 Vessel/数字员工 语义。"
+        },
+        {
+          "date": "2026-05-16",
+          "result": "verified",
+          "detail": "沙箱外执行 ./init.sh 成功，9 个 reactor 模块全部 SUCCESS。"
         }
       ],
-      "notes": "核心运行代码已基本完成语义迁移，但还不能把“全仓清理完成”记为 passing。"
+      "notes": "历史设计与迁移文档中的 Expert 术语按设计保留，用于说明演进过程；活跃工件已完成清理。"
     },
     {
       "id": "chat-001",
