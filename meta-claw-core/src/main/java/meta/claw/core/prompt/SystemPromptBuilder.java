@@ -40,7 +40,8 @@ public class SystemPromptBuilder {
         String template = templateLoader.loadContextTemplate();
         template = template.replace("<WORKSPACE_SECTION/>", buildWorkspaceSection(context));
         template = template.replace("<RUNTIME_SECTION/>", buildRuntimeSection(context));
-        template = template.replace("<MEMORY_SECTION/>", buildMemorySection(context));
+        template = template.replace("<PREFERENCES_SECTION/>", buildPreferencesSection(context));
+        template = template.replace("<CONVERSATION_HISTORY_SECTION/>", buildConversationHistorySection(context));
         return template.trim();
     }
 
@@ -87,14 +88,17 @@ public class SystemPromptBuilder {
     }
 
     private String buildKnowledgeSection(PromptContext context) {
-        StringBuilder sb = new StringBuilder();
-        if (!isBlank(context.getKnowledge())) {
-            sb.append("## Domain Knowledge\n\n").append(context.getKnowledge()).append("\n\n");
+        if (isBlank(context.getKnowledge())) {
+            return "";
         }
-        if (!isBlank(context.getPreferences())) {
-            sb.append("## User Preferences\n\n").append(context.getPreferences()).append("\n\n");
+        return "## Domain Knowledge\n\n" + context.getKnowledge();
+    }
+
+    private String buildPreferencesSection(PromptContext context) {
+        if (isBlank(context.getPreferences())) {
+            return "";
         }
-        return sb.toString().trim();
+        return "## User Preferences\n\n" + context.getPreferences();
     }
 
     private String buildWorkspaceSection(PromptContext context) {
@@ -116,9 +120,13 @@ public class SystemPromptBuilder {
         return sb.toString().trim();
     }
 
-    private String buildMemorySection(PromptContext context) {
+    private String buildConversationHistorySection(PromptContext context) {
+        if (isBlank(context.getConversationSummary())
+                && (context.getRecentMessages() == null || context.getRecentMessages().isEmpty())) {
+            return "";
+        }
         StringBuilder sb = new StringBuilder();
-        sb.append("## Memory\n\n");
+        sb.append("## Conversation History\n\n");
         if (!isBlank(context.getConversationSummary())) {
             sb.append("### Conversation Summary\n\n").append(context.getConversationSummary()).append("\n\n");
         }
