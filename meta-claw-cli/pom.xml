@@ -11,7 +11,7 @@
     </parent>
     <artifactId>meta-claw-cli</artifactId>
     <name>Meta-Claw CLI</name>
-    <description>命令行交互模块，支持配置管理、专家对话和后台守护模式</description>
+    <description>命令行交互模块，支持配置管理、数字员工对话和后台守护模式</description>
     <dependencies>
         <dependency>
             <groupId>com.meta</groupId>

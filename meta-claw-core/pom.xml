@@ -2,7 +2,7 @@
 <!-- 
     Meta-Claw Core 模块 POM
     作用：提供系统基础工具、公共常量、通用工具类等核心基础设施
-    被依赖：meta-claw-session、meta-claw-gateway、meta-claw-bootstrap
+    被依赖：meta-claw-gateway、meta-claw-bootstrap、meta-claw-store、meta-claw-cli
 -->
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"

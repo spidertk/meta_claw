@@ -12,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * SessionManager 单元测试
- * 验证会话管理器的核心逻辑，包括会话创建、模式切换、目标专家解析等功能
+ * 验证会话管理器的核心逻辑，包括会话创建、模式切换、目标 Vessel 解析等功能
  */
 class SessionManagerTest {
 
@@ -82,12 +82,12 @@ class SessionManagerTest {
 
         assertNotNull(session, "会话应已被创建并保存");
         assertEquals(ChatMode.SINGLE, session.getMode(), "会话模式应为单聊");
-        assertEquals(vesselName, session.getTargetVessel(), "目标专家应被正确绑定");
+        assertEquals(vesselName, session.getTargetVessel(), "目标 Vessel 应被正确绑定");
         assertNull(session.getGroupSessionId(), "群聊会话 ID 应为 null");
     }
 
     /**
-     * 测试：单聊模式下，getTargetVessels 应返回已绑定的专家
+     * 测试：单聊模式下，getTargetVessels 应返回已绑定的 Vessel
      */
     @Test
     void testGetTargetVesselsSingleMode() {
@@ -97,20 +97,20 @@ class SessionManagerTest {
         String agentId = "agent_003";
         List<String> availableVessels = Arrays.asList("VesselA", "VesselB", "VesselC");
 
-        // 先设置为单聊模式并绑定专家
+        // 先设置为单聊模式并绑定 Vessel
         sessionManager.setSingleMode(userId, source, vesselName, agentId);
         UserSession session = sessionManager.getSession(userId, source, agentId);
 
-        // 获取目标专家
+        // 获取目标 Vessel
         List<String> targets = sessionManager.getTargetVessels(session, availableVessels);
 
-        assertNotNull(targets, "返回的专家列表不应为 null");
-        assertEquals(1, targets.size(), "单聊模式应只返回一个专家");
-        assertEquals(vesselName, targets.get(0), "应返回已绑定的专家");
+        assertNotNull(targets, "返回的 Vessel 列表不应为 null");
+        assertEquals(1, targets.size(), "单聊模式应只返回一个 Vessel");
+        assertEquals(vesselName, targets.get(0), "应返回已绑定的 Vessel");
     }
 
     /**
-     * 测试：未绑定专家时回退返回第一个可用专家；群聊模式返回所有专家
+     * 测试：未绑定 Vessel 时回退返回第一个可用 Vessel；群聊模式返回所有 Vessel
      */
     @Test
     void testGetTargetVesselsFallback() {
@@ -119,23 +119,23 @@ class SessionManagerTest {
         String agentId = "agent_004";
         List<String> availableVessels = Arrays.asList("VesselX", "VesselY", "VesselZ");
 
-        // 场景一：单聊模式但未绑定专家，应回退返回第一个可用专家
+        // 场景一：单聊模式但未绑定 Vessel，应回退返回第一个可用 Vessel
         UserSession session = sessionManager.getSession(userId, source, agentId);
         // 确保当前为单聊模式且未设置 targetVessel
         assertEquals(ChatMode.SINGLE, session.getMode());
         assertNull(session.getTargetVessel());
 
         List<String> fallbackTargets = sessionManager.getTargetVessels(session, availableVessels);
-        assertEquals(1, fallbackTargets.size(), "未绑定专家时应回退返回一个专家");
-        assertEquals("VesselX", fallbackTargets.get(0), "应返回可用专家列表中的第一个");
+        assertEquals(1, fallbackTargets.size(), "未绑定 Vessel 时应回退返回一个 Vessel");
+        assertEquals("VesselX", fallbackTargets.get(0), "应返回可用 Vessel 列表中的第一个");
 
-        // 场景二：群聊模式应返回所有可用专家
+        // 场景二：群聊模式应返回所有可用 Vessel
         sessionManager.setGroupMode(userId, source, "group_001", agentId);
         UserSession groupSession = sessionManager.getSession(userId, source, agentId);
         List<String> groupTargets = sessionManager.getTargetVessels(groupSession, availableVessels);
 
-        assertEquals(3, groupTargets.size(), "群聊模式应返回所有可用专家");
-        assertTrue(groupTargets.containsAll(availableVessels), "返回列表应包含所有可用专家");
+        assertEquals(3, groupTargets.size(), "群聊模式应返回所有可用 Vessel");
+        assertTrue(groupTargets.containsAll(availableVessels), "返回列表应包含所有可用 Vessel");
     }
 
     /**
@@ -186,7 +186,7 @@ class SessionManagerTest {
     }
 
     /**
-     * 测试：传入 null 会话或空可用专家列表时，应返回空列表
+     * 测试：传入 null 会话或空可用 Vessel 列表时，应返回空列表
      */
     @Test
     void testGetTargetVesselsWithNullOrEmpty() {
@@ -196,14 +196,14 @@ class SessionManagerTest {
         List<String> result1 = sessionManager.getTargetVessels(null, availableVessels);
         assertTrue(result1.isEmpty(), "null 会话应返回空列表");
 
-        // null 可用专家列表
+        // null 可用 Vessel 列表
         UserSession session = sessionManager.getSession("u1", "s1", "a1");
         List<String> result2 = sessionManager.getTargetVessels(session, null);
-        assertTrue(result2.isEmpty(), "null 可用专家列表应返回空列表");
+        assertTrue(result2.isEmpty(), "null 可用 Vessel 列表应返回空列表");
 
-        // 空可用专家列表
+        // 空可用 Vessel 列表
         List<String> result3 = sessionManager.getTargetVessels(session, Collections.emptyList());
-        assertTrue(result3.isEmpty(), "空可用专家列表应返回空列表");
+        assertTrue(result3.isEmpty(), "空可用 Vessel 列表应返回空列表");
     }
 
     /**
