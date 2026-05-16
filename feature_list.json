@@ -1,6 +1,6 @@
 {
   "project": "meta-claw",
-  "last_updated": "2026-05-15",
+  "last_updated": "2026-05-16",
   "rules": {
     "single_active_feature": true,
     "passing_requires_evidence": true,
@@ -19,7 +19,7 @@
       "area": "repository-hygiene",
       "title": "恢复统一启动与验证入口",
       "user_visible_behavior": "下一轮会话可以从仓库根目录直接运行标准入口，完成依赖准备与基础验证，而不是先人工猜测该怎么启动项目。",
-      "status": "in_progress",
+      "status": "passing",
       "verification": [
         "从仓库根目录运行 ./init.sh。",
         "确认脚本使用与当前 Java/Maven 仓库匹配的命令，而不是 npm 模板命令。",
@@ -46,9 +46,14 @@
           "date": "2026-05-15",
           "result": "verified_failure_boundary",
           "detail": "./init.sh 现在会快速报出“未找到 mvn”，且不再调用 npm。"
+        },
+        {
+          "date": "2026-05-16",
+          "result": "passing",
+          "detail": "手动安装 Maven 3.9.15 后，执行 ./init.sh 成功；脚本内部完成 mvn clean test，9 个 reactor 模块全部 SUCCESS。"
         }
       ],
-      "notes": "入口脚本逻辑已修正，但在 Maven 可执行且真实验证通过前，仍保持 in_progress。"
+      "notes": "标准入口已恢复。当前仓库仍可能在沙箱环境中因 ~/.m2 写权限受限而需要在允许写入依赖缓存的环境下执行。"
     },
     {
       "id": "vessel-001",
