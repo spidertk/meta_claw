@@ -166,16 +166,17 @@
       "id": "chat-001",
       "priority": 6,
       "area": "chat",
-      "title": "重启后恢复同一会话历史",
-      "user_visible_behavior": "用户重新进入同一 CLI 会话后，系统能继续使用此前历史，而不是每次生成全新上下文。",
+      "title": "列出并恢复已有 CLI 会话",
+      "user_visible_behavior": "用户可以先查看某个 Vessel 的历史会话，再显式选择一条会话继续聊天。",
       "status": "not_started",
       "verification": [
-        "启动 chat 并发送至少一轮消息。",
-        "退出后重新进入同一会话。",
-        "确认系统加载先前 history.jsonl，而不是生成新的孤立 sessionKey。"
+        "为同一个 Vessel 创建至少两个会话并发送消息。",
+        "运行 sessions 命令，确认能列出该 Vessel 的历史会话。",
+        "运行 chat <vessel> --resume <session-id>。",
+        "确认系统加载被选中的 history.jsonl，并把后续消息追加回同一会话。"
       ],
       "evidence": [],
-      "notes": "当前 ChatCommand 每次运行都会 UUID.randomUUID() 生成新 sessionKey；因此不能把现有落盘能力误记为历史恢复。"
+      "notes": "显式恢复比改 sessionKey 生成规则更有产品意义；当前 JsonlConversationStore 已有底层存储能力，但 CLI 尚未暴露 sessions 列表与 --resume 入口。"
     }
   ]
 }
