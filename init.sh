@@ -5,7 +5,14 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT_DIR"
 
-VERIFY_CMD=(mvn clean test)
+COMPILE_CMD=(mvn clean compile)
+VERIFY_CMD=(
+  mvn test
+  -pl meta-claw-core,meta-claw-store,meta-claw-cli,meta-claw-bootstrap
+  -am
+  -Dtest=VesselConfigLoaderTest,VesselManagerTest,SystemPromptBuilderTest,JsonlShortMemoryStoreTest,FileLongMemoryStoreTest,ChatCommandTest,MessageFlowIntegrationTest
+  -Dsurefire.failIfNoSpecifiedTests=false
+)
 START_CMD=(mvn spring-boot:run -pl meta-claw-bootstrap -DskipTests)
 
 echo "==> 当前目录: $PWD"
@@ -15,7 +22,10 @@ if ! command -v mvn >/dev/null 2>&1; then
   exit 127
 fi
 
-echo "==> 运行基础验证"
+echo "==> 编译全仓库"
+"${COMPILE_CMD[@]}"
+
+echo "==> 运行 P0 验证"
 "${VERIFY_CMD[@]}"
 
 echo "==> 启动命令"

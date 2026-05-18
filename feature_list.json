@@ -1,6 +1,6 @@
 {
   "project": "meta-claw",
-  "last_updated": "2026-05-17",
+  "last_updated": "2026-05-18",
   "rules": {
     "single_active_feature": true,
     "passing_requires_evidence": true,
@@ -258,6 +258,37 @@
         }
       ],
       "notes": "ConversationHistoryManager 现在只是 short-term windowing strategy；CLI 通过 MemoryManagerFactory 装配 backend，偏好提示词通过 LongMemoryManager 读取。"
+    },
+    {
+      "id": "test-baseline-001",
+      "priority": 9,
+      "area": "repository-hygiene",
+      "title": "收敛初始化阶段 P0 测试基线",
+      "user_visible_behavior": "开发初始化阶段只维护能够保护主链路的少量 P0 测试，标准验证更短、更聚焦。",
+      "status": "passing",
+      "verification": [
+        "确认仓库只保留设计定义的 7 个 P0 测试类。",
+        "运行 ./init.sh。",
+        "确认第三方 openilink-sdk-java 仅参与编译，不参与初始化阶段测试基线。"
+      ],
+      "evidence": [
+        {
+          "date": "2026-05-18",
+          "result": "verified",
+          "detail": "已删除非 P0 测试；当前仓库只剩 7 个 P0 测试类，第三方 openilink-sdk-java 测试已退出初始化阶段测试基线。"
+        },
+        {
+          "date": "2026-05-18",
+          "result": "blocked_by_environment",
+          "detail": "新版 ./init.sh 在沙箱内完成全仓编译，但在 MessageFlowIntegrationTest 阶段因 Mockito/ByteBuddy 自附加受限失败。"
+        },
+        {
+          "date": "2026-05-18",
+          "result": "passing",
+          "detail": "在允许 JVM agent 附加的真实环境中执行新版 ./init.sh 成功；完成全仓编译，并通过 7 个 P0 测试类。"
+        }
+      ],
+      "notes": "这是开发初始化阶段的主动收敛策略；后续能力进入主链后再补对应测试。"
     }
   ]
 }

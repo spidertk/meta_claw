@@ -5,8 +5,8 @@
 - 仓库根目录：`/Users/kai/IdeaProjects/meta_claw`
 - 当前架构基线：Java 21 + Maven 多模块仓库；已存在 `meta-claw-core`、`meta-claw-vessel`、`meta-claw-store`、`meta-claw-cli`、`meta-claw-gateway*`、`meta-claw-bootstrap`
 - 标准启动路径：`./init.sh`
-- 标准验证路径：`./init.sh` 内部执行 `mvn clean test`
-- 最近已通过证据：2026-05-17 在真实 Maven 环境中执行 `./init.sh`，9 个 reactor 模块全部 `SUCCESS`
+- 标准验证路径：`./init.sh` 先执行全仓编译，再运行初始化阶段 P0 测试集
+- 最近已通过证据：2026-05-18 在真实 Maven 环境中执行新版 `./init.sh`，完成全仓编译并通过 7 个 P0 测试类
 - 当前最高优先级未完成功能：暂无新的已选定功能
 - 当前 blocker：
   1. 当前无 blocker
@@ -243,3 +243,38 @@
   - `MemoryManagerFactory` 当前只注册 JSONL / file 两个默认 backend；后续若增加新 backend，需要同时补充装配与配置文档
 - 下一步最佳动作：
   1. 由用户决定下一项优先级
+
+### Session 008
+
+- 日期：2026-05-18
+- 本轮目标：把开发初始化阶段的标准验证收敛为只维护主链路 P0 测试
+- 已完成：
+  - 新增初始化阶段 P0 测试基线收敛设计与实施计划
+  - 将 `./init.sh` 从 `mvn clean test` 改为“全仓编译 + P0 测试集”
+  - 删除当前阶段不再维护的旁支测试与第三方 `openilink-sdk-java` 测试
+  - 当前仓库只保留 7 个 P0 测试类：
+    - `VesselConfigLoaderTest`
+    - `VesselManagerTest`
+    - `SystemPromptBuilderTest`
+    - `JsonlShortMemoryStoreTest`
+    - `FileLongMemoryStoreTest`
+    - `ChatCommandTest`
+    - `MessageFlowIntegrationTest`
+- 运行过的验证：
+  - `find . -path '*/src/test/java/*Test.java' | sort` → 确认仓库只剩 7 个 P0 测试类
+  - `./init.sh`（沙箱内）→ 编译阶段成功；P0 测试阶段在 `MessageFlowIntegrationTest` 因 Mockito/ByteBuddy 自附加限制失败
+  - `./init.sh`（沙箱外真实环境）→ 成功；全仓编译通过，7 个 P0 测试类全部通过
+- 已记录证据：
+  - 新标准入口已能把全仓编译与 P0 测试分开执行
+  - 第三方 `openilink-sdk-java` 当前只参与编译，不再参与初始化阶段测试基线
+- 更新过的文件或工件：
+  - `init.sh`
+  - `docs/superpowers/specs/2026-05-18-p0-test-baseline-reduction-design.md`
+  - `docs/superpowers/plans/2026-05-18-p0-test-baseline-reduction.md`
+  - 多个已删除测试文件
+  - 长期状态文件
+- 已知风险或未解决问题：
+  - `MessageFlowIntegrationTest` 仍依赖 Mockito 自附加；在受限沙箱里仍需允许真实进程附加，才能完成标准入口验证
+  - 当前 P0 测试集是初始化阶段策略，不代表未来长期最终测试面
+- 下一步最佳动作：
+  1. 回到 Memory 重构主线
