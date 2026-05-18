@@ -368,6 +368,33 @@
         }
       ],
       "notes": "会话目录现在在会话生命周期开始时就可见，不再依赖第一条消息追加；workspace 以当前 Vessel 为边界。"
+    },
+    {
+      "id": "memory-003",
+      "priority": 13,
+      "area": "memory",
+      "title": "短期消息实时落盘并记录可读时间",
+      "user_visible_behavior": "聊天过程中每条消息会立即写入当前会话文件，文件中保留人可直接阅读的消息时间。",
+      "status": "passing",
+      "verification": [
+        "确认 history.jsonl 使用 `MemoryEntry` 结构。",
+        "确认每条消息包含 `yyyy-MM-dd HH:mm:ss` 格式时间。",
+        "确认 appendMessage 返回后文件内容已可读取。",
+        "运行 store 相关定向测试。"
+      ],
+      "evidence": [
+        {
+          "date": "2026-05-18",
+          "result": "passing",
+          "detail": "`JsonlShortMemoryStore` 改为写入 `MemoryEntry`，并保留旧版 `SpiMessage` JSONL 的读取兼容。"
+        },
+        {
+          "date": "2026-05-18",
+          "result": "verified",
+          "detail": "`JsonlShortMemoryStoreTest` 新增即时文件读取与时间格式覆盖，定向测试通过；`./init.sh` 通过。"
+        }
+      ],
+      "notes": "新写入记录以 `metadata.role` 保存角色；旧历史文件不会自动迁移，但仍能正常读取。"
     }
   ]
 }

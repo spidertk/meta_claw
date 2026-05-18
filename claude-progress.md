@@ -219,9 +219,26 @@
   - `ChatCommand` 构建 prompt context 时，将 workspace 从 `.meta-claw` 根目录改为 `.meta-claw/vessels/<vessel>`
 - 运行过的验证：
   - `mvn test -pl meta-claw-store -am -Dtest=JsonlShortMemoryStoreTest -Dsurefire.failIfNoSpecifiedTests=false` → 成功
+  - `./init.sh` → 成功；完成全仓编译并通过 P0 测试集
   - `./init.sh`（沙箱外真实环境）→ 成功；完成全仓编译并通过 P0 测试集
 - 已记录证据：
   - `JsonlShortMemoryStoreTest` 新增“初始化会话即创建空 history 文件”覆盖
+- 下一步最佳动作：
+  1. 由用户决定下一项优先级
+
+### Session 012
+
+- 日期：2026-05-18
+- 本轮目标：让短期会话消息实时以统一记忆实体落盘，并记录逐条消息时间
+- 已完成：
+  - `JsonlShortMemoryStore` 的 JSONL 磁盘格式从直接序列化 `SpiMessage` 改为 `MemoryEntry`
+  - 短期消息写入时记录 `timestamp`，格式固定为 `yyyy-MM-dd HH:mm:ss`
+  - 读取路径兼容旧版 `SpiMessage` JSONL，已有历史文件仍可恢复
+  - 新增核心测试，直接在 `appendMessage()` 返回后读取文件，验证记录已经即时写入
+- 运行过的验证：
+  - `mvn test -pl meta-claw-store -am -Dtest=JsonlShortMemoryStoreTest -Dsurefire.failIfNoSpecifiedTests=false` → 成功
+- 已记录证据：
+  - 新增“追加后立即可从 history 文件读到带时间 MemoryEntry”覆盖
 - 下一步最佳动作：
   1. 由用户决定下一项优先级
 

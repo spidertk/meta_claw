@@ -5,6 +5,8 @@ import meta.claw.core.spi.llm.SpiMessage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
@@ -34,6 +36,19 @@ class JsonlShortMemoryStoreTest {
         assertEquals(2, history.size());
         assertEquals("Hello", history.get(0).content());
         assertEquals("Hi", history.get(1).content());
+    }
+
+    @Test
+    void appendMessage_shouldPersistMemoryEntryImmediatelyWithReadableTimestamp() throws IOException {
+        JsonlShortMemoryStore store = createStore();
+        store.appendMessage("s1", SpiMessage.user("Hello"));
+
+        String persisted = Files.readString(tempDir.resolve("vessel-a/conversations/s1/history.jsonl"));
+        assertTrue(persisted.contains("\"category\":\"message\""));
+        assertTrue(persisted.contains("\"content\":\"Hello\""));
+        assertTrue(persisted.contains("\"sessionId\":\"s1\""));
+        assertTrue(persisted.contains("\"role\":\"user\""));
+        assertTrue(persisted.matches("(?s).*\"timestamp\":\"\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}\".*"));
     }
 
     @Test

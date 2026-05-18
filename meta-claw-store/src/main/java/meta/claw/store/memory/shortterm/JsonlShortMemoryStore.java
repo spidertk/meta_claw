@@ -1,11 +1,17 @@
 package meta.claw.store.memory.shortterm;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.fasterxml.jackson.datatype.jsr310.deser.LocalDateTimeDeserializer;
+import com.fasterxml.jackson.datatype.jsr310.ser.LocalDateTimeSerializer;
 import lombok.extern.slf4j.Slf4j;
 import meta.claw.core.memory.MemoryEntry;
 import meta.claw.core.memory.shortterm.ShortMemoryStore;
 import meta.claw.core.spi.llm.SpiMessage;
+import meta.claw.core.spi.llm.SpiToolCall;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -16,9 +22,12 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.regex.Pattern;
@@ -37,10 +46,14 @@ public class JsonlShortMemoryStore implements ShortMemoryStore {
     private static final Pattern BASE64_PATTERN = Pattern.compile(
             "data:([^;]+);base64,[A-Za-z0-9+/=]{200,}"
     );
+    private static final String MESSAGE_CATEGORY = "message";
+    private static final String ROLE_KEY = "role";
+    private static final String TOOL_CALLS_KEY = "toolCalls";
+    private static final DateTimeFormatter TIMESTAMP_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private final Path baseDir;
     private final String boundVesselId;
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper;
     private final ConcurrentHashMap<String, ReentrantReadWriteLock> lockMap = new ConcurrentHashMap<>();
 
     public JsonlShortMemoryStore(Path baseDir) {
@@ -50,6 +63,7 @@ public class JsonlShortMemoryStore implements ShortMemoryStore {
     public JsonlShortMemoryStore(Path baseDir, String vesselId) {
         this.baseDir = baseDir;
         this.boundVesselId = vesselId;
+        this.objectMapper = createObjectMapper();
     }
 
     @Override
@@ -79,7 +93,7 @@ public class JsonlShortMemoryStore implements ShortMemoryStore {
             Path filePath = getHistoryFilePath(vesselId, sessionKey);
             initializeConversation(sessionKey);
             SpiMessage safeMessage = new SpiMessage(message.role(), stripBase64(message.content()), message.toolCalls());
-            String jsonLine = objectMapper.writeValueAsString(safeMessage) + "\n";
+            String jsonLine = objectMapper.writeValueAsString(toMemoryEntry(sessionKey, safeMessage)) + "\n";
             try (FileChannel channel = FileChannel.open(filePath,
                     StandardOpenOption.CREATE, StandardOpenOption.APPEND, StandardOpenOption.WRITE)) {
                 channel.write(ByteBuffer.wrap(jsonLine.getBytes(StandardCharsets.UTF_8)));
@@ -254,11 +268,52 @@ public class JsonlShortMemoryStore implements ShortMemoryStore {
 
     private SpiMessage parseMessage(String jsonLine) {
         try {
+            MemoryEntry entry = objectMapper.readValue(jsonLine, MemoryEntry.class);
+            if (MESSAGE_CATEGORY.equals(entry.getCategory())) {
+                return toSpiMessage(entry);
+            }
+        } catch (JsonProcessingException e) {
+            // Older conversation files persisted SpiMessage directly.
+        }
+        try {
             return objectMapper.readValue(jsonLine, SpiMessage.class);
         } catch (JsonProcessingException e) {
             log.warn("Failed to parse memory message JSON: {}", e.getMessage());
             return null;
         }
+    }
+
+    private ObjectMapper createObjectMapper() {
+        JavaTimeModule javaTimeModule = new JavaTimeModule();
+        javaTimeModule.addSerializer(LocalDateTime.class, new LocalDateTimeSerializer(TIMESTAMP_FORMATTER));
+        javaTimeModule.addDeserializer(LocalDateTime.class, new LocalDateTimeDeserializer(TIMESTAMP_FORMATTER));
+        return new ObjectMapper()
+                .registerModule(javaTimeModule)
+                .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+    }
+
+    private MemoryEntry toMemoryEntry(String sessionKey, SpiMessage message) {
+        Map<String, Object> metadata = new HashMap<>();
+        metadata.put(ROLE_KEY, message.role());
+        if (message.toolCalls() != null && !message.toolCalls().isEmpty()) {
+            metadata.put(TOOL_CALLS_KEY, message.toolCalls());
+        }
+        return MemoryEntry.builder()
+                .timestamp(LocalDateTime.now())
+                .category(MESSAGE_CATEGORY)
+                .content(message.content())
+                .metadata(metadata)
+                .sessionId(sessionKey)
+                .build();
+    }
+
+    private SpiMessage toSpiMessage(MemoryEntry entry) {
+        Map<String, Object> metadata = entry.getMetadata() == null ? Collections.emptyMap() : entry.getMetadata();
+        String role = metadata.get(ROLE_KEY) == null ? null : metadata.get(ROLE_KEY).toString();
+        List<SpiToolCall> toolCalls = metadata.containsKey(TOOL_CALLS_KEY)
+                ? objectMapper.convertValue(metadata.get(TOOL_CALLS_KEY), new TypeReference<>() {})
+                : null;
+        return new SpiMessage(role, entry.getContent(), toolCalls);
     }
 
     private ReentrantReadWriteLock getLock(String sessionKey) {
