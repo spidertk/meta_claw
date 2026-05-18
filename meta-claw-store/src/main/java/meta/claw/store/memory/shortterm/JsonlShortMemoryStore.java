@@ -115,8 +115,8 @@ public class JsonlShortMemoryStore implements ShortMemoryStore {
                     .map(this::parseMessage)
                     .filter(msg -> msg != null)
                     .collect(Collectors.toList());
-            if (limit > 0 && messages.size() > limit) {
-                return messages.subList(messages.size() - limit, messages.size());
+            if (limit > 0) {
+                return trimByRound(messages, limit);
             }
             return messages;
         } catch (IOException e) {
@@ -179,8 +179,7 @@ public class JsonlShortMemoryStore implements ShortMemoryStore {
         return Files.exists(getHistoryFilePath(resolveVesselId(sessionKey), sessionKey));
     }
 
-    @Override
-    public List<MemoryEntry> getHistory(List<MemoryEntry> history, int maxRounds) {
+    private List<MemoryEntry> trimByRound(List<MemoryEntry> history, int maxRounds) {
         if (maxRounds <= 0 || history == null || history.isEmpty()) {
             return history == null ? new ArrayList<>() : new ArrayList<>(history);
         }
@@ -208,7 +207,11 @@ public class JsonlShortMemoryStore implements ShortMemoryStore {
     }
 
     @Override
-    public List<MemoryEntry> getHistoryByToken(List<MemoryEntry> history, int maxTokens) {
+    public List<MemoryEntry> getHistoryByToken(String sessionKey, int maxTokens) {
+        return trimByToken(getHistory(sessionKey), maxTokens);
+    }
+
+    private List<MemoryEntry> trimByToken(List<MemoryEntry> history, int maxTokens) {
         if (maxTokens <= 0 || history == null || history.isEmpty()) {
             return history == null ? new ArrayList<>() : new ArrayList<>(history);
         }

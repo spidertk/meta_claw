@@ -423,6 +423,33 @@
         }
       ],
       "notes": "CLI 继续面向 `SpiMessage` 与 LLM 交互，但转换仅发生在边界处。"
+    },
+    {
+      "id": "memory-005",
+      "priority": 15,
+      "area": "memory",
+      "title": "历史窗口查询改为基于 sessionKey",
+      "user_visible_behavior": "短期历史窗口由存储层根据会话 ID 统一生成，调用方不需要再把历史列表重新传回存储层。",
+      "status": "passing",
+      "verification": [
+        "确认已删除 `getHistory(List<MemoryEntry>, int)`。",
+        "确认 `getHistory(String sessionKey, int limit)` 按轮数返回历史。",
+        "确认 `getHistoryByToken(String sessionKey, int maxTokens)` 已替代旧签名。",
+        "运行 core/store/cli 相关定向测试。"
+      ],
+      "evidence": [
+        {
+          "date": "2026-05-18",
+          "result": "passing",
+          "detail": "`ChatCommand` 改为直接按 `sessionKey` 查询窗口；store 内部负责按轮数或 token 裁剪。"
+        },
+        {
+          "date": "2026-05-18",
+          "result": "verified",
+          "detail": "`MemoryEntryConverterTest`、`JsonlShortMemoryStoreTest`、`ChatCommandTest` 定向通过；`./init.sh` 通过。"
+        }
+      ],
+      "notes": "system prompt 不持久化，发送给 LLM 前由 CLI 单独补回。"
     }
   ]
 }

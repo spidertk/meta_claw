@@ -55,10 +55,16 @@ class JsonlShortMemoryStoreTest {
     @Test
     void getHistory_withLimit() {
         JsonlShortMemoryStore store = createStore();
-        for (int i = 0; i < 5; i++) store.appendEntry("s1", MemoryEntryConverter.fromSpiMessage("s1", SpiMessage.user("M" + i)));
+        store.appendEntry("s1", MemoryEntryConverter.fromSpiMessage("s1", SpiMessage.user("u1")));
+        store.appendEntry("s1", MemoryEntryConverter.fromSpiMessage("s1", SpiMessage.assistant("a1")));
+        store.appendEntry("s1", MemoryEntryConverter.fromSpiMessage("s1", SpiMessage.user("u2")));
+        store.appendEntry("s1", MemoryEntryConverter.fromSpiMessage("s1", SpiMessage.assistant("a2")));
+        store.appendEntry("s1", MemoryEntryConverter.fromSpiMessage("s1", SpiMessage.user("u3")));
+        store.appendEntry("s1", MemoryEntryConverter.fromSpiMessage("s1", SpiMessage.assistant("a3")));
+
         List<MemoryEntry> history = store.getHistory("s1", 2);
-        assertEquals(2, history.size());
-        assertEquals("M3", history.get(0).getContent());
+        assertEquals(4, history.size());
+        assertEquals("u2", history.get(0).getContent());
     }
 
     @Test
@@ -88,31 +94,27 @@ class JsonlShortMemoryStoreTest {
     }
 
     @Test
-    void getHistory_shouldKeepSystemAndRecentRounds() {
+    void getHistory_withLimit_shouldKeepRecentRounds() {
         JsonlShortMemoryStore store = createStore();
-        List<MemoryEntry> result = store.getHistory(List.of(
-                MemoryEntryConverter.fromSpiMessage("s1", SpiMessage.system("system")),
-                MemoryEntryConverter.fromSpiMessage("s1", SpiMessage.user("u1")),
-                MemoryEntryConverter.fromSpiMessage("s1", SpiMessage.assistant("a1")),
-                MemoryEntryConverter.fromSpiMessage("s1", SpiMessage.user("u2")),
-                MemoryEntryConverter.fromSpiMessage("s1", SpiMessage.assistant("a2"))
-        ), 1);
-        assertEquals(3, result.size());
-        assertEquals("system", result.get(0).getContent());
-        assertEquals("u2", result.get(1).getContent());
-        assertEquals("a2", result.get(2).getContent());
+        store.appendEntry("s1", MemoryEntryConverter.fromSpiMessage("s1", SpiMessage.user("u1")));
+        store.appendEntry("s1", MemoryEntryConverter.fromSpiMessage("s1", SpiMessage.assistant("a1")));
+        store.appendEntry("s1", MemoryEntryConverter.fromSpiMessage("s1", SpiMessage.user("u2")));
+        store.appendEntry("s1", MemoryEntryConverter.fromSpiMessage("s1", SpiMessage.assistant("a2")));
+
+        List<MemoryEntry> result = store.getHistory("s1", 1);
+        assertEquals(2, result.size());
+        assertEquals("u2", result.get(0).getContent());
+        assertEquals("a2", result.get(1).getContent());
     }
 
     @Test
-    void getHistoryByToken_shouldKeepSystemAndTail() {
+    void getHistoryByToken_shouldKeepTail() {
         JsonlShortMemoryStore store = createStore();
-        List<MemoryEntry> result = store.getHistoryByToken(List.of(
-                MemoryEntryConverter.fromSpiMessage("s1", SpiMessage.system("system")),
-                MemoryEntryConverter.fromSpiMessage("s1", SpiMessage.user("12345678")),
-                MemoryEntryConverter.fromSpiMessage("s1", SpiMessage.assistant("abcd"))
-        ), 3);
-        assertEquals(2, result.size());
-        assertEquals("system", result.get(0).getContent());
-        assertEquals("abcd", result.get(1).getContent());
+        store.appendEntry("s1", MemoryEntryConverter.fromSpiMessage("s1", SpiMessage.user("12345678")));
+        store.appendEntry("s1", MemoryEntryConverter.fromSpiMessage("s1", SpiMessage.assistant("abcd")));
+
+        List<MemoryEntry> result = store.getHistoryByToken("s1", 3);
+        assertEquals(1, result.size());
+        assertEquals("abcd", result.get(0).getContent());
     }
 }

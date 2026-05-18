@@ -215,11 +215,12 @@ public class ChatCommand implements Runnable {
                     log.error("Failed to persist user message", e);
                 }
 
-                // Phase 2: Truncate history before sending to LLM
-                List<MemoryEntry> memoryHistory = history.stream()
-                        .map(message -> MemoryEntryConverter.fromSpiMessage(sessionKey, message))
-                        .toList();
-                List<SpiMessage> truncatedHistory = toSpiMessages(memoryManager.getHistory(memoryHistory, maxHistoryRounds));
+                // Phase 2: Build the LLM context from persisted history.
+                List<SpiMessage> truncatedHistory = new ArrayList<>();
+                if (systemPrompt != null && !systemPrompt.isBlank()) {
+                    truncatedHistory.add(SpiMessage.system(systemPrompt));
+                }
+                truncatedHistory.addAll(toSpiMessages(memoryManager.getHistory(sessionKey, maxHistoryRounds)));
                 SpiChatRequest request = SpiChatRequest.builder().messages(truncatedHistory).build();
 
                 terminal.writer().print("AI: ");

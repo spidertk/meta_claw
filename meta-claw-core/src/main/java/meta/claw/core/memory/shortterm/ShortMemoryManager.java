@@ -33,6 +33,10 @@ public class ShortMemoryManager {
         return store.getHistory(sessionKey);
     }
 
+    public List<MemoryEntry> getHistory(String sessionKey, int limit) {
+        return store.getHistory(sessionKey, limit);
+    }
+
     public List<MemoryEntry> listSessions(String vesselId) {
         return store.listSessions(vesselId);
     }
@@ -45,12 +49,8 @@ public class ShortMemoryManager {
         return store.conversationExists(sessionKey);
     }
 
-    public List<MemoryEntry> getHistory(List<MemoryEntry> history, int maxRounds) {
-        return store.getHistory(history, maxRounds);
-    }
-
-    public List<MemoryEntry> getHistoryByToken(List<MemoryEntry> history, int maxTokens) {
-        return store.getHistoryByToken(history, maxTokens);
+    public List<MemoryEntry> getHistoryByToken(String sessionKey, int maxTokens) {
+        return store.getHistoryByToken(sessionKey, maxTokens);
     }
 
     public String summarizeConversation(List<MemoryEntry> history) {

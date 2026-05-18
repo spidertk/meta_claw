@@ -256,9 +256,27 @@
 - 运行过的验证：
   - `mvn test -pl meta-claw-core,meta-claw-store,meta-claw-cli -am -Dtest=MemoryEntryConverterTest,JsonlShortMemoryStoreTest,ChatCommandTest -Dsurefire.failIfNoSpecifiedTests=false` → 成功
   - `./init.sh` → 成功；完成全仓编译并通过 P0 测试集
+  - `./init.sh` → 成功；完成全仓编译并通过 P0 测试集
 - 已记录证据：
   - `MemoryEntryConverterTest` 覆盖双向转换
   - `JsonlShortMemoryStoreTest` 全部切到 `MemoryEntry`
+- 下一步最佳动作：
+  1. 由用户决定下一项优先级
+
+### Session 014
+
+- 日期：2026-05-18
+- 本轮目标：把短期历史窗口查询进一步收敛到基于 `sessionKey` 的接口
+- 已完成：
+  - 删除 `getHistory(List<MemoryEntry>, int)`
+  - `getHistory(String sessionKey, int limit)` 直接承担按轮数读取历史
+  - `getHistoryByToken(...)` 改为 `getHistoryByToken(String sessionKey, int maxTokens)`
+  - `ChatCommand` 不再把外部历史列表重新传回 store，而是直接按 `sessionKey` 查询窗口
+  - LLM 请求前单独补回 system prompt，避免持久化历史不含 system 消息时丢上下文
+- 运行过的验证：
+  - `mvn test -pl meta-claw-core,meta-claw-store,meta-claw-cli -am -Dtest=MemoryEntryConverterTest,JsonlShortMemoryStoreTest,ChatCommandTest -Dsurefire.failIfNoSpecifiedTests=false` → 成功
+- 已记录证据：
+  - `JsonlShortMemoryStoreTest` 已按“最近 N 轮”语义验证 `getHistory(sessionKey, limit)`
 - 下一步最佳动作：
   1. 由用户决定下一项优先级
 

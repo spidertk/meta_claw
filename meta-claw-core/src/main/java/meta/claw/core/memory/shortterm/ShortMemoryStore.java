@@ -19,7 +19,6 @@ public interface ShortMemoryStore {
     List<MemoryEntry> listSessions(String vesselId);
     boolean clearHistory(String sessionKey);
     boolean conversationExists(String sessionKey);
-    List<MemoryEntry> getHistory(List<MemoryEntry> history, int maxRounds);
-    List<MemoryEntry> getHistoryByToken(List<MemoryEntry> history, int maxTokens);
+    List<MemoryEntry> getHistoryByToken(String sessionKey, int maxTokens);
     String summarizeConversation(List<MemoryEntry> history);
 }
