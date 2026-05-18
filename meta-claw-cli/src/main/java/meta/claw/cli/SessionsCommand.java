@@ -1,7 +1,7 @@
 package meta.claw.cli;
 
 import meta.claw.core.config.VesselConfig;
-import meta.claw.core.memory.MemoryEntry;
+import meta.claw.core.memory.SessionMemory;
 import meta.claw.core.memory.shortterm.ShortMemoryManager;
 import meta.claw.store.memory.MemoryManagerProvider;
 import meta.claw.vessel.ProjectRootFinder;
@@ -48,7 +48,7 @@ public class SessionsCommand implements Runnable {
 
     }
 
-    static void printSessions(String vesselName, List<MemoryEntry> sessions) {
+    static void printSessions(String vesselName, List<SessionMemory> sessions) {
         System.out.println("Sessions for vessel '" + vesselName + "'");
         System.out.println();
         if (sessions.isEmpty()) {
@@ -56,7 +56,7 @@ public class SessionsCommand implements Runnable {
             return;
         }
         System.out.println(String.format("%-36s  %-16s  %s", "SESSION ID", "UPDATED AT", "MESSAGES"));
-        for (MemoryEntry session : sessions) {
+        for (SessionMemory session : sessions) {
             String updatedAt = session.getUpdatedAt() != null ? FORMATTER.format(session.getUpdatedAt()) : "";
             System.out.println(String.format("%-36s  %-16s  %d",
                     session.getSessionId(), updatedAt, session.getMessageCount()));

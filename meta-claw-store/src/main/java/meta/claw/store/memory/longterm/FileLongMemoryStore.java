@@ -4,7 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import lombok.extern.slf4j.Slf4j;
-import meta.claw.core.memory.MemoryEntry;
+import meta.claw.core.memory.PreferenceMemory;
 import meta.claw.core.memory.longterm.LongMemoryStore;
 
 import java.io.IOException;
@@ -47,7 +47,7 @@ public class FileLongMemoryStore implements LongMemoryStore {
     }
 
     @Override
-    public void addPreference(String vesselId, MemoryEntry entry) {
+    public void addPreference(String vesselId, PreferenceMemory entry) {
         Path filePath = getPreferencesFilePath(vesselId);
         try {
             Files.createDirectories(filePath.getParent());
@@ -64,7 +64,7 @@ public class FileLongMemoryStore implements LongMemoryStore {
     }
 
     @Override
-    public List<MemoryEntry> lookupPreference(String vesselId, String query) {
+    public List<PreferenceMemory> lookupPreference(String vesselId, String query) {
         Path filePath = getPreferencesFilePath(vesselId);
         if (!Files.exists(filePath)) {
             return Collections.emptyList();
@@ -85,14 +85,14 @@ public class FileLongMemoryStore implements LongMemoryStore {
     }
 
     @Override
-    public List<MemoryEntry> listRecentPreferences(String vesselId, int limit) {
+    public List<PreferenceMemory> listRecentPreferences(String vesselId, int limit) {
         Path filePath = getPreferencesFilePath(vesselId);
         if (!Files.exists(filePath)) {
             return Collections.emptyList();
         }
 
         try {
-            List<MemoryEntry> entries = Files.lines(filePath)
+            List<PreferenceMemory> entries = Files.lines(filePath)
                     .filter(line -> !line.isBlank())
                     .map(this::parseEntry)
                     .filter(entry -> entry != null)
@@ -120,7 +120,7 @@ public class FileLongMemoryStore implements LongMemoryStore {
             List<String> filtered = lines.stream()
                     .filter(line -> {
                         if (line.isBlank()) return false;
-                        MemoryEntry entry = parseEntry(line);
+                        PreferenceMemory entry = parseEntry(line);
                         return entry != null && !preferenceId.equals(entry.getId());
                     })
                     .collect(Collectors.toList());
@@ -148,16 +148,16 @@ public class FileLongMemoryStore implements LongMemoryStore {
         }
     }
 
-    private MemoryEntry parseEntry(String jsonLine) {
+    private PreferenceMemory parseEntry(String jsonLine) {
         try {
-            return objectMapper.readValue(jsonLine, MemoryEntry.class);
+            return objectMapper.readValue(jsonLine, PreferenceMemory.class);
         } catch (JsonProcessingException e) {
             log.warn("Failed to parse preference entry JSON: {}", e.getMessage());
             return null;
         }
     }
 
-    private boolean matchesQuery(MemoryEntry entry, String lowerQuery) {
+    private boolean matchesQuery(PreferenceMemory entry, String lowerQuery) {
         if (entry.getContent() != null && entry.getContent().toLowerCase(Locale.ROOT).contains(lowerQuery)) {
             return true;
         }

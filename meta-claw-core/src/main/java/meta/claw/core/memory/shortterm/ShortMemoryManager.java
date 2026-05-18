@@ -1,7 +1,8 @@
 package meta.claw.core.memory.shortterm;
 
 import meta.claw.core.config.MemoryConfig;
-import meta.claw.core.memory.MemoryEntry;
+import meta.claw.core.memory.MemoryMessage;
+import meta.claw.core.memory.SessionMemory;
 import java.util.List;
 import java.util.Map;
 import org.springframework.context.annotation.Scope;
@@ -21,23 +22,23 @@ public class ShortMemoryManager {
         this.store = requireStore(stores, backend);
     }
 
-    public void appendEntry(String sessionKey, MemoryEntry entry) {
-        store.appendEntry(sessionKey, entry);
+    public void appendMessage(String sessionKey, MemoryMessage message) {
+        store.appendMessage(sessionKey, message);
     }
 
     public void initializeConversation(String sessionKey) {
         store.initializeConversation(sessionKey);
     }
 
-    public List<MemoryEntry> getHistory(String sessionKey) {
+    public List<MemoryMessage> getHistory(String sessionKey) {
         return store.getHistory(sessionKey);
     }
 
-    public List<MemoryEntry> getHistory(String sessionKey, int limit) {
+    public List<MemoryMessage> getHistory(String sessionKey, int limit) {
         return store.getHistory(sessionKey, limit);
     }
 
-    public List<MemoryEntry> listSessions(String vesselId) {
+    public List<SessionMemory> listSessions(String vesselId) {
         return store.listSessions(vesselId);
     }
 
@@ -49,11 +50,19 @@ public class ShortMemoryManager {
         return store.conversationExists(sessionKey);
     }
 
-    public List<MemoryEntry> getHistoryByToken(String sessionKey, int maxTokens) {
+    public List<MemoryMessage> getHistoryByToken(String sessionKey, int maxTokens) {
         return store.getHistoryByToken(sessionKey, maxTokens);
     }
 
-    public String summarizeConversation(List<MemoryEntry> history) {
+    public SessionMemory loadSummary(String sessionKey) {
+        return store.loadSummary(sessionKey);
+    }
+
+    public void saveSummary(String sessionKey, SessionMemory summary) {
+        store.saveSummary(sessionKey, summary);
+    }
+
+    public String summarizeConversation(List<MemoryMessage> history) {
         return store.summarizeConversation(history);
     }
 

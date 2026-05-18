@@ -2,7 +2,7 @@ package meta.claw.core.prompt;
 
 import lombok.RequiredArgsConstructor;
 import meta.claw.core.config.VesselConfig;
-import meta.claw.core.memory.MemoryEntry;
+import meta.claw.core.memory.PreferenceMemory;
 import meta.claw.core.memory.longterm.LongMemoryStore;
 
 import java.nio.file.Path;
@@ -57,7 +57,7 @@ public class PromptContextFactory {
         if (store == null || !config.isPreferencesEnabled() || config.getId() == null) {
             return "";
         }
-        List<MemoryEntry> entries = store.listRecentPreferences(config.getId(), 20);
+        List<PreferenceMemory> entries = store.listRecentPreferences(config.getId(), 20);
         if (entries.isEmpty()) {
             return "";
         }

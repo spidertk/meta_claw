@@ -450,6 +450,34 @@
         }
       ],
       "notes": "system prompt 不持久化，发送给 LLM 前由 CLI 单独补回。"
+    },
+    {
+      "id": "memory-006",
+      "priority": 16,
+      "area": "memory",
+      "title": "重构为 Memory 聚合模型",
+      "user_visible_behavior": "短期消息、会话摘要和长期偏好按各自层级维护，不再把会话统计字段混进单条消息记录。",
+      "status": "passing",
+      "verification": [
+        "确认 `MemoryEntry` 已被新的聚合模型替代。",
+        "确认 history.jsonl 写入 `MemoryMessage`。",
+        "确认 summary.json 可读写 `SessionMemory`。",
+        "确认长期偏好使用 `PreferenceMemory`。",
+        "运行 core/store/cli 相关定向测试。"
+      ],
+      "evidence": [
+        {
+          "date": "2026-05-18",
+          "result": "passing",
+          "detail": "新增 `Memory`、`SessionMemory`、`MemoryMessage`、`PreferenceMemory`；删除旧 `MemoryEntry` 模型。"
+        },
+        {
+          "date": "2026-05-18",
+          "result": "verified",
+          "detail": "`MemoryMessageConverterTest`、`JsonlShortMemoryStoreTest`、`FileLongMemoryStoreTest`、`ChatCommandTest` 定向通过；`./init.sh` 通过。"
+        }
+      ],
+      "notes": "当前仅建立会话摘要存储能力，自动摘要生成仍保持后续能力。"
     }
   ]
 }

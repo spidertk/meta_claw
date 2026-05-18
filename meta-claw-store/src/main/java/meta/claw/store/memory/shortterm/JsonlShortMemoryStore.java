@@ -1,14 +1,16 @@
 package meta.claw.store.memory.shortterm;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.fasterxml.jackson.datatype.jsr310.deser.LocalDateTimeDeserializer;
 import com.fasterxml.jackson.datatype.jsr310.ser.LocalDateTimeSerializer;
 import lombok.extern.slf4j.Slf4j;
-import meta.claw.core.memory.MemoryEntry;
-import meta.claw.core.memory.MemoryEntryConverter;
+import meta.claw.core.memory.MemoryMessage;
+import meta.claw.core.memory.MemoryMessageConverter;
+import meta.claw.core.memory.SessionMemory;
 import meta.claw.core.memory.shortterm.ShortMemoryStore;
 import meta.claw.core.spi.llm.SpiMessage;
 
@@ -79,15 +81,15 @@ public class JsonlShortMemoryStore implements ShortMemoryStore {
     }
 
     @Override
-    public void appendEntry(String sessionKey, MemoryEntry entry) {
+    public void appendMessage(String sessionKey, MemoryMessage message) {
         String vesselId = resolveVesselId(sessionKey);
         ReentrantReadWriteLock lock = getLock(sessionKey);
         lock.writeLock().lock();
         try {
             Path filePath = getHistoryFilePath(vesselId, sessionKey);
             initializeConversation(sessionKey);
-            entry.setContent(stripBase64(entry.getContent()));
-            String jsonLine = objectMapper.writeValueAsString(entry) + "\n";
+            message.setContent(stripBase64(message.getContent()));
+            String jsonLine = objectMapper.writeValueAsString(message) + "\n";
             try (FileChannel channel = FileChannel.open(filePath,
                     StandardOpenOption.CREATE, StandardOpenOption.APPEND, StandardOpenOption.WRITE)) {
                 channel.write(ByteBuffer.wrap(jsonLine.getBytes(StandardCharsets.UTF_8)));
@@ -101,7 +103,7 @@ public class JsonlShortMemoryStore implements ShortMemoryStore {
     }
 
     @Override
-    public List<MemoryEntry> getHistory(String sessionKey, int limit) {
+    public List<MemoryMessage> getHistory(String sessionKey, int limit) {
         String vesselId = resolveVesselId(sessionKey);
         Path filePath = getHistoryFilePath(vesselId, sessionKey);
         if (!Files.exists(filePath)) {
@@ -110,7 +112,7 @@ public class JsonlShortMemoryStore implements ShortMemoryStore {
         ReentrantReadWriteLock lock = getLock(sessionKey);
         lock.readLock().lock();
         try {
-            List<MemoryEntry> messages = Files.lines(filePath)
+            List<MemoryMessage> messages = Files.lines(filePath)
                     .filter(line -> !line.isBlank())
                     .map(this::parseMessage)
                     .filter(msg -> msg != null)
@@ -128,8 +130,8 @@ public class JsonlShortMemoryStore implements ShortMemoryStore {
     }
 
     @Override
-    public List<MemoryEntry> listSessions(String vesselId) {
-        List<MemoryEntry> result = new ArrayList<>();
+    public List<SessionMemory> listSessions(String vesselId) {
+        List<SessionMemory> result = new ArrayList<>();
         Path conversationsDir = baseDir.resolve(vesselId).resolve("conversations");
         if (!Files.exists(conversationsDir)) {
             return result;
@@ -141,11 +143,13 @@ public class JsonlShortMemoryStore implements ShortMemoryStore {
                 if (!Files.exists(historyFile)) {
                     return;
                 }
-                List<MemoryEntry> history = getHistoryForVessel(vesselId, sessionId);
-                result.add(MemoryEntry.builder()
+                List<MemoryMessage> history = getHistoryForVessel(vesselId, sessionId);
+                SessionMemory summary = loadSummaryForVessel(vesselId, sessionId);
+                result.add(SessionMemory.builder()
                         .sessionId(sessionId)
                         .updatedAt(getFileUpdatedTime(historyFile))
                         .messageCount(history.size())
+                        .summary(summary == null ? null : summary.getSummary())
                         .build());
             });
         } catch (IOException e) {
@@ -179,7 +183,7 @@ public class JsonlShortMemoryStore implements ShortMemoryStore {
         return Files.exists(getHistoryFilePath(resolveVesselId(sessionKey), sessionKey));
     }
 
-    private List<MemoryEntry> trimByRound(List<MemoryEntry> history, int maxRounds) {
+    private List<MemoryMessage> trimByRound(List<MemoryMessage> history, int maxRounds) {
         if (maxRounds <= 0 || history == null || history.isEmpty()) {
             return history == null ? new ArrayList<>() : new ArrayList<>(history);
         }
@@ -187,7 +191,7 @@ public class JsonlShortMemoryStore implements ShortMemoryStore {
         int roundsFound = 0;
         int cutoffIndex = 0;
         for (int i = history.size() - 1; i >= 0; i--) {
-            if ("assistant".equalsIgnoreCase(resolveRole(history.get(i)))) {
+            if ("assistant".equalsIgnoreCase(history.get(i).getRole())) {
                 roundsFound++;
                 if (roundsFound > maxRounds) {
                     cutoffIndex = i + 1;
@@ -196,10 +200,10 @@ public class JsonlShortMemoryStore implements ShortMemoryStore {
             }
         }
 
-        List<MemoryEntry> result = new ArrayList<>();
+        List<MemoryMessage> result = new ArrayList<>();
         for (int i = 0; i < history.size(); i++) {
-            MemoryEntry message = history.get(i);
-            if ("system".equalsIgnoreCase(resolveRole(message)) || i >= cutoffIndex) {
+            MemoryMessage message = history.get(i);
+            if ("system".equalsIgnoreCase(message.getRole()) || i >= cutoffIndex) {
                 result.add(message);
             }
         }
@@ -207,11 +211,11 @@ public class JsonlShortMemoryStore implements ShortMemoryStore {
     }
 
     @Override
-    public List<MemoryEntry> getHistoryByToken(String sessionKey, int maxTokens) {
+    public List<MemoryMessage> getHistoryByToken(String sessionKey, int maxTokens) {
         return trimByToken(getHistory(sessionKey), maxTokens);
     }
 
-    private List<MemoryEntry> trimByToken(List<MemoryEntry> history, int maxTokens) {
+    private List<MemoryMessage> trimByToken(List<MemoryMessage> history, int maxTokens) {
         if (maxTokens <= 0 || history == null || history.isEmpty()) {
             return history == null ? new ArrayList<>() : new ArrayList<>(history);
         }
@@ -219,9 +223,9 @@ public class JsonlShortMemoryStore implements ShortMemoryStore {
         int currentTokens = 0;
         int cutoffIndex = 0;
         for (int i = history.size() - 1; i >= 0; i--) {
-            MemoryEntry message = history.get(i);
+            MemoryMessage message = history.get(i);
             int tokens = estimateTokens(message.getContent());
-            if ("system".equalsIgnoreCase(resolveRole(message))) {
+            if ("system".equalsIgnoreCase(message.getRole())) {
                 currentTokens += tokens;
                 continue;
             }
@@ -232,10 +236,10 @@ public class JsonlShortMemoryStore implements ShortMemoryStore {
             currentTokens += tokens;
         }
 
-        List<MemoryEntry> result = new ArrayList<>();
+        List<MemoryMessage> result = new ArrayList<>();
         for (int i = 0; i < history.size(); i++) {
-            MemoryEntry message = history.get(i);
-            if ("system".equalsIgnoreCase(resolveRole(message)) || i >= cutoffIndex) {
+            MemoryMessage message = history.get(i);
+            if ("system".equalsIgnoreCase(message.getRole()) || i >= cutoffIndex) {
                 result.add(message);
             }
         }
@@ -243,11 +247,33 @@ public class JsonlShortMemoryStore implements ShortMemoryStore {
     }
 
     @Override
-    public String summarizeConversation(List<MemoryEntry> history) {
+    public SessionMemory loadSummary(String sessionKey) {
+        return loadSummaryForVessel(resolveVesselId(sessionKey), sessionKey);
+    }
+
+    @Override
+    public void saveSummary(String sessionKey, SessionMemory summary) {
+        String vesselId = resolveVesselId(sessionKey);
+        Path filePath = getSummaryFilePath(vesselId, sessionKey);
+        ReentrantReadWriteLock lock = getLock(sessionKey);
+        lock.writeLock().lock();
+        try {
+            Files.createDirectories(filePath.getParent());
+            Files.writeString(filePath, objectMapper.writeValueAsString(summary),
+                    StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+        } catch (IOException e) {
+            throw new RuntimeException("Summary save failed", e);
+        } finally {
+            lock.writeLock().unlock();
+        }
+    }
+
+    @Override
+    public String summarizeConversation(List<MemoryMessage> history) {
         return "Earlier conversation summarized.";
     }
 
-    private List<MemoryEntry> getHistoryForVessel(String vesselId, String sessionKey) {
+    private List<MemoryMessage> getHistoryForVessel(String vesselId, String sessionKey) {
         Path filePath = getHistoryFilePath(vesselId, sessionKey);
         if (!Files.exists(filePath)) {
             return Collections.emptyList();
@@ -263,19 +289,35 @@ public class JsonlShortMemoryStore implements ShortMemoryStore {
         }
     }
 
-    private MemoryEntry parseMessage(String jsonLine) {
+    private MemoryMessage parseMessage(String jsonLine) {
         try {
-            MemoryEntry entry = objectMapper.readValue(jsonLine, MemoryEntry.class);
-            if (entry.getCategory() != null) {
-                return entry;
+            MemoryMessage message = objectMapper.readValue(jsonLine, MemoryMessage.class);
+            if (message.getRole() != null) {
+                return message;
             }
         } catch (JsonProcessingException e) {
-            // Older conversation files persisted SpiMessage directly.
+            // Older conversation files used the previous aggregate shape or SpiMessage.
         }
         try {
-            return MemoryEntryConverter.fromSpiMessage(null, objectMapper.readValue(jsonLine, SpiMessage.class));
+            JsonNode node = objectMapper.readTree(jsonLine);
+            if (node.hasNonNull("category") && node.hasNonNull("metadata")) {
+                JsonNode metadata = node.get("metadata");
+                MemoryMessage message = MemoryMessage.builder()
+                        .role(metadata.hasNonNull("role") ? metadata.get("role").asText() : null)
+                        .content(node.hasNonNull("content") ? node.get("content").asText() : null)
+                        .build();
+                if (node.hasNonNull("timestamp")) {
+                    message.setTimestamp(LocalDateTime.parse(node.get("timestamp").asText(), TIMESTAMP_FORMATTER));
+                }
+                return message;
+            }
         } catch (JsonProcessingException e) {
-            log.warn("Failed to parse memory message JSON: {}", e.getMessage());
+            // Older conversation files may have persisted SpiMessage directly.
+        }
+        try {
+            return MemoryMessageConverter.fromSpiMessage(objectMapper.readValue(jsonLine, SpiMessage.class));
+        } catch (JsonProcessingException legacyException) {
+            log.warn("Failed to parse memory message JSON: {}", legacyException.getMessage());
             return null;
         }
     }
@@ -287,12 +329,6 @@ public class JsonlShortMemoryStore implements ShortMemoryStore {
         return new ObjectMapper()
                 .registerModule(javaTimeModule)
                 .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
-    }
-
-    private String resolveRole(MemoryEntry entry) {
-        return entry.getMetadata() == null || entry.getMetadata().get(MemoryEntryConverter.ROLE_KEY) == null
-                ? null
-                : entry.getMetadata().get(MemoryEntryConverter.ROLE_KEY).toString();
     }
 
     private ReentrantReadWriteLock getLock(String sessionKey) {
@@ -319,6 +355,23 @@ public class JsonlShortMemoryStore implements ShortMemoryStore {
 
     private Path getHistoryFilePath(String vesselId, String sessionKey) {
         return baseDir.resolve(vesselId).resolve("conversations").resolve(sessionKey).resolve("history.jsonl");
+    }
+
+    private Path getSummaryFilePath(String vesselId, String sessionKey) {
+        return baseDir.resolve(vesselId).resolve("conversations").resolve(sessionKey).resolve("summary.json");
+    }
+
+    private SessionMemory loadSummaryForVessel(String vesselId, String sessionKey) {
+        Path filePath = getSummaryFilePath(vesselId, sessionKey);
+        if (!Files.exists(filePath)) {
+            return null;
+        }
+        try {
+            return objectMapper.readValue(Files.readString(filePath), SessionMemory.class);
+        } catch (IOException e) {
+            log.warn("Failed to read summary for session {}: {}", sessionKey, e.getMessage());
+            return null;
+        }
     }
 
     private LocalDateTime getFileUpdatedTime(Path file) {

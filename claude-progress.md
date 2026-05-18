@@ -280,6 +280,27 @@
 - 下一步最佳动作：
   1. 由用户决定下一项优先级
 
+### Session 015
+
+- 日期：2026-05-18
+- 本轮目标：把记忆领域模型从 `MemoryEntry` 重构为 `Memory` 聚合模型
+- 已完成：
+  - 新增 `Memory`、`SessionMemory`、`MemoryMessage`、`PreferenceMemory`
+  - 删除旧 `MemoryEntry` / `MemoryEntryConverter`
+  - 短期记忆历史改为持久化 `MemoryMessage`
+  - 每个会话目录新增 `summary.json` 的读写能力
+  - 会话列表改为返回 `SessionMemory`
+  - 长期偏好改为使用 `PreferenceMemory`
+  - CLI 边界改用 `MemoryMessageConverter`
+- 运行过的验证：
+  - `mvn test -pl meta-claw-core,meta-claw-store,meta-claw-cli -am -Dtest=MemoryMessageConverterTest,JsonlShortMemoryStoreTest,FileLongMemoryStoreTest,ChatCommandTest -Dsurefire.failIfNoSpecifiedTests=false` → 成功
+  - `./init.sh` → 成功；完成全仓编译并通过 P0 测试集
+- 已记录证据：
+  - `JsonlShortMemoryStoreTest` 现覆盖 `summary.json` 读写
+  - 新写入的消息文件不再带 `messageCount` 这类会话级字段
+- 下一步最佳动作：
+  1. 由用户决定下一项优先级
+
 ### Session 010
 
 - 日期：2026-05-18

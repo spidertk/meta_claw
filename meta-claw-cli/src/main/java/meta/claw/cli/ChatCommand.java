@@ -1,8 +1,8 @@
 package meta.claw.cli;
 
 import lombok.extern.slf4j.Slf4j;
-import meta.claw.core.memory.MemoryEntry;
-import meta.claw.core.memory.MemoryEntryConverter;
+import meta.claw.core.memory.MemoryMessage;
+import meta.claw.core.memory.MemoryMessageConverter;
 import meta.claw.core.memory.shortterm.ShortMemoryManager;
 import meta.claw.core.memory.longterm.LongMemoryManager;
 import meta.claw.core.prompt.PromptContext;
@@ -209,8 +209,8 @@ public class ChatCommand implements Runnable {
 
                 history.add(SpiMessage.user(input));
                 try {
-                    shortMemoryManager.appendEntry(sessionKey,
-                            MemoryEntryConverter.fromSpiMessage(sessionKey, SpiMessage.user(input)));
+                    shortMemoryManager.appendMessage(sessionKey,
+                            MemoryMessageConverter.fromSpiMessage(SpiMessage.user(input)));
                 } catch (Exception e) {
                     log.error("Failed to persist user message", e);
                 }
@@ -251,8 +251,8 @@ public class ChatCommand implements Runnable {
                         String responseText = responseBuffer.toString();
                         history.add(SpiMessage.assistant(responseText));
                         try {
-                            shortMemoryManager.appendEntry(sessionKey,
-                                    MemoryEntryConverter.fromSpiMessage(sessionKey, SpiMessage.assistant(responseText)));
+                            shortMemoryManager.appendMessage(sessionKey,
+                                    MemoryMessageConverter.fromSpiMessage(SpiMessage.assistant(responseText)));
                         } catch (Exception e) {
                             log.error("Failed to persist assistant message", e);
                         }
@@ -274,10 +274,10 @@ public class ChatCommand implements Runnable {
         terminal.writer().flush();
     }
 
-    static List<SpiMessage> toSpiMessages(List<MemoryEntry> entries) {
+    static List<SpiMessage> toSpiMessages(List<MemoryMessage> entries) {
         List<SpiMessage> restored = new ArrayList<>();
-        for (MemoryEntry entry : entries) {
-            SpiMessage message = MemoryEntryConverter.toSpiMessage(entry);
+        for (MemoryMessage entry : entries) {
+            SpiMessage message = MemoryMessageConverter.toSpiMessage(entry);
             if (message.role() == null) {
                 continue;
             }

@@ -5,25 +5,22 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import meta.claw.core.spi.llm.SpiToolCall;
 
 import java.time.LocalDateTime;
-import java.util.Map;
+import java.util.List;
 
 /**
- * 统一记忆实体。
+ * 单条短期记忆消息。
  */
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 @Getter
 @Setter
-public class MemoryEntry {
-    private String id;
+public class MemoryMessage {
     private LocalDateTime timestamp;
-    private String category;
+    private String role;
     private String content;
-    private Map<String, Object> metadata;
-    private String sessionId;
-    private LocalDateTime updatedAt;
-    private int messageCount;
+    private List<SpiToolCall> toolCalls;
 }

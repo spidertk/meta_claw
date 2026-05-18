@@ -1,6 +1,7 @@
 package meta.claw.core.memory.shortterm;
 
-import meta.claw.core.memory.MemoryEntry;
+import meta.claw.core.memory.MemoryMessage;
+import meta.claw.core.memory.SessionMemory;
 
 import java.util.List;
 
@@ -9,16 +10,18 @@ import java.util.List;
  */
 public interface ShortMemoryStore {
     void initializeConversation(String sessionKey);
-    void appendEntry(String sessionKey, MemoryEntry entry);
-    List<MemoryEntry> getHistory(String sessionKey, int limit);
+    void appendMessage(String sessionKey, MemoryMessage message);
+    List<MemoryMessage> getHistory(String sessionKey, int limit);
 
-    default List<MemoryEntry> getHistory(String sessionKey) {
+    default List<MemoryMessage> getHistory(String sessionKey) {
         return getHistory(sessionKey, 0);
     }
 
-    List<MemoryEntry> listSessions(String vesselId);
+    List<SessionMemory> listSessions(String vesselId);
     boolean clearHistory(String sessionKey);
     boolean conversationExists(String sessionKey);
-    List<MemoryEntry> getHistoryByToken(String sessionKey, int maxTokens);
-    String summarizeConversation(List<MemoryEntry> history);
+    List<MemoryMessage> getHistoryByToken(String sessionKey, int maxTokens);
+    SessionMemory loadSummary(String sessionKey);
+    void saveSummary(String sessionKey, SessionMemory summary);
+    String summarizeConversation(List<MemoryMessage> history);
 }

@@ -1,6 +1,6 @@
 package meta.claw.store.memory.longterm;
 
-import meta.claw.core.memory.MemoryEntry;
+import meta.claw.core.memory.PreferenceMemory;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -20,8 +20,8 @@ class FileLongMemoryStoreTest {
         return new FileLongMemoryStore(tempDir);
     }
 
-    private MemoryEntry entry(String id, String content, String category) {
-        return MemoryEntry.builder()
+    private PreferenceMemory entry(String id, String content, String category) {
+        return PreferenceMemory.builder()
                 .id(id)
                 .content(content)
                 .category(category)
@@ -29,8 +29,8 @@ class FileLongMemoryStoreTest {
                 .build();
     }
 
-    private MemoryEntry entryWithMetadata(String id, String content, Map<String, Object> metadata) {
-        return MemoryEntry.builder()
+    private PreferenceMemory entryWithMetadata(String id, String content, Map<String, Object> metadata) {
+        return PreferenceMemory.builder()
                 .id(id)
                 .content(content)
                 .category("test")
@@ -45,7 +45,7 @@ class FileLongMemoryStoreTest {
         store.addPreference("vessel-1", entry("p1", "I like Java", "language"));
         store.addPreference("vessel-1", entry("p2", "I prefer Python", "language"));
 
-        List<MemoryEntry> results = store.lookupPreference("vessel-1", "java");
+        List<PreferenceMemory> results = store.lookupPreference("vessel-1", "java");
         assertEquals(1, results.size());
         assertEquals("I like Java", results.get(0).getContent());
     }
@@ -55,7 +55,7 @@ class FileLongMemoryStoreTest {
         FileLongMemoryStore store = createStore();
         store.addPreference("vessel-1", entry("p1", "Hello", "greeting"));
 
-        List<MemoryEntry> results = store.lookupPreference("vessel-1", "nonexistent");
+        List<PreferenceMemory> results = store.lookupPreference("vessel-1", "nonexistent");
         assertTrue(results.isEmpty());
     }
 
@@ -66,7 +66,7 @@ class FileLongMemoryStoreTest {
             store.addPreference("vessel-1", entry("p" + i, "Content " + i, "test"));
         }
 
-        List<MemoryEntry> results = store.listRecentPreferences("vessel-1", 5);
+        List<PreferenceMemory> results = store.listRecentPreferences("vessel-1", 5);
         assertEquals(5, results.size());
         assertEquals("Content 5", results.get(0).getContent());
         assertEquals("Content 9", results.get(4).getContent());
@@ -77,7 +77,7 @@ class FileLongMemoryStoreTest {
         FileLongMemoryStore store = createStore();
         store.addPreference("vessel-1", entry("p1", "One", "test"));
 
-        List<MemoryEntry> results = store.listRecentPreferences("vessel-1", 0);
+        List<PreferenceMemory> results = store.listRecentPreferences("vessel-1", 0);
         assertEquals(1, results.size());
     }
 
@@ -89,7 +89,7 @@ class FileLongMemoryStoreTest {
 
         assertTrue(store.deletePreference("vessel-1", "p1"));
 
-        List<MemoryEntry> results = store.listRecentPreferences("vessel-1", 0);
+        List<PreferenceMemory> results = store.listRecentPreferences("vessel-1", 0);
         assertEquals(1, results.size());
         assertEquals("Keep this", results.get(0).getContent());
     }
@@ -100,7 +100,7 @@ class FileLongMemoryStoreTest {
         store.addPreference("vessel-1", entry("p1", "Hello", "test"));
         assertTrue(store.clearPreferences("vessel-1"));
 
-        List<MemoryEntry> results = store.listRecentPreferences("vessel-1", 0);
+        List<PreferenceMemory> results = store.listRecentPreferences("vessel-1", 0);
         assertTrue(results.isEmpty());
     }
 
@@ -110,7 +110,7 @@ class FileLongMemoryStoreTest {
         store.addPreference("vessel-1", entryWithMetadata("p1", "With metadata",
                 Map.of("key1", "value1", "key2", 42)));
 
-        List<MemoryEntry> results = store.lookupPreference("vessel-1", "value1");
+        List<PreferenceMemory> results = store.lookupPreference("vessel-1", "value1");
         assertEquals(1, results.size());
         assertNotNull(results.get(0).getMetadata());
         assertEquals("value1", results.get(0).getMetadata().get("key1"));
@@ -122,7 +122,7 @@ class FileLongMemoryStoreTest {
         FileLongMemoryStore store = createStore();
         store.addPreference("vessel-1", entry("p1", "Content", "favorite-color"));
 
-        List<MemoryEntry> results = store.lookupPreference("vessel-1", "favorite-color");
+        List<PreferenceMemory> results = store.lookupPreference("vessel-1", "favorite-color");
         assertEquals(1, results.size());
     }
 }
