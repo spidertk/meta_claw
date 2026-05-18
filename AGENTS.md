@@ -23,6 +23,17 @@
 - 实现过程中不要悄悄改弱验证规则。
 - 优先依赖仓库里的持久化文件，而不是聊天记录。
 
+## 开发规范
+
+- 业务逻辑对象默认交给 Spring 容器管理。
+  - 可复用的 service、manager、loader、converter、provider、factory 等，优先使用 `@Component`、`@Service`、`@Repository`、`@Configuration` 等方式纳入容器，并通过构造注入协作。
+  - 业务调用链中不得直接 `new` 业务服务或可复用组件；如果对象依赖运行时参数，优先使用 Spring 管理的 provider / prototype bean，而不是在调用方手工拼装依赖图。
+- DTO / 值对象统一使用 Lombok builder 风格。
+  - 新增 DTO、事件对象、消息对象、配置快照对象等数据载体时，默认提供 `@Builder`。
+  - 调用方创建 DTO / 值对象时，统一使用 `Type.builder()...build()`，不要直接 `new Type(...)`。
+  - 只有集合、`StringBuilder`、reader、lock、第三方 SDK 回调等纯临时对象，才允许直接构造。
+- 代码评审时，默认把“手工 `new` 业务对象”和“DTO 直接 `new`”视为需要解释或修正的设计问题。
+
 ## 必需文件
 
 - `feature_list.json`：功能状态的唯一事实来源
