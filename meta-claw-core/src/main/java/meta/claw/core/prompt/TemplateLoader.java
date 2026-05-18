@@ -1,9 +1,11 @@
 package meta.claw.core.prompt;
 
+import org.springframework.stereotype.Component;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 
+@Component
 public class TemplateLoader {
     private static final String SYSTEM_TEMPLATE = "templates/system.tmpl.md";
     private static final String CONTEXT_TEMPLATE = "templates/context.tmpl.md";

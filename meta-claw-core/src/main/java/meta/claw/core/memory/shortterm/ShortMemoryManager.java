@@ -6,10 +6,14 @@ import meta.claw.core.spi.llm.SpiMessage;
 
 import java.util.List;
 import java.util.Map;
+import org.springframework.context.annotation.Scope;
+import org.springframework.stereotype.Component;
 
 /**
  * 短期记忆编排器。
  */
+@Component
+@Scope("prototype")
 public class ShortMemoryManager {
     private final ShortMemoryStore store;
 

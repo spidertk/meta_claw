@@ -16,12 +16,16 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.stream.Collectors;
+import org.springframework.context.annotation.Scope;
+import org.springframework.stereotype.Component;
 
 /**
  * 基于 JSONL 文件的用户偏好存储实现
  * 每个 Vessel 拥有独立的 preferences.jsonl 文件，存储用户偏好、个人习惯等信息
  */
 @Slf4j
+@Component
+@Scope("prototype")
 public class FileLongMemoryStore implements LongMemoryStore {
 
     private final Path baseDir;

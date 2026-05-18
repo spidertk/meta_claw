@@ -3,7 +3,7 @@ package meta.claw.cli;
 import meta.claw.core.config.VesselConfig;
 import meta.claw.core.memory.MemoryEntry;
 import meta.claw.core.memory.shortterm.ShortMemoryManager;
-import meta.claw.store.memory.MemoryManagerFactory;
+import meta.claw.store.memory.MemoryManagerProvider;
 import meta.claw.vessel.ProjectRootFinder;
 import meta.claw.vessel.VesselConfigResolver;
 import org.springframework.stereotype.Component;
@@ -21,9 +21,11 @@ public class SessionsCommand implements Runnable {
     private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
     private final VesselConfigResolver resolver;
+    private final MemoryManagerProvider memoryManagerProvider;
 
-    public SessionsCommand(VesselConfigResolver resolver) {
+    public SessionsCommand(VesselConfigResolver resolver, MemoryManagerProvider memoryManagerProvider) {
         this.resolver = resolver;
+        this.memoryManagerProvider = memoryManagerProvider;
     }
 
     @Parameters(index = "0", defaultValue = "default", description = "Vessel name")
@@ -35,8 +37,8 @@ public class SessionsCommand implements Runnable {
         try {
             var resolved = resolver.resolve(configDir, vesselName);
             VesselConfig config = resolved.getVesselConfig();
-            MemoryManagerFactory memoryManagerFactory = new MemoryManagerFactory(configDir.resolve("vessels"));
-            ShortMemoryManager memoryManager = memoryManagerFactory.createShortTerm(config.getMemory(), vesselName);
+            ShortMemoryManager memoryManager = memoryManagerProvider.createShortTerm(
+                    configDir.resolve("vessels"), config.getMemory(), vesselName);
             printSessions(vesselName, memoryManager.listSessions(vesselName));
             return;
         } catch (IllegalStateException | IllegalArgumentException e) {

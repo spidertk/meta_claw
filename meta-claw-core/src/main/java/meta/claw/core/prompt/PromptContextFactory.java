@@ -12,12 +12,14 @@ import java.time.format.DateTimeFormatter;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
+import org.springframework.stereotype.Component;
 
 /**
  * 从 VesselConfig 构建 PromptContext 的工厂。
  * 负责提取 Vessel 配置、格式化运行时信息、读取用户偏好。
  */
 @RequiredArgsConstructor
+@Component
 public class PromptContextFactory {
 
     private static final DateTimeFormatter TIME_FORMATTER =

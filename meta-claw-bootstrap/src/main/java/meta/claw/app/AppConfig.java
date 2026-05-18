@@ -9,7 +9,9 @@ import meta.claw.core.runtime.AgentLoop;
 import meta.claw.core.runtime.VesselManager;
 import meta.claw.core.runtime.VesselRuntime;
 import meta.claw.core.config.VesselConfig;
+import meta.claw.core.config.VesselConfigLoader;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -91,8 +93,8 @@ public class AppConfig {
      * @return VesselManager 实例
      */
     @Bean
-    public VesselManager vesselManager() {
-        VesselManager manager = new VesselManager(vesselsDir);
+    public VesselManager vesselManager(VesselConfigLoader vesselConfigLoader) {
+        VesselManager manager = new VesselManager(vesselsDir, vesselConfigLoader);
         manager.loadVessels();
         return manager;
     }
@@ -124,10 +126,11 @@ public class AppConfig {
      * @return WeixinChannel 实例
      */
     @Bean
-    public WeixinChannel weixinChannel(Gateway gateway) {
+    public WeixinChannel weixinChannel(Gateway gateway,
+                                       meta.claw.gateway.weixin.WeixinMessageConverter converter) {
         WeixinConfig config = new WeixinConfig();
         config.setToken(weixinToken);
-        return new WeixinChannel(config, gateway);
+        return new WeixinChannel(config, gateway, converter);
     }
 
     /**
@@ -141,9 +144,10 @@ public class AppConfig {
      * @param vesselManager Vessel 管理器，包含已加载的 Vessel 配置
      * @param chatClient    Spring AI ChatClient，底层 AI 模型对话客户端
      */
-    public void initializeRuntimes(VesselManager vesselManager, ChatClient chatClient) {
+    public void initializeRuntimes(VesselManager vesselManager, ChatClient chatClient,
+                                   ObjectProvider<VesselRuntime> runtimes) {
         for (VesselConfig config : vesselManager.listAvailableVessels()) {
-            VesselRuntime runtime = new VesselRuntime(config, chatClient);
+            VesselRuntime runtime = runtimes.getObject(config, chatClient);
             vesselManager.registerRuntime(config.getId(), runtime);
         }
     }

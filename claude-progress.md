@@ -209,6 +209,25 @@
 - 下一步最佳动作：
   1. 由用户决定下一项优先级
 
+### Session 010
+
+- 日期：2026-05-18
+- 本轮目标：把主链业务对象改为 Spring 托管装配，移除业务调用链上的手工 `new`
+- 已完成：
+  - 将 prompt、vessel template、config loader、weixin converter 改为 Spring 组件
+  - 新增 `MemoryManagerProvider`，通过 prototype bean 统一获取 short-term / long-term manager 与 store
+  - 删除 `MemoryManagerFactory`
+  - `ChatCommand`、`SessionsCommand`、`VesselRuntime`、`VesselManager`、`InitCommand`、`CreateCommand`、`WeixinChannel` 改为注入式依赖
+  - `SpringAiLlmClient` 与 `VesselRuntime` 改为 prototype bean，由 Spring 根据运行时参数创建
+  - 清理生产代码中原先那批手工业务装配 `new`
+- 运行过的验证：
+  - 生产代码扫描：`rg -n "new (MemoryManagerFactory|PromptContextFactory|TemplateLoader|SystemPromptBuilder|VesselTemplate|WeixinMessageConverter|VesselRuntime|VesselConfigLoader)\\(" ...` → 无结果
+  - `./init.sh`（沙箱外真实环境）→ 成功；完成全仓编译并通过 P0 测试集
+- 已知风险或未解决问题：
+  - 当前 prototype provider 仍属于运行时装配边界；若后续 backend 类型继续增加，最好把 backend 名称与 provider 映射进一步抽象成注册表
+- 下一步最佳动作：
+  1. 由用户决定下一项优先级
+
 ### Session 007
 
 - 日期：2026-05-17

@@ -23,11 +23,15 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import org.springframework.context.annotation.Scope;
+import org.springframework.stereotype.Component;
 
 /**
  * 基于 JSONL 文件的短期记忆 backend。
  */
 @Slf4j
+@Component
+@Scope("prototype")
 public class JsonlShortMemoryStore implements ShortMemoryStore {
 
     private static final Pattern BASE64_PATTERN = Pattern.compile(

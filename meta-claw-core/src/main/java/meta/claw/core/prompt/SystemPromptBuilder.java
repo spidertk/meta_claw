@@ -1,6 +1,7 @@
 package meta.claw.core.prompt;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Component;
 
 import java.util.stream.Collectors;
 
@@ -9,6 +10,7 @@ import java.util.stream.Collectors;
  * 加载模板，用 PromptContext 数据替换占位符，生成完整的系统提示。
  */
 @RequiredArgsConstructor
+@Component
 public class SystemPromptBuilder {
 
     private final TemplateLoader templateLoader;

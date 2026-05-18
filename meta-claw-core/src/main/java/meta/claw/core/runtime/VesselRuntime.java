@@ -7,7 +7,6 @@ import meta.claw.core.config.VesselConfig;
 import meta.claw.core.prompt.PromptContext;
 import meta.claw.core.prompt.PromptContextFactory;
 import meta.claw.core.prompt.SystemPromptBuilder;
-import meta.claw.core.prompt.TemplateLoader;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.messages.SystemMessage;
@@ -16,6 +15,8 @@ import org.springframework.ai.chat.prompt.Prompt;
 
 import java.nio.file.Path;
 import java.util.List;
+import org.springframework.context.annotation.Scope;
+import org.springframework.stereotype.Component;
 
 /**
  * Vessel 核心运行时类
@@ -26,6 +27,8 @@ import java.util.List;
  * </p>
  */
 @Slf4j
+@Component
+@Scope("prototype")
 public class VesselRuntime {
 
     /**
@@ -37,6 +40,8 @@ public class VesselRuntime {
      * Spring AI 对话客户端，负责与底层 AI 模型进行交互
      */
     private final ChatClient chatClient;
+    private final PromptContextFactory promptContextFactory;
+    private final SystemPromptBuilder systemPromptBuilder;
 
     /**
      * 构造方法：根据 Vessel 配置和 ChatClient 初始化运行时实例
@@ -44,9 +49,13 @@ public class VesselRuntime {
      * @param config     Vessel 配置对象，包含系统提示词等元数据
      * @param chatClient Spring AI ChatClient，底层 AI 模型对话客户端
      */
-    public VesselRuntime(VesselConfig config, ChatClient chatClient) {
+    public VesselRuntime(VesselConfig config, ChatClient chatClient,
+                         PromptContextFactory promptContextFactory,
+                         SystemPromptBuilder systemPromptBuilder) {
         this.config = config;
         this.chatClient = chatClient;
+        this.promptContextFactory = promptContextFactory;
+        this.systemPromptBuilder = systemPromptBuilder;
         if (config != null) {
             log.info("VesselRuntime 初始化完成: vesselId={}, model={}, systemPromptLength={}",
                     config.getId(), config.getModel(),
@@ -62,10 +71,8 @@ public class VesselRuntime {
         }
         // Phase 2: Fall back to SystemPromptBuilder if no static systemPrompt configured
         try {
-            PromptContextFactory factory = new PromptContextFactory();
-            PromptContext ctx = factory.create(config, Path.of("."), null);
-            SystemPromptBuilder builder = new SystemPromptBuilder(new TemplateLoader());
-            return builder.build(ctx);
+            PromptContext ctx = promptContextFactory.create(config, Path.of("."), null);
+            return systemPromptBuilder.build(ctx);
         } catch (Exception e) {
             log.warn("Failed to build dynamic system prompt for vessel {}, fallback to null", config.getId(), e);
             return null;

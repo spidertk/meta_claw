@@ -4,6 +4,7 @@ import lombok.extern.slf4j.Slf4j;
 import meta.claw.core.config.GlobalConfig;
 import meta.claw.core.config.ProviderConfig;
 import org.yaml.snakeyaml.Yaml;
+import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -12,6 +13,7 @@ import java.nio.file.Path;
 import java.util.Map;
 
 @Slf4j
+@Component
 public class GlobalConfigLoader {
 
     private static final String CONFIG_FILE = "config.yaml";

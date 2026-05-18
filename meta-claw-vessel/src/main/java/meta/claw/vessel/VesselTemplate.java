@@ -1,6 +1,7 @@
 package meta.claw.vessel;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -11,6 +12,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.Map;
 
 @Slf4j
+@Component
 public class VesselTemplate {
 
     private static final String VESSEL_CONFIG_TEMPLATE = "/templates/vessel-config.tmpl.yaml";

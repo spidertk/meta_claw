@@ -20,6 +20,11 @@ import java.nio.file.Paths;
 @Component
 @Command(name = "create", description = "Create a new vessel")
 public class CreateCommand implements Runnable {
+    private final VesselTemplate vesselTemplate;
+
+    public CreateCommand(VesselTemplate vesselTemplate) {
+        this.vesselTemplate = vesselTemplate;
+    }
 
     @Parameters(index = "0", description = "Vessel name")
     private String vesselName;
@@ -37,8 +42,7 @@ public class CreateCommand implements Runnable {
         }
 
         try {
-            VesselTemplate template = new VesselTemplate();
-            template.createVessel(vesselsDir, vesselName,
+            vesselTemplate.createVessel(vesselsDir, vesselName,
                     description != null ? description : "A customized AI vessel for specific tasks.");
             System.out.println("Created vessel: " + vesselName);
             System.out.println("Edit .meta-claw/vessels/" + vesselName + "/vessel.md to customize.");

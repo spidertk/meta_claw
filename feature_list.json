@@ -316,6 +316,32 @@
         }
       ],
       "notes": "`ShortMemoryStore` 现直接承载轮数裁剪、token 裁剪与摘要接口；`PromptContextFactory` 直接依赖 `LongMemoryStore`。"
+    },
+    {
+      "id": "spring-wiring-001",
+      "priority": 11,
+      "area": "architecture",
+      "title": "把主链业务装配迁入 Spring",
+      "user_visible_behavior": "主链业务对象由 Spring 统一管理，后续扩展不再需要在调用链里手工拼装依赖图。",
+      "status": "passing",
+      "verification": [
+        "确认主链业务类不再直接 `new` 已纳入 Spring 管理的组件。",
+        "确认 memory backend 由 Spring 托管 provider 创建。",
+        "运行 ./init.sh。"
+      ],
+      "evidence": [
+        {
+          "date": "2026-05-18",
+          "result": "passing",
+          "detail": "prompt、vessel、weixin 与 memory 主链组件已改为 Spring 管理；`MemoryManagerFactory` 已删除。"
+        },
+        {
+          "date": "2026-05-18",
+          "result": "verified",
+          "detail": "生产代码扫描已无目标手工业务装配 `new`；新版 ./init.sh 在真实环境中通过。"
+        }
+      ],
+      "notes": "值对象、集合、第三方请求对象仍正常直接构造；本轮目标是清理业务服务装配，而不是机械消灭所有 `new`。"
     }
   ]
 }

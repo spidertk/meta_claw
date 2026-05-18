@@ -43,21 +43,11 @@ public class VesselManager {
      * vessels 目录的绝对路径
      */
     private final String vesselsDir;
+    private final VesselConfigLoader vesselConfigLoader;
 
-    /**
-     * 构造方法：使用默认 vessels 目录
-     */
-    public VesselManager() {
-        this(DEFAULT_VESSELS_DIR);
-    }
-
-    /**
-     * 构造方法：指定 vessels 目录
-     *
-     * @param vesselsDir vessels 配置目录路径
-     */
-    public VesselManager(String vesselsDir) {
+    public VesselManager(String vesselsDir, VesselConfigLoader vesselConfigLoader) {
         this.vesselsDir = vesselsDir;
+        this.vesselConfigLoader = vesselConfigLoader;
     }
 
     /**
@@ -68,8 +58,7 @@ public class VesselManager {
      * </p>
      */
     public void loadVessels() {
-        VesselConfigLoader loader = new VesselConfigLoader();
-        List<VesselConfig> loaded = loader.loadFromDirectory(Path.of(vesselsDir));
+        List<VesselConfig> loaded = vesselConfigLoader.loadFromDirectory(Path.of(vesselsDir));
         for (VesselConfig config : loaded) {
             if (config.getId() != null && !config.getId().isEmpty()) {
                 vessels.put(config.getId(), config);

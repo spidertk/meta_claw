@@ -15,6 +15,8 @@ import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.ToolResponseMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.context.annotation.Scope;
+import org.springframework.stereotype.Component;
 
 import reactor.core.publisher.Flux;
 
@@ -26,6 +28,8 @@ import java.util.stream.Collectors;
  * 基于 Spring AI 1.0.6 ChatClient 的 SpiLlmClient 实现。
  */
 @Slf4j
+@Component
+@Scope("prototype")
 public class SpringAiLlmClient implements SpiLlmClient {
 
     private final ChatClient chatClient;

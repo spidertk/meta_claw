@@ -2,6 +2,7 @@ package meta.claw.core.config;
 
 import lombok.extern.slf4j.Slf4j;
 import org.yaml.snakeyaml.Yaml;
+import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -17,6 +18,7 @@ import java.util.stream.Stream;
  *  数字员工模版内的个性化数据加载
  */
 @Slf4j
+@Component
 public class VesselConfigLoader {
 
     private static final String VESSEL_MD = "vessel.md";

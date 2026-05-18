@@ -65,9 +65,9 @@ public class WeixinChannel extends ChatChannel {
      * @param config  微信配置对象，包含 token 等连接参数
      * @param gateway 网关控制器，用于入站消息直推 EventBus
      */
-    public WeixinChannel(WeixinConfig config, Gateway gateway) {
+    public WeixinChannel(WeixinConfig config, Gateway gateway, WeixinMessageConverter converter) {
         this.config = config;
-        this.converter = new WeixinMessageConverter();
+        this.converter = converter;
         this.gateway = gateway;
     }
 

@@ -6,7 +6,6 @@ import meta.claw.core.memory.longterm.LongMemoryManager;
 import meta.claw.core.prompt.PromptContext;
 import meta.claw.core.prompt.PromptContextFactory;
 import meta.claw.core.prompt.SystemPromptBuilder;
-import meta.claw.core.prompt.TemplateLoader;
 import meta.claw.core.runtime.SpringAiLlmClient;
 import meta.claw.core.spi.llm.LlmClientFactoryManager;
 import meta.claw.core.spi.llm.SpiChatRequest;
@@ -22,12 +21,13 @@ import meta.claw.vessel.VesselConfigResolver;
 import org.jline.terminal.Terminal;
 import org.jline.terminal.TerminalBuilder;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
 
-import meta.claw.store.memory.MemoryManagerFactory;
+import meta.claw.store.memory.MemoryManagerProvider;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -45,10 +45,22 @@ public class ChatCommand implements Runnable {
 
     private final LlmClientFactoryManager factoryManager;
     private final VesselConfigResolver resolver;
+    private final MemoryManagerProvider memoryManagerProvider;
+    private final PromptContextFactory contextFactory;
+    private final SystemPromptBuilder promptBuilder;
+    private final ObjectProvider<SpringAiLlmClient> llmClients;
 
-    public ChatCommand(LlmClientFactoryManager factoryManager, VesselConfigResolver resolver) {
+    public ChatCommand(LlmClientFactoryManager factoryManager, VesselConfigResolver resolver,
+                       MemoryManagerProvider memoryManagerProvider,
+                       PromptContextFactory contextFactory,
+                       SystemPromptBuilder promptBuilder,
+                       ObjectProvider<SpringAiLlmClient> llmClients) {
         this.factoryManager = factoryManager;
         this.resolver = resolver;
+        this.memoryManagerProvider = memoryManagerProvider;
+        this.contextFactory = contextFactory;
+        this.promptBuilder = promptBuilder;
+        this.llmClients = llmClients;
     }
 
     @Parameters(index = "0", defaultValue = "default", description = "Vessel name")
@@ -113,13 +125,12 @@ public class ChatCommand implements Runnable {
                 .baseUrl(providerConfig.getBaseUrl())
                 .build();
 
-        SpringAiLlmClient llmClient = new SpringAiLlmClient(chatClient, meta);
+        SpringAiLlmClient llmClient = llmClients.getObject(chatClient, meta);
 
         // Initialize memory managers and session
         Path vesselsDir = configDir.resolve("vessels");
-        MemoryManagerFactory memoryManagerFactory = new MemoryManagerFactory(vesselsDir);
-        this.shortMemoryManager = memoryManagerFactory.createShortTerm(vesselConfig.getMemory(), vesselName);
-        LongMemoryManager longMemoryManager = memoryManagerFactory.createLongTerm(vesselConfig.getMemory());
+        this.shortMemoryManager = memoryManagerProvider.createShortTerm(vesselsDir, vesselConfig.getMemory(), vesselName);
+        LongMemoryManager longMemoryManager = memoryManagerProvider.createLongTerm(vesselsDir, vesselConfig.getMemory());
         if (resumeSessionId != null && !resumeSessionId.isBlank()) {
             if (!shortMemoryManager.conversationExists(resumeSessionId)) {
                 System.err.println("Session not found for vessel '" + vesselName + "': " + resumeSessionId);
@@ -153,10 +164,7 @@ public class ChatCommand implements Runnable {
         terminal.flush();
 
         // Phase 2: Build dynamic system prompt via SystemPromptBuilder
-        PromptContextFactory contextFactory = new PromptContextFactory();
         PromptContext promptContext = contextFactory.create(vesselConfig, configDir, longMemoryManager);
-        TemplateLoader templateLoader = new TemplateLoader();
-        SystemPromptBuilder promptBuilder = new SystemPromptBuilder(templateLoader);
         String systemPrompt = promptBuilder.build(promptContext);
 
         ShortMemoryManager memoryManager = shortMemoryManager;

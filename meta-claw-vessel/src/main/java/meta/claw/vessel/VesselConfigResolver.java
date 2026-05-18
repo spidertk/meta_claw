@@ -24,10 +24,6 @@ public class VesselConfigResolver {
     private final GlobalConfigLoader globalConfigLoader;
     private final VesselConfigLoader vesselConfigLoader;
 
-    public VesselConfigResolver() {
-        this(new GlobalConfigLoader(), new VesselConfigLoader());
-    }
-
     public VesselConfigResolver(GlobalConfigLoader globalConfigLoader,
                                  VesselConfigLoader vesselConfigLoader) {
         this.globalConfigLoader = globalConfigLoader;

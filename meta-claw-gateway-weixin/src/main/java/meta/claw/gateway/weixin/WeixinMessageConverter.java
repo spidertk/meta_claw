@@ -3,6 +3,7 @@ package meta.claw.gateway.weixin;
 import com.openilink.model.WeixinMessage;
 import com.openilink.util.MessageHelper;
 import meta.claw.gateway.channel.ChatMessage;
+import org.springframework.stereotype.Component;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -13,6 +14,7 @@ import java.time.ZoneId;
  * 负责将 openilink SDK 的原始 {@link WeixinMessage} 对象转换为系统内部统一的 {@link ChatMessage}。
  * 转换后的 ChatMessage 可直接进入 Gateway 的事件总线流程。
  */
+@Component
 public class WeixinMessageConverter {
 
     /**

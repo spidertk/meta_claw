@@ -5,10 +5,14 @@ import meta.claw.core.memory.MemoryEntry;
 
 import java.util.List;
 import java.util.Map;
+import org.springframework.context.annotation.Scope;
+import org.springframework.stereotype.Component;
 
 /**
  * 长期记忆编排器。
  */
+@Component
+@Scope("prototype")
 public class LongMemoryManager implements LongMemoryStore {
     private final LongMemoryStore store;
 

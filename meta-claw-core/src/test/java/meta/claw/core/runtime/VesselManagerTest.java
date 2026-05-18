@@ -9,6 +9,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.*;
+import meta.claw.core.prompt.PromptContextFactory;
+import meta.claw.core.prompt.SystemPromptBuilder;
+import meta.claw.core.prompt.TemplateLoader;
+import meta.claw.core.config.VesselConfigLoader;
 
 class VesselManagerTest {
 
@@ -56,7 +60,7 @@ class VesselManagerTest {
             """;
         createVesselDir("test-vessel", configYaml, vesselMd);
 
-        VesselManager manager = new VesselManager(tempDir.toString());
+        VesselManager manager = new VesselManager(tempDir.toString(), new VesselConfigLoader());
         manager.loadVessels();
 
         assertTrue(manager.hasVessel("test-vessel"));
@@ -74,7 +78,7 @@ class VesselManagerTest {
 
     @Test
     void loadVessels_shouldHandleMissingDirectory() {
-        VesselManager manager = new VesselManager("/nonexistent/path");
+        VesselManager manager = new VesselManager("/nonexistent/path", new VesselConfigLoader());
         assertDoesNotThrow(manager::loadVessels);
         assertTrue(manager.listAvailableVessels().isEmpty());
     }
@@ -87,7 +91,7 @@ class VesselManagerTest {
             """;
         createVesselDir("no-id-vessel", configYaml, null);
 
-        VesselManager manager = new VesselManager(tempDir.toString());
+        VesselManager manager = new VesselManager(tempDir.toString(), new VesselConfigLoader());
         manager.loadVessels();
 
         assertFalse(manager.hasVessel("no-id-vessel"));
@@ -102,13 +106,18 @@ class VesselManagerTest {
             """;
         createVesselDir("runtime-test", configYaml, null);
 
-        VesselManager manager = new VesselManager(tempDir.toString());
+        VesselManager manager = new VesselManager(tempDir.toString(), new VesselConfigLoader());
         manager.loadVessels();
 
         assertEquals(1, manager.listAvailableVessels().size());
         assertNotNull(manager.getConfig("runtime-test"));
 
-        VesselRuntime mockRuntime = new VesselRuntime(manager.getConfig("runtime-test"), null);
+        VesselRuntime mockRuntime = new VesselRuntime(
+                manager.getConfig("runtime-test"),
+                null,
+                new PromptContextFactory(),
+                new SystemPromptBuilder(new TemplateLoader())
+        );
         manager.registerRuntime("runtime-test", mockRuntime);
 
         assertNotNull(manager.getRuntime("runtime-test"));

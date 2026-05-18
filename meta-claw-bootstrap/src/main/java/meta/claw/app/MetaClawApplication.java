@@ -15,6 +15,7 @@ import org.springframework.boot.context.event.ApplicationEnvironmentPreparedEven
 import org.springframework.boot.logging.LogLevel;
 import org.springframework.boot.logging.LoggingSystem;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationListener;
 
 import java.nio.file.Path;
@@ -69,6 +70,9 @@ public class MetaClawApplication implements CommandLineRunner {
     @Autowired
     private AgentLoop agentLoop;
 
+    @Autowired
+    private ObjectProvider<meta.claw.core.runtime.VesselRuntime> vesselRuntimes;
+
     /**
      * 应用程序主入口
      *
@@ -110,7 +114,7 @@ public class MetaClawApplication implements CommandLineRunner {
     public void run(String... args) {
         // 步骤 1：为所有已加载的 Vessel 创建运行时实例
         ChatClient chatClient = chatClientBuilder.build();
-        appConfig.initializeRuntimes(vesselManager, chatClient);
+        appConfig.initializeRuntimes(vesselManager, chatClient, vesselRuntimes);
 
         // 步骤 2：注册并启动微信渠道
         gateway.registerChannel(weixinChannel);
