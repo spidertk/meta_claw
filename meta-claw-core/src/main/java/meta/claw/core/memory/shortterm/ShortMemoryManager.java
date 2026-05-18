@@ -2,8 +2,6 @@ package meta.claw.core.memory.shortterm;
 
 import meta.claw.core.config.MemoryConfig;
 import meta.claw.core.memory.MemoryEntry;
-import meta.claw.core.spi.llm.SpiMessage;
-
 import java.util.List;
 import java.util.Map;
 import org.springframework.context.annotation.Scope;
@@ -23,15 +21,15 @@ public class ShortMemoryManager {
         this.store = requireStore(stores, backend);
     }
 
-    public void appendMessage(String sessionKey, SpiMessage message) {
-        store.appendMessage(sessionKey, message);
+    public void appendEntry(String sessionKey, MemoryEntry entry) {
+        store.appendEntry(sessionKey, entry);
     }
 
     public void initializeConversation(String sessionKey) {
         store.initializeConversation(sessionKey);
     }
 
-    public List<SpiMessage> getHistory(String sessionKey) {
+    public List<MemoryEntry> getHistory(String sessionKey) {
         return store.getHistory(sessionKey);
     }
 
@@ -47,15 +45,15 @@ public class ShortMemoryManager {
         return store.conversationExists(sessionKey);
     }
 
-    public List<SpiMessage> truncateByRound(List<SpiMessage> history, int maxRounds) {
-        return store.truncateByRound(history, maxRounds);
+    public List<MemoryEntry> getHistory(List<MemoryEntry> history, int maxRounds) {
+        return store.getHistory(history, maxRounds);
     }
 
-    public List<SpiMessage> truncateByToken(List<SpiMessage> history, int maxTokens) {
-        return store.truncateByToken(history, maxTokens);
+    public List<MemoryEntry> getHistoryByToken(List<MemoryEntry> history, int maxTokens) {
+        return store.getHistoryByToken(history, maxTokens);
     }
 
-    public String summarizeConversation(List<SpiMessage> history) {
+    public String summarizeConversation(List<MemoryEntry> history) {
         return store.summarizeConversation(history);
     }
 

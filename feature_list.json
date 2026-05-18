@@ -395,6 +395,34 @@
         }
       ],
       "notes": "新写入记录以 `metadata.role` 保存角色；旧历史文件不会自动迁移，但仍能正常读取。"
+    },
+    {
+      "id": "memory-004",
+      "priority": 14,
+      "area": "memory",
+      "title": "短期记忆接口统一为 MemoryEntry",
+      "user_visible_behavior": "短期记忆只暴露统一记忆实体，窗口裁剪和会话读取都遵循一套契约，后续扩展不再混用传输模型。",
+      "status": "passing",
+      "verification": [
+        "确认 `ShortMemoryStore` 与 `ShortMemoryManager` 出入参统一为 `MemoryEntry`。",
+        "确认 `truncateByRound` 已改名为 `getHistory`。",
+        "确认 `truncateByToken` 已改名为 `getHistoryByToken`。",
+        "确认转换逻辑集中在 `MemoryEntryConverter`。",
+        "运行 core/store/cli 相关定向测试。"
+      ],
+      "evidence": [
+        {
+          "date": "2026-05-18",
+          "result": "passing",
+          "detail": "新增 `MemoryEntryConverter`；短期记忆接口、manager 与 JSONL store 已统一切换为 `MemoryEntry`。"
+        },
+        {
+          "date": "2026-05-18",
+          "result": "verified",
+          "detail": "`MemoryEntryConverterTest`、`JsonlShortMemoryStoreTest`、`ChatCommandTest` 定向通过；`./init.sh` 通过。"
+        }
+      ],
+      "notes": "CLI 继续面向 `SpiMessage` 与 LLM 交互，但转换仅发生在边界处。"
     }
   ]
 }

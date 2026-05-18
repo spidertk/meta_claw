@@ -242,6 +242,26 @@
 - 下一步最佳动作：
   1. 由用户决定下一项优先级
 
+### Session 013
+
+- 日期：2026-05-18
+- 本轮目标：把短期记忆接口层彻底统一为 `MemoryEntry`
+- 已完成：
+  - 新增 `MemoryEntryConverter`，集中处理 `SpiMessage` 与 `MemoryEntry` 转换
+  - `ShortMemoryStore` / `ShortMemoryManager` 出入参统一切换为 `MemoryEntry`
+  - `truncateByRound` 更名为重载 `getHistory`
+  - `truncateByToken` 更名为 `getHistoryByToken`
+  - `JsonlShortMemoryStore` 不再直接暴露 `SpiMessage`
+  - `ChatCommand` 在 CLI 边界显式做模型转换
+- 运行过的验证：
+  - `mvn test -pl meta-claw-core,meta-claw-store,meta-claw-cli -am -Dtest=MemoryEntryConverterTest,JsonlShortMemoryStoreTest,ChatCommandTest -Dsurefire.failIfNoSpecifiedTests=false` → 成功
+  - `./init.sh` → 成功；完成全仓编译并通过 P0 测试集
+- 已记录证据：
+  - `MemoryEntryConverterTest` 覆盖双向转换
+  - `JsonlShortMemoryStoreTest` 全部切到 `MemoryEntry`
+- 下一步最佳动作：
+  1. 由用户决定下一项优先级
+
 ### Session 010
 
 - 日期：2026-05-18

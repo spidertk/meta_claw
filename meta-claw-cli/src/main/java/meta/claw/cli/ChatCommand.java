@@ -1,6 +1,8 @@
 package meta.claw.cli;
 
 import lombok.extern.slf4j.Slf4j;
+import meta.claw.core.memory.MemoryEntry;
+import meta.claw.core.memory.MemoryEntryConverter;
 import meta.claw.core.memory.shortterm.ShortMemoryManager;
 import meta.claw.core.memory.longterm.LongMemoryManager;
 import meta.claw.core.prompt.PromptContext;
@@ -207,13 +209,17 @@ public class ChatCommand implements Runnable {
 
                 history.add(SpiMessage.user(input));
                 try {
-                    shortMemoryManager.appendMessage(sessionKey, SpiMessage.user(input));
+                    shortMemoryManager.appendEntry(sessionKey,
+                            MemoryEntryConverter.fromSpiMessage(sessionKey, SpiMessage.user(input)));
                 } catch (Exception e) {
                     log.error("Failed to persist user message", e);
                 }
 
                 // Phase 2: Truncate history before sending to LLM
-                List<SpiMessage> truncatedHistory = memoryManager.truncateByRound(history, maxHistoryRounds);
+                List<MemoryEntry> memoryHistory = history.stream()
+                        .map(message -> MemoryEntryConverter.fromSpiMessage(sessionKey, message))
+                        .toList();
+                List<SpiMessage> truncatedHistory = toSpiMessages(memoryManager.getHistory(memoryHistory, maxHistoryRounds));
                 SpiChatRequest request = SpiChatRequest.builder().messages(truncatedHistory).build();
 
                 terminal.writer().print("AI: ");
@@ -244,7 +250,8 @@ public class ChatCommand implements Runnable {
                         String responseText = responseBuffer.toString();
                         history.add(SpiMessage.assistant(responseText));
                         try {
-                            shortMemoryManager.appendMessage(sessionKey, SpiMessage.assistant(responseText));
+                            shortMemoryManager.appendEntry(sessionKey,
+                                    MemoryEntryConverter.fromSpiMessage(sessionKey, SpiMessage.assistant(responseText)));
                         } catch (Exception e) {
                             log.error("Failed to persist assistant message", e);
                         }
@@ -266,9 +273,10 @@ public class ChatCommand implements Runnable {
         terminal.writer().flush();
     }
 
-    static List<SpiMessage> toSpiMessages(List<SpiMessage> messages) {
+    static List<SpiMessage> toSpiMessages(List<MemoryEntry> entries) {
         List<SpiMessage> restored = new ArrayList<>();
-        for (SpiMessage message : messages) {
+        for (MemoryEntry entry : entries) {
+            SpiMessage message = MemoryEntryConverter.toSpiMessage(entry);
             if (message.role() == null) {
                 continue;
             }
