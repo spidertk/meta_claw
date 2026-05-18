@@ -18,6 +18,14 @@ class JsonlShortMemoryStoreTest {
     }
 
     @Test
+    void initializeConversation_shouldCreateEmptyHistoryFile() {
+        JsonlShortMemoryStore store = createStore();
+        store.initializeConversation("s0");
+        assertTrue(tempDir.resolve("vessel-a/conversations/s0/history.jsonl").toFile().exists());
+        assertTrue(store.getHistory("s0").isEmpty());
+    }
+
+    @Test
     void appendMessage_andGetHistory_roundTrip() {
         JsonlShortMemoryStore store = createStore();
         store.appendMessage("s1", SpiMessage.user("Hello"));

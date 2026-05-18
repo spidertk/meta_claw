@@ -209,6 +209,22 @@
 - 下一步最佳动作：
   1. 由用户决定下一项优先级
 
+### Session 011
+
+- 日期：2026-05-18
+- 本轮目标：修复 CLI 会话目录延迟创建，并把 prompt workspace 收敛到当前 Vessel 目录
+- 已完成：
+  - 为 `ShortMemoryStore` / `ShortMemoryManager` 增加 `initializeConversation(sessionKey)`
+  - 新会话创建时立即生成 `<vessel>/conversations/<session-id>/history.jsonl`
+  - `ChatCommand` 构建 prompt context 时，将 workspace 从 `.meta-claw` 根目录改为 `.meta-claw/vessels/<vessel>`
+- 运行过的验证：
+  - `mvn test -pl meta-claw-store -am -Dtest=JsonlShortMemoryStoreTest -Dsurefire.failIfNoSpecifiedTests=false` → 成功
+  - `./init.sh`（沙箱外真实环境）→ 成功；完成全仓编译并通过 P0 测试集
+- 已记录证据：
+  - `JsonlShortMemoryStoreTest` 新增“初始化会话即创建空 history 文件”覆盖
+- 下一步最佳动作：
+  1. 由用户决定下一项优先级
+
 ### Session 010
 
 - 日期：2026-05-18

@@ -342,6 +342,32 @@
         }
       ],
       "notes": "值对象、集合、第三方请求对象仍正常直接构造；本轮目标是清理业务服务装配，而不是机械消灭所有 `new`。"
+    },
+    {
+      "id": "chat-002",
+      "priority": 12,
+      "area": "chat",
+      "title": "会话建立时立即落盘并使用 Vessel 工作区",
+      "user_visible_behavior": "开始新会话后，当前 Vessel 下会立刻出现会话目录；系统提示中的 workspace 也指向当前 Vessel 自己的目录。",
+      "status": "passing",
+      "verification": [
+        "确认新会话创建时立即生成空 history.jsonl。",
+        "确认 prompt workspace 指向 .meta-claw/vessels/<vessel>。",
+        "运行 ./init.sh。"
+      ],
+      "evidence": [
+        {
+          "date": "2026-05-18",
+          "result": "passing",
+          "detail": "新增 `initializeConversation(sessionKey)`；`ChatCommand` 在新会话生成后立即初始化会话文件。"
+        },
+        {
+          "date": "2026-05-18",
+          "result": "verified",
+          "detail": "`JsonlShortMemoryStoreTest` 增加空 history 文件创建覆盖；新版 ./init.sh 在真实环境中通过。"
+        }
+      ],
+      "notes": "会话目录现在在会话生命周期开始时就可见，不再依赖第一条消息追加；workspace 以当前 Vessel 为边界。"
     }
   ]
 }

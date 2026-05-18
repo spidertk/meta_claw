@@ -27,6 +27,10 @@ public class ShortMemoryManager {
         store.appendMessage(sessionKey, message);
     }
 
+    public void initializeConversation(String sessionKey) {
+        store.initializeConversation(sessionKey);
+    }
+
     public List<SpiMessage> getHistory(String sessionKey) {
         return store.getHistory(sessionKey);
     }

@@ -9,6 +9,7 @@ import java.util.List;
  * 短期记忆 backend 契约。
  */
 public interface ShortMemoryStore {
+    void initializeConversation(String sessionKey);
     void appendMessage(String sessionKey, SpiMessage message);
     List<SpiMessage> getHistory(String sessionKey, int limit);
 

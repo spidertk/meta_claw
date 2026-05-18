@@ -53,13 +53,31 @@ public class JsonlShortMemoryStore implements ShortMemoryStore {
     }
 
     @Override
+    public void initializeConversation(String sessionKey) {
+        String vesselId = resolveVesselId(sessionKey);
+        Path filePath = getHistoryFilePath(vesselId, sessionKey);
+        ReentrantReadWriteLock lock = getLock(sessionKey);
+        lock.writeLock().lock();
+        try {
+            Files.createDirectories(filePath.getParent());
+            if (!Files.exists(filePath)) {
+                Files.createFile(filePath);
+            }
+        } catch (IOException e) {
+            throw new RuntimeException("Conversation initialization failed", e);
+        } finally {
+            lock.writeLock().unlock();
+        }
+    }
+
+    @Override
     public void appendMessage(String sessionKey, SpiMessage message) {
         String vesselId = resolveVesselId(sessionKey);
         ReentrantReadWriteLock lock = getLock(sessionKey);
         lock.writeLock().lock();
         try {
             Path filePath = getHistoryFilePath(vesselId, sessionKey);
-            Files.createDirectories(filePath.getParent());
+            initializeConversation(sessionKey);
             SpiMessage safeMessage = new SpiMessage(message.role(), stripBase64(message.content()), message.toolCalls());
             String jsonLine = objectMapper.writeValueAsString(safeMessage) + "\n";
             try (FileChannel channel = FileChannel.open(filePath,

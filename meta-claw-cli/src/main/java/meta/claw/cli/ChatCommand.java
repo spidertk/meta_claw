@@ -139,6 +139,7 @@ public class ChatCommand implements Runnable {
             this.sessionKey = resumeSessionId;
         } else {
             this.sessionKey = UUID.randomUUID().toString();
+            shortMemoryManager.initializeConversation(sessionKey);
         }
 
         String displayName = vesselConfig.getName() != null ? vesselConfig.getName() : vesselName;
@@ -164,7 +165,8 @@ public class ChatCommand implements Runnable {
         terminal.flush();
 
         // Phase 2: Build dynamic system prompt via SystemPromptBuilder
-        PromptContext promptContext = contextFactory.create(vesselConfig, configDir, longMemoryManager);
+        Path vesselWorkspaceDir = vesselsDir.resolve(vesselName);
+        PromptContext promptContext = contextFactory.create(vesselConfig, vesselWorkspaceDir, longMemoryManager);
         String systemPrompt = promptBuilder.build(promptContext);
 
         ShortMemoryManager memoryManager = shortMemoryManager;
