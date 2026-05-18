@@ -1,4 +1,4 @@
-package meta.claw.core.memory.longterm;
+package meta.claw.core.memory;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -10,38 +10,20 @@ import java.time.LocalDateTime;
 import java.util.Map;
 
 /**
- * 用户偏好条目
- * 记录用户偏好、个人习惯、工具使用模式等非领域知识信息
+ * 统一记忆实体。
  */
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 @Getter
 @Setter
-public class PreferenceEntry {
-
-    /**
-     * 偏好条目唯一标识
-     */
+public class MemoryEntry {
     private String id;
-
-    /**
-     * 时间戳
-     */
     private LocalDateTime timestamp;
-
-    /**
-     * 偏好类别：preference / fact / tool_usage / context
-     */
     private String category;
-
-    /**
-     * 偏好内容
-     */
     private String content;
-
-    /**
-     * 扩展元数据
-     */
     private Map<String, Object> metadata;
+    private String sessionId;
+    private LocalDateTime updatedAt;
+    private int messageCount;
 }

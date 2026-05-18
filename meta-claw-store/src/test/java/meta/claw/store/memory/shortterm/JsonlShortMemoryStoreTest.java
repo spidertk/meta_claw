@@ -1,6 +1,6 @@
 package meta.claw.store.memory.shortterm;
 
-import meta.claw.core.memory.shortterm.SessionSummary;
+import meta.claw.core.memory.MemoryEntry;
 import meta.claw.core.spi.llm.SpiMessage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -43,7 +43,7 @@ class JsonlShortMemoryStoreTest {
         JsonlShortMemoryStore b = new JsonlShortMemoryStore(tempDir, "vessel-b");
         a.appendMessage("a1", SpiMessage.user("A"));
         b.appendMessage("b1", SpiMessage.user("B"));
-        List<SessionSummary> sessions = a.listSessions("vessel-a");
+        List<MemoryEntry> sessions = a.listSessions("vessel-a");
         assertEquals(1, sessions.size());
         assertEquals("a1", sessions.get(0).getSessionId());
     }
@@ -61,5 +61,34 @@ class JsonlShortMemoryStoreTest {
         JsonlShortMemoryStore store = createStore();
         store.appendMessage("s1", SpiMessage.user("See data:image/png;base64," + "A".repeat(300)));
         assertTrue(store.getHistory("s1").get(0).content().contains("[media:image/png:base64:<stripped>]"));
+    }
+
+    @Test
+    void truncateByRound_shouldKeepSystemAndRecentRounds() {
+        JsonlShortMemoryStore store = createStore();
+        List<SpiMessage> result = store.truncateByRound(List.of(
+                SpiMessage.system("system"),
+                SpiMessage.user("u1"),
+                SpiMessage.assistant("a1"),
+                SpiMessage.user("u2"),
+                SpiMessage.assistant("a2")
+        ), 1);
+        assertEquals(3, result.size());
+        assertEquals("system", result.get(0).content());
+        assertEquals("u2", result.get(1).content());
+        assertEquals("a2", result.get(2).content());
+    }
+
+    @Test
+    void truncateByToken_shouldKeepSystemAndTail() {
+        JsonlShortMemoryStore store = createStore();
+        List<SpiMessage> result = store.truncateByToken(List.of(
+                SpiMessage.system("system"),
+                SpiMessage.user("12345678"),
+                SpiMessage.assistant("abcd")
+        ), 3);
+        assertEquals(2, result.size());
+        assertEquals("system", result.get(0).content());
+        assertEquals("abcd", result.get(1).content());
     }
 }

@@ -2,8 +2,8 @@ package meta.claw.core.prompt;
 
 import lombok.RequiredArgsConstructor;
 import meta.claw.core.config.VesselConfig;
-import meta.claw.core.memory.longterm.PreferenceEntry;
-import meta.claw.core.memory.longterm.UserPreferenceStore;
+import meta.claw.core.memory.MemoryEntry;
+import meta.claw.core.memory.longterm.LongMemoryStore;
 
 import java.nio.file.Path;
 import java.time.ZoneId;
@@ -32,7 +32,7 @@ public class PromptContextFactory {
      * @return 构建好的 PromptContext
      */
     public PromptContext create(VesselConfig config, Path workspaceDir,
-                                 UserPreferenceStore preferenceStore) {
+                                 LongMemoryStore preferenceStore) {
         return PromptContext.builder()
                 .vesselName(orDefault(config.getName(), "Vessel"))
                 .vesselDescription(orDefault(config.getDescription(), ""))
@@ -51,11 +51,11 @@ public class PromptContextFactory {
                 .build();
     }
 
-    private String loadPreferences(VesselConfig config, UserPreferenceStore store) {
+    private String loadPreferences(VesselConfig config, LongMemoryStore store) {
         if (store == null || !config.isPreferencesEnabled() || config.getId() == null) {
             return "";
         }
-        List<PreferenceEntry> entries = store.listRecentPreferences(config.getId(), 20);
+        List<MemoryEntry> entries = store.listRecentPreferences(config.getId(), 20);
         if (entries.isEmpty()) {
             return "";
         }

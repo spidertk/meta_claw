@@ -22,7 +22,7 @@
 - Prompt Engineering Phase 2 的主件已存在：`PromptContext`、`TemplateLoader`、`SystemPromptBuilder`、`PromptContextFactory`
 - `Memory` 已成为独立领域：短期记忆位于 `core.memory.shortterm`，长期记忆位于 `core.memory.longterm`
 - `core.session` 与 `core.model` 已移除；配置模型归入 `core.config`，消息流模型归入 `core.message`
-- `ShortMemoryManager` / `LongMemoryManager` 已成为配置驱动的编排入口，`ConversationHistoryManager` 退回 short-term 窗口策略
+- `ShortMemoryManager` / `LongMemoryManager` 已成为配置驱动的编排入口；short-term 窗口策略已下沉到 `ShortMemoryStore`
 - `meta-claw-store` 已按 Memory 边界拆为 `store.memory.shortterm.JsonlShortMemoryStore` 与 `store.memory.longterm.FileLongMemoryStore`
 - `VesselConfigLoader` 已支持读取 `memory.short_term_store` / `memory.long_term_store`
 - `ChatCommand` 已通过 `MemoryManagerFactory` 追加短期消息，并通过 `LongMemoryManager` 把长期偏好接回 prompt context
@@ -278,3 +278,29 @@
   - 当前 P0 测试集是初始化阶段策略，不代表未来长期最终测试面
 - 下一步最佳动作：
   1. 回到 Memory 重构主线
+
+### Session 009
+
+- 日期：2026-05-18
+- 本轮目标：统一 Memory 领域实体，并移除多余的 short-term / long-term 抽象
+- 已完成：
+  - 新增统一实体 `MemoryEntry`
+  - 删除 `PreferenceEntry` 与 `SessionSummary`
+  - 删除 `ConversationHistoryManager`，把轮数裁剪、token 裁剪与摘要接口下沉到 `ShortMemoryStore`
+  - 删除 `UserPreferenceStore`，让 `PromptContextFactory` 直接依赖 `LongMemoryStore`
+  - `SessionsCommand`、`FileLongMemoryStore`、`JsonlShortMemoryStore` 已全部切到新实体
+- 运行过的验证：
+  - `mvn test -pl meta-claw-store -am -Dtest=JsonlShortMemoryStoreTest,FileLongMemoryStoreTest -Dsurefire.failIfNoSpecifiedTests=false` → 成功
+  - `./init.sh`（沙箱外真实环境）→ 成功；完成全仓编译并通过 P0 测试集
+- 已记录证据：
+  - `JsonlShortMemoryStoreTest` 现覆盖会话列表、按轮数裁剪、按 token 裁剪
+  - `FileLongMemoryStoreTest` 已全部改用 `MemoryEntry`
+- 更新过的文件或工件：
+  - `meta-claw-core/src/main/java/meta/claw/core/memory/*`
+  - `meta-claw-store/src/main/java/meta/claw/store/memory/*`
+  - `meta-claw-cli/src/main/java/meta/claw/cli/SessionsCommand.java`
+  - 长期状态文件
+- 已知风险或未解决问题：
+  - `getHistory(sessionKey, limit)` 仍保留为历史读取 API，未来若需要更强的窗口查询，可以再单独设计更明确的 query 形态
+- 下一步最佳动作：
+  1. 由用户决定下一项优先级

@@ -1,6 +1,7 @@
 package meta.claw.core.memory.longterm;
 
 import meta.claw.core.config.MemoryConfig;
+import meta.claw.core.memory.MemoryEntry;
 
 import java.util.List;
 import java.util.Map;
@@ -8,7 +9,7 @@ import java.util.Map;
 /**
  * 长期记忆编排器。
  */
-public class LongMemoryManager implements UserPreferenceStore {
+public class LongMemoryManager implements LongMemoryStore {
     private final LongMemoryStore store;
 
     public LongMemoryManager(MemoryConfig config, Map<String, LongMemoryStore> stores) {
@@ -18,17 +19,17 @@ public class LongMemoryManager implements UserPreferenceStore {
     }
 
     @Override
-    public void addPreference(String vesselId, PreferenceEntry entry) {
+    public void addPreference(String vesselId, MemoryEntry entry) {
         store.addPreference(vesselId, entry);
     }
 
     @Override
-    public List<PreferenceEntry> lookupPreference(String vesselId, String query) {
+    public List<MemoryEntry> lookupPreference(String vesselId, String query) {
         return store.lookupPreference(vesselId, query);
     }
 
     @Override
-    public List<PreferenceEntry> listRecentPreferences(String vesselId, int limit) {
+    public List<MemoryEntry> listRecentPreferences(String vesselId, int limit) {
         return store.listRecentPreferences(vesselId, limit);
     }
 

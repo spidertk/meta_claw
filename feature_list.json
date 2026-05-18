@@ -219,7 +219,7 @@
           "detail": "./init.sh 全量通过，9 个 reactor 模块全部 SUCCESS。"
         }
       ],
-      "notes": "Memory 已从命名清理升级为真正的领域边界；后续 facts、summaries、relationships 可沿 longterm 分支扩展。"
+      "notes": "Memory 已从命名清理升级为真正的领域边界；`MemoryEntry` 已统一短期与长期实体，后续 facts、summaries、relationships 可沿 longterm 分支扩展。"
     },
     {
       "id": "core-001",
@@ -257,7 +257,7 @@
           "detail": "./init.sh 全量通过，9 个 reactor 模块全部 SUCCESS。"
         }
       ],
-      "notes": "ConversationHistoryManager 现在只是 short-term windowing strategy；CLI 通过 MemoryManagerFactory 装配 backend，偏好提示词通过 LongMemoryManager 读取。"
+      "notes": "short-term windowing strategy 已下沉到 `ShortMemoryStore`；CLI 通过 MemoryManagerFactory 装配 backend，偏好提示词通过 LongMemoryManager 读取。"
     },
     {
       "id": "test-baseline-001",
@@ -289,6 +289,33 @@
         }
       ],
       "notes": "这是开发初始化阶段的主动收敛策略；后续能力进入主链后再补对应测试。"
+    },
+    {
+      "id": "memory-002",
+      "priority": 10,
+      "area": "memory",
+      "title": "统一 Memory 实体与抽象边界",
+      "user_visible_behavior": "短期与长期记忆共用统一实体，后续维护者只需要理解一套记忆模型，窗口策略与长期提示读取也各自落在真实契约上。",
+      "status": "passing",
+      "verification": [
+        "确认 `MemoryEntry` 已替代 `PreferenceEntry` 与 `SessionSummary`。",
+        "确认 `ConversationHistoryManager` 与 `UserPreferenceStore` 已删除。",
+        "运行 store 相关定向测试。",
+        "运行 ./init.sh。"
+      ],
+      "evidence": [
+        {
+          "date": "2026-05-18",
+          "result": "passing",
+          "detail": "新增统一实体 `MemoryEntry`；删除 `PreferenceEntry`、`SessionSummary`、`ConversationHistoryManager`、`UserPreferenceStore`。"
+        },
+        {
+          "date": "2026-05-18",
+          "result": "verified",
+          "detail": "`JsonlShortMemoryStoreTest` 与 `FileLongMemoryStoreTest` 定向通过；新版 ./init.sh 在真实环境中通过。"
+        }
+      ],
+      "notes": "`ShortMemoryStore` 现直接承载轮数裁剪、token 裁剪与摘要接口；`PromptContextFactory` 直接依赖 `LongMemoryStore`。"
     }
   ]
 }

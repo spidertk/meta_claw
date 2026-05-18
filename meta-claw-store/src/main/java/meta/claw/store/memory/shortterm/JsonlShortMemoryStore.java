@@ -3,7 +3,7 @@ package meta.claw.store.memory.shortterm;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
-import meta.claw.core.memory.shortterm.SessionSummary;
+import meta.claw.core.memory.MemoryEntry;
 import meta.claw.core.memory.shortterm.ShortMemoryStore;
 import meta.claw.core.spi.llm.SpiMessage;
 
@@ -98,8 +98,8 @@ public class JsonlShortMemoryStore implements ShortMemoryStore {
     }
 
     @Override
-    public List<SessionSummary> listSessions(String vesselId) {
-        List<SessionSummary> result = new ArrayList<>();
+    public List<MemoryEntry> listSessions(String vesselId) {
+        List<MemoryEntry> result = new ArrayList<>();
         Path conversationsDir = baseDir.resolve(vesselId).resolve("conversations");
         if (!Files.exists(conversationsDir)) {
             return result;
@@ -112,7 +112,7 @@ public class JsonlShortMemoryStore implements ShortMemoryStore {
                     return;
                 }
                 List<SpiMessage> history = getHistoryForVessel(vesselId, sessionId);
-                result.add(SessionSummary.builder()
+                result.add(MemoryEntry.builder()
                         .sessionId(sessionId)
                         .updatedAt(getFileUpdatedTime(historyFile))
                         .messageCount(history.size())
@@ -147,6 +147,71 @@ public class JsonlShortMemoryStore implements ShortMemoryStore {
     @Override
     public boolean conversationExists(String sessionKey) {
         return Files.exists(getHistoryFilePath(resolveVesselId(sessionKey), sessionKey));
+    }
+
+    @Override
+    public List<SpiMessage> truncateByRound(List<SpiMessage> history, int maxRounds) {
+        if (maxRounds <= 0 || history == null || history.isEmpty()) {
+            return history == null ? new ArrayList<>() : new ArrayList<>(history);
+        }
+
+        int roundsFound = 0;
+        int cutoffIndex = 0;
+        for (int i = history.size() - 1; i >= 0; i--) {
+            if ("assistant".equalsIgnoreCase(history.get(i).role())) {
+                roundsFound++;
+                if (roundsFound > maxRounds) {
+                    cutoffIndex = i + 1;
+                    break;
+                }
+            }
+        }
+
+        List<SpiMessage> result = new ArrayList<>();
+        for (int i = 0; i < history.size(); i++) {
+            SpiMessage message = history.get(i);
+            if ("system".equalsIgnoreCase(message.role()) || i >= cutoffIndex) {
+                result.add(message);
+            }
+        }
+        return result;
+    }
+
+    @Override
+    public List<SpiMessage> truncateByToken(List<SpiMessage> history, int maxTokens) {
+        if (maxTokens <= 0 || history == null || history.isEmpty()) {
+            return history == null ? new ArrayList<>() : new ArrayList<>(history);
+        }
+
+        int currentTokens = 0;
+        int cutoffIndex = 0;
+        for (int i = history.size() - 1; i >= 0; i--) {
+            SpiMessage message = history.get(i);
+            int tokens = estimateTokens(message.content());
+            if ("system".equalsIgnoreCase(message.role())) {
+                currentTokens += tokens;
+                continue;
+            }
+            if (currentTokens + tokens > maxTokens) {
+                cutoffIndex = i + 1;
+                break;
+            }
+            currentTokens += tokens;
+        }
+
+        List<SpiMessage> result = new ArrayList<>();
+        for (int i = 0; i < history.size(); i++) {
+            SpiMessage message = history.get(i);
+            if ("system".equalsIgnoreCase(message.role()) || i >= cutoffIndex) {
+                result.add(message);
+            }
+        }
+        return result;
+    }
+
+    @Override
+    public String summarizeConversation(List<SpiMessage> history) {
+        return "Earlier conversation summarized.";
     }
 
     private List<SpiMessage> getHistoryForVessel(String vesselId, String sessionKey) {
@@ -214,5 +279,23 @@ public class JsonlShortMemoryStore implements ShortMemoryStore {
         }
         return BASE64_PATTERN.matcher(content).replaceAll(match ->
                 "[media:" + match.group(1) + ":base64:<stripped>]");
+    }
+
+    private int estimateTokens(String text) {
+        if (text == null || text.isEmpty()) {
+            return 0;
+        }
+        int chineseChars = 0;
+        int otherChars = 0;
+        for (char c : text.toCharArray()) {
+            Character.UnicodeBlock block = Character.UnicodeBlock.of(c);
+            if (block == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS
+                    || block == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS_EXTENSION_A) {
+                chineseChars++;
+            } else {
+                otherChars++;
+            }
+        }
+        return chineseChars + (otherChars / 4) + 1;
     }
 }

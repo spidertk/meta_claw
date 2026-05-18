@@ -1,6 +1,7 @@
 package meta.claw.core.memory.shortterm;
 
 import meta.claw.core.config.MemoryConfig;
+import meta.claw.core.memory.MemoryEntry;
 import meta.claw.core.spi.llm.SpiMessage;
 
 import java.util.List;
@@ -11,18 +12,11 @@ import java.util.Map;
  */
 public class ShortMemoryManager {
     private final ShortMemoryStore store;
-    private final ConversationHistoryManager historyManager;
 
     public ShortMemoryManager(MemoryConfig config, Map<String, ShortMemoryStore> stores) {
-        this(config, stores, new ConversationHistoryManager());
-    }
-
-    public ShortMemoryManager(MemoryConfig config, Map<String, ShortMemoryStore> stores,
-                              ConversationHistoryManager historyManager) {
         String backend = config != null && config.getShortTermStore() != null
                 ? config.getShortTermStore() : "jsonl";
         this.store = requireStore(stores, backend);
-        this.historyManager = historyManager;
     }
 
     public void appendMessage(String sessionKey, SpiMessage message) {
@@ -33,7 +27,7 @@ public class ShortMemoryManager {
         return store.getHistory(sessionKey);
     }
 
-    public List<SessionSummary> listSessions(String vesselId) {
+    public List<MemoryEntry> listSessions(String vesselId) {
         return store.listSessions(vesselId);
     }
 
@@ -46,15 +40,15 @@ public class ShortMemoryManager {
     }
 
     public List<SpiMessage> truncateByRound(List<SpiMessage> history, int maxRounds) {
-        return historyManager.truncateByRound(history, maxRounds);
+        return store.truncateByRound(history, maxRounds);
     }
 
     public List<SpiMessage> truncateByToken(List<SpiMessage> history, int maxTokens) {
-        return historyManager.truncateByToken(history, maxTokens);
+        return store.truncateByToken(history, maxTokens);
     }
 
     public String summarizeConversation(List<SpiMessage> history) {
-        return historyManager.summarizeConversation(history);
+        return store.summarizeConversation(history);
     }
 
     private static ShortMemoryStore requireStore(Map<String, ShortMemoryStore> stores, String backend) {
