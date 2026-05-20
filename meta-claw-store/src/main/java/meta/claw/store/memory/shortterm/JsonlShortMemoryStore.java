@@ -54,6 +54,11 @@ public class JsonlShortMemoryStore implements ShortMemoryStore {
     }
 
     @Override
+    public String type() {
+        return "jsonl";
+    }
+
+    @Override
     public void initializeConversation(String vesselId, String sessionKey) {
         Path filePath = getHistoryFilePath(vesselId, sessionKey);
         ReentrantReadWriteLock lock = getLock(sessionKey);

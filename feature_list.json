@@ -533,6 +533,11 @@
           "date": "2026-05-20",
           "result": "verified",
           "detail": "./init.sh 全量通过；10 个 reactor 模块全部 SUCCESS；core 16/16、store 18/18、bootstrap 3/3、cli 5/5、tool 全部通过。"
+        },
+        {
+          "date": "2026-05-20",
+          "result": "verified",
+          "detail": "ShortMemoryStoreFactory / LongMemoryStoreFactory 统一改为 ApplicationContextAware + ApplicationListener<ContextRefreshedEvent> 模式，通过 getBeansOfType() 自拉取 Store 实现；不再有任何 Map 从上游传入。"
         }
       ],
       "notes": "ProjectRootFinder 已从 vessel 模块移入 core 模块；LongMemoryManager 不再 implements LongMemoryStore，彻底消除 Spring 注入冲突根因。"

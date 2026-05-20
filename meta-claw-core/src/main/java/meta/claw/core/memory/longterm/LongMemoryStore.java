@@ -13,4 +13,5 @@ public interface LongMemoryStore {
     List<PreferenceMemory> listRecentPreferences(String vesselId, int limit);
     boolean deletePreference(String vesselId, String preferenceId);
     boolean clearPreferences(String vesselId);
+    String type();
 }

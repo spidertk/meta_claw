@@ -90,13 +90,18 @@ class ChatCommandTest {
 
     private static ShortMemoryManager shortMemoryManager(ShortMemoryStore store) {
         ShortMemoryStoreFactory factory = new ShortMemoryStoreFactory();
-        factory.setStores(Map.of("jsonl", store));
+        factory.registerStore("jsonl", store);
         return new ShortMemoryManager(factory);
     }
 
     private static class RecordingShortMemoryStore implements ShortMemoryStore {
         private final Set<String> initializedSessions = new HashSet<>();
         private final Set<String> existingSessions = new HashSet<>();
+
+        @Override
+        public String type() {
+            return "recording";
+        }
 
         @Override
         public void initializeConversation(String vesselId, String sessionKey) {

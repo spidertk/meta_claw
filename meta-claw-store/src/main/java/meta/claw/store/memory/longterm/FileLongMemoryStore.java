@@ -143,6 +143,11 @@ public class FileLongMemoryStore implements LongMemoryStore {
         }
     }
 
+    @Override
+    public String type() {
+        return "file";
+    }
+
     private PreferenceMemory parseEntry(String jsonLine) {
         try {
             return objectMapper.readValue(jsonLine, PreferenceMemory.class);

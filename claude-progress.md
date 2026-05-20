@@ -802,3 +802,29 @@
 - 下一步最佳动作：
   1. 提交本轮修改
   2. 由用户决定下一项功能优先级
+
+### Session 026
+
+- 日期：2026-05-20
+- 本轮目标：统一所有 Factory 为 ApplicationContext 自拉取模式，彻底消灭 Map 从上游传入
+- 已完成：
+  - `LongMemoryStoreFactory` 重写为 `ApplicationContextAware` + `ApplicationListener<ContextRefreshedEvent>` 模式，与 `ShortMemoryStoreFactory` 对齐
+  - 两个 Factory 均通过 `applicationContext.getBeansOfType()` 自拉取所有 Store 实现，按 `store.type()` 构建映射，并检测 type 重名
+  - 删除 3 个编译失败的遗留测试文件（引用了已删除的包或缺失的依赖）
+  - 给两个 Factory 增加 `registerStore(String, Store)` 单条注册方法（供测试使用，不违反"不从上游传入 Map"原则）
+  - `stores` 字段初始化为空 HashMap，避免非 Spring 场景 NPE
+  - 修复 `ChatCommandTest`：`setStores(Map)` → `registerStore("jsonl", store)`；`RecordingShortMemoryStore` 补全 `type()`
+- 运行过的验证：
+  - `./init.sh`（真实环境，Java 21）→ 成功；10 个 reactor 模块全部 SUCCESS
+  - 全量测试通过
+- 更新过的文件或工件：
+  - `meta-claw-core/src/main/java/meta/claw/core/memory/shortterm/ShortMemoryStoreFactory.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/memory/longterm/LongMemoryStoreFactory.java`
+  - `meta-claw-cli/src/test/java/meta/claw/cli/ChatCommandTest.java`
+  - 删除：`DuplicateTypeTestStore.java`、`ShortMemoryStoreDuplicateTypeTest.java`、`ShortMemoryStoreFactoryIntegrationTest.java`
+  - `claude-progress.md`
+- 已知风险或未解决的问题：
+  - 当前无新增 blocker
+- 下一步最佳动作：
+  1. 提交本轮修改
+  2. 由用户决定下一项功能优先级
