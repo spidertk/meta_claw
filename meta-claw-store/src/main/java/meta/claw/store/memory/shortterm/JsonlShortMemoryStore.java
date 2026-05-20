@@ -70,8 +70,9 @@ public class JsonlShortMemoryStore implements ShortMemoryStore {
         lock.writeLock().lock();
         try {
             Files.createDirectories(filePath.getParent());
-            if (!Files.exists(filePath)) {
-                Files.createFile(filePath);
+            try (FileChannel channel = FileChannel.open(filePath,
+                    StandardOpenOption.CREATE, StandardOpenOption.WRITE)) {
+                channel.force(true);
             }
         } catch (IOException e) {
             throw new RuntimeException("Conversation initialization failed", e);

@@ -158,6 +158,9 @@ public class ChatCommand implements Runnable {
         terminal.writer().println("║                                                                  ║");
         terminal.writer().println("╚══════════════════════════════════════════════════════════════════╝");
         terminal.writer().println();
+        terminal.writer().println("Session: " + sessionKey);
+        terminal.writer().println("History: " + historyFilePath(vesselsDir, vesselName, sessionKey));
+        terminal.writer().println();
         terminal.writer().println("Commands: /exit  /clear");
         terminal.writer().println("Press Ctrl+D to quit");
         terminal.writer().println();
@@ -302,5 +305,9 @@ public class ChatCommand implements Runnable {
         String sessionId = newSessionIds.get();
         memoryManager.initializeConversation(sessionId);
         return sessionId;
+    }
+
+    static Path historyFilePath(Path vesselsDir, String vesselName, String sessionKey) {
+        return vesselsDir.resolve(vesselName).resolve("conversations").resolve(sessionKey).resolve("history.jsonl");
     }
 }

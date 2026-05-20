@@ -6,7 +6,7 @@
 - 当前架构基线：Java 21 + Maven 多模块仓库；已存在 `meta-claw-core`、`meta-claw-vessel`、`meta-claw-store`、`meta-claw-cli`、`meta-claw-gateway*`、`meta-claw-bootstrap`
 - 标准启动路径：`./init.sh`
 - 标准验证路径：`./init.sh` 先执行全仓编译，再运行初始化阶段 P0 测试集
-- 最近已通过证据：2026-05-20 在真实 Maven 环境中执行新版 `./init.sh`，完成全仓编译并通过 P0 测试集；`ChatCommandTest` 4/4 覆盖新会话即时初始化
+- 最近已通过证据：2026-05-20 在真实 Maven 环境中执行新版 `./init.sh`，完成全仓编译并通过 P0 测试集；`ChatCommandTest` 覆盖新会话即时初始化
 - 当前最高优先级未完成功能：暂无新的已选定功能
 - 当前 blocker：
   1. 当前无 blocker
@@ -31,7 +31,7 @@
 
 - `./init.sh` 已迁移到当前 Java/Maven 实际启动路径，并已于 2026-05-16 完整跑通
 - `ChatCommand` 默认仍会创建新 `sessionKey`，但已支持 `sessions <vessel>` 与 `chat <vessel> --resume <session-id>` 的显式恢复
-- `ChatCommand` 新会话生成 `sessionKey` 后会在 LLM client 构建前调用 `initializeConversation(sessionKey)`，立即创建 `<vessel>/conversations/<session-id>/history.jsonl`
+- `ChatCommand` 新会话生成 `sessionKey` 后会在 LLM client 构建前调用 `initializeConversation(sessionKey)`，立即创建并刷新 `<vessel>/conversations/<session-id>/history.jsonl`；CLI 欢迎区会显示当前 `Session` 与 `History` 绝对路径
 - `serve/start/stop/restart/status/logs`、工具引擎、MCP、Skill 系统仍未实现
 
 ## 会话记录
@@ -442,3 +442,28 @@
   - 沙箱内标准验证仍可能因 Mockito/ByteBuddy 自附加受限失败；真实环境验证已通过
 - 下一步最佳动作：
   1. 由用户继续做手动 CLI 验收：启动新会话后，在另一个终端检查 `.meta-claw/vessels/default/conversations/<session-id>/history.jsonl` 是否立即出现
+
+### Session 014
+
+- 日期：2026-05-20
+- 本轮目标：复核用户反馈“仍然退出后才创建”，并让运行中可直接核对新会话文件
+- 已完成：
+  - 按真实 CLI 入口复现：`mvn -f meta-claw-cli/pom.xml -q exec:java -Dexec.mainClass=meta.claw.cli.CliApplication -Dexec.args='chat default'`
+  - 在进程停留于 `>` 输入提示符期间确认 `.meta-claw/vessels/default/conversations/<session-id>/history.jsonl` 已存在
+  - 将 `JsonlShortMemoryStore.initializeConversation` 从 `Files.createFile` 改为 `FileChannel.open(... CREATE, WRITE)` 并 `force(true)`
+  - CLI 欢迎区新增当前 `Session` 与 `History` 绝对路径输出，便于用户直接按显示路径核对
+- 运行过的验证：
+  - `mvn test -pl meta-claw-store,meta-claw-cli -am -Dtest=JsonlShortMemoryStoreTest,ChatCommandTest -Dsurefire.failIfNoSpecifiedTests=false` → 成功，`JsonlShortMemoryStoreTest` 10/10、`ChatCommandTest` 5/5 通过
+  - 真实 CLI 启动验收 → 成功；未退出时已看到对应 history 文件
+- 已记录证据：
+  - `feature_list.json` 的 `chat-002` 已补充第二条 2026-05-20 验证记录
+- 更新过的文件或工件：
+  - `meta-claw-store/src/main/java/meta/claw/store/memory/shortterm/JsonlShortMemoryStore.java`
+  - `meta-claw-cli/src/main/java/meta/claw/cli/ChatCommand.java`
+  - `meta-claw-cli/src/test/java/meta/claw/cli/ChatCommandTest.java`
+  - `feature_list.json`
+  - `claude-progress.md`
+- 已知风险或未解决问题：
+  - 若用户通过其他未纳入仓库的包装命令启动，需要先确认该命令是否指向本仓当前 `CliApplication`
+- 下一步最佳动作：
+  1. 用户按 CLI 输出的 `History:` 绝对路径在另一个终端直接 `ls -l <path>`，确认不是在看旧路径或旧入口

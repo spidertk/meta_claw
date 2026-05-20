@@ -9,6 +9,7 @@ import meta.claw.core.memory.shortterm.ShortMemoryStore;
 import meta.claw.core.spi.llm.SpiMessage;
 import org.junit.jupiter.api.Test;
 
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -70,6 +71,15 @@ class ChatCommandTest {
                 () -> ChatCommand.selectSession(manager, "default", "missing-session", () -> "new-session"));
 
         assertEquals("Session not found for vessel 'default': missing-session", error.getMessage());
+    }
+
+    @Test
+    void historyFilePath_shouldPointToVesselConversationHistory() {
+        Path historyFile = ChatCommand.historyFilePath(Path.of(".meta-claw", "vessels"),
+                "default", "session-1");
+
+        assertEquals(Path.of(".meta-claw", "vessels", "default",
+                "conversations", "session-1", "history.jsonl"), historyFile);
     }
 
     private static ShortMemoryManager shortMemoryManager(ShortMemoryStore store) {

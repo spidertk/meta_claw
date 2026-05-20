@@ -370,9 +370,14 @@
           "date": "2026-05-20",
           "result": "verified",
           "detail": "`ChatCommand` 将新会话初始化提前到 LLM client 构建之前；`ChatCommandTest` 覆盖新会话立即调用 `initializeConversation`、恢复已有会话不新建、缺失恢复报错；`mvn test -pl meta-claw-cli -am -Dtest=ChatCommandTest -Dsurefire.failIfNoSpecifiedTests=false` 与真实环境 `./init.sh` 均通过。"
+        },
+        {
+          "date": "2026-05-20",
+          "result": "verified",
+          "detail": "`JsonlShortMemoryStore.initializeConversation` 改为通过 `FileChannel` 创建并 `force(true)` 刷新空 history 文件；CLI 欢迎区显示当前 `Session` 和 `History` 绝对路径。真实启动 `mvn -f meta-claw-cli/pom.xml -q exec:java -Dexec.mainClass=meta.claw.cli.CliApplication -Dexec.args='chat default'` 时，在进程停留于输入提示符期间已能看到对应 history 文件。"
         }
       ],
-      "notes": "会话目录现在在 session ID 生成后、LLM client 构建前就可见，不再依赖第一条消息追加、模型响应或进程退出；workspace 以当前 Vessel 为边界。"
+      "notes": "会话目录现在在 session ID 生成后、LLM client 构建前就创建并刷新；CLI 会显示本轮 history 文件绝对路径，便于运行中核对。workspace 以当前 Vessel 为边界。"
     },
     {
       "id": "memory-003",
