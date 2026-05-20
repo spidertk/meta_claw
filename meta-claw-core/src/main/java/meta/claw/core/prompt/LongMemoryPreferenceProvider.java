@@ -10,8 +10,11 @@ import java.util.stream.Collectors;
 
 /**
  * 基于 {@link LongMemoryStore} 的 {@link PreferenceProvider} 实现。
+ * <p>
+ * 注意：此类不是 Spring 组件，因为它依赖的 {@link LongMemoryStore}
+ * 需要运行时参数（如 vesselsDir）才能实例化。由调用方在需要时手动创建。
+ * </p>
  */
-@Component
 @RequiredArgsConstructor
 public class LongMemoryPreferenceProvider implements PreferenceProvider {
 

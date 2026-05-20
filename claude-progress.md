@@ -681,3 +681,27 @@
 
 - 下一步最佳动作：
   1. 运行标准入口 `./init.sh`
+
+### Session 022
+
+- 日期：2026-05-20
+- 本轮目标：修复 Spring Boot 启动失败——`LongMemoryPreferenceProvider` 多 bean 冲突
+- 已完成：
+  - 诊断根因：`LongMemoryManager` 和 `FileLongMemoryStore` 都实现 `LongMemoryStore` 且都是 `@Component`，导致 `LongMemoryPreferenceProvider` 按接口注入时 Spring 发现 2 个候选 bean
+  - 修复方案：将 `LongMemoryPreferenceProvider` 从 Spring `@Component` 中剥离，改为普通 POJO（构造函数接收 `LongMemoryStore`）
+  - `PromptContextFactory` 不再注入 `PreferenceProvider`，改为在 `create(VesselConfig)` 中通过 `@Autowired(required = false)` 获取；新增 `create(VesselConfig, PreferenceProvider)` 重载供调用方显式传入
+  - `ChatCommand` 改为本地 `new LongMemoryPreferenceProvider(new FileLongMemoryStore(vesselsDir))`，绕过 Spring 注入冲突
+  - `VesselManagerTest` 适配新的 `PromptContextFactory` 两参数构造函数签名
+- 运行过的验证：
+  - `./init.sh`（真实环境，Java 21）→ 成功；10 个 reactor 模块全部 SUCCESS
+  - 全量测试：core 16/16、store 18/18、bootstrap 3/3、cli 5/5、tool 全部通过
+- 更新过的文件或工件：
+  - `meta-claw-core/src/main/java/meta/claw/core/prompt/LongMemoryPreferenceProvider.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/prompt/PromptContextFactory.java`
+  - `meta-claw-cli/src/main/java/meta/claw/cli/ChatCommand.java`
+  - `meta-claw-core/src/test/java/meta/claw/core/runtime/VesselManagerTest.java`
+  - `claude-progress.md`
+- 已知风险或未解决的问题：
+  - 当前无新增 blocker
+- 下一步最佳动作：
+  1. 由用户决定下一项功能优先级

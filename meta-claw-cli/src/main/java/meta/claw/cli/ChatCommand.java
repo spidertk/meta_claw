@@ -31,6 +31,9 @@ import picocli.CommandLine.Parameters;
 
 import meta.claw.store.memory.MemoryManagerProvider;
 import meta.claw.core.spi.tool.ToolDefinitionProvider;
+import meta.claw.store.memory.longterm.FileLongMemoryStore;
+import meta.claw.core.prompt.LongMemoryPreferenceProvider;
+import meta.claw.core.prompt.PreferenceProvider;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -171,7 +174,9 @@ public class ChatCommand implements Runnable {
         terminal.flush();
 
         // Phase 2: Build static system prompt (persona + preferences + runtime + tools)
-        PromptContext promptContext = contextFactory.create(vesselConfig);
+        PreferenceProvider preferenceProvider = new LongMemoryPreferenceProvider(
+                new FileLongMemoryStore(vesselsDir));
+        PromptContext promptContext = contextFactory.create(vesselConfig, preferenceProvider);
         String systemPrompt = promptBuilder.build(promptContext);
 
         int maxHistoryRounds = vesselConfig.getMaxHistoryRounds() != null
