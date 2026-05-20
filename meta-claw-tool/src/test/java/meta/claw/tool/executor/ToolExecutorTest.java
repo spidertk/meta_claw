@@ -31,7 +31,7 @@ class ToolExecutorTest {
     }
 
     private final ToolExecutor executor = new ToolExecutor();
-    private final ToolRegistry registry = new ToolRegistry();
+    private final ToolRegistry registry = new ToolRegistry(null);
 
     ToolExecutorTest() {
         registry.register(new DemoTool());

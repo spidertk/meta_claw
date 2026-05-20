@@ -7,6 +7,7 @@ import meta.claw.core.config.VesselConfig;
 import meta.claw.core.prompt.PromptContext;
 import meta.claw.core.prompt.PromptContextFactory;
 import meta.claw.core.prompt.SystemPromptBuilder;
+import meta.claw.core.spi.tool.ToolDefinitionProvider;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.messages.SystemMessage;
@@ -42,6 +43,7 @@ public class VesselRuntime {
     private final ChatClient chatClient;
     private final PromptContextFactory promptContextFactory;
     private final SystemPromptBuilder systemPromptBuilder;
+    private final ToolDefinitionProvider toolProvider;
 
     /**
      * 构造方法：根据 Vessel 配置和 ChatClient 初始化运行时实例
@@ -51,11 +53,13 @@ public class VesselRuntime {
      */
     public VesselRuntime(VesselConfig config, ChatClient chatClient,
                          PromptContextFactory promptContextFactory,
-                         SystemPromptBuilder systemPromptBuilder) {
+                         SystemPromptBuilder systemPromptBuilder,
+                         ToolDefinitionProvider toolProvider) {
         this.config = config;
         this.chatClient = chatClient;
         this.promptContextFactory = promptContextFactory;
         this.systemPromptBuilder = systemPromptBuilder;
+        this.toolProvider = toolProvider;
         if (config != null) {
             log.info("VesselRuntime 初始化完成: vesselId={}, model={}, systemPromptLength={}",
                     config.getId(), config.getModel(),
@@ -71,7 +75,7 @@ public class VesselRuntime {
         }
         // Phase 2: Fall back to SystemPromptBuilder if no static systemPrompt configured
         try {
-            PromptContext ctx = promptContextFactory.create(config, Path.of("."), java.util.Collections.emptyList());
+            PromptContext ctx = promptContextFactory.create(config, Path.of("."), toolProvider != null ? toolProvider.getToolDefinitions() : java.util.Collections.emptyList());
             return systemPromptBuilder.build(ctx);
         } catch (Exception e) {
             log.warn("Failed to build dynamic system prompt for vessel {}, fallback to null", config.getId(), e);

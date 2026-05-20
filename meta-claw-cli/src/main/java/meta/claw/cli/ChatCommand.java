@@ -30,8 +30,7 @@ import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
 
 import meta.claw.store.memory.MemoryManagerProvider;
-import meta.claw.tool.registry.ToolRegistry;
-import meta.claw.tool.sample.CalculatorTool;
+import meta.claw.core.spi.tool.ToolDefinitionProvider;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -53,18 +52,21 @@ public class ChatCommand implements Runnable {
     private final PromptContextFactory contextFactory;
     private final SystemPromptBuilder promptBuilder;
     private final ObjectProvider<SpringAiLlmClient> llmClients;
+    private final ToolDefinitionProvider toolProvider;
 
     public ChatCommand(LlmClientFactoryManager factoryManager, VesselConfigResolver resolver,
                        MemoryManagerProvider memoryManagerProvider,
                        PromptContextFactory contextFactory,
                        SystemPromptBuilder promptBuilder,
-                       ObjectProvider<SpringAiLlmClient> llmClients) {
+                       ObjectProvider<SpringAiLlmClient> llmClients,
+                       ToolDefinitionProvider toolProvider) {
         this.factoryManager = factoryManager;
         this.resolver = resolver;
         this.memoryManagerProvider = memoryManagerProvider;
         this.contextFactory = contextFactory;
         this.promptBuilder = promptBuilder;
         this.llmClients = llmClients;
+        this.toolProvider = toolProvider;
     }
 
     @Parameters(index = "0", defaultValue = "default", description = "Vessel name")
@@ -170,9 +172,8 @@ public class ChatCommand implements Runnable {
 
         // Phase 2: Build static system prompt (persona + preferences + runtime + tools)
         Path vesselWorkspaceDir = vesselsDir.resolve(vesselName);
-        ToolRegistry toolRegistry = new ToolRegistry();
-        toolRegistry.register(new CalculatorTool());
-        PromptContext promptContext = contextFactory.create(vesselConfig, vesselWorkspaceDir, toolRegistry.getToolDefinitions());
+        PromptContext promptContext = contextFactory.create(vesselConfig, vesselWorkspaceDir,
+                toolProvider != null ? toolProvider.getToolDefinitions() : java.util.Collections.emptyList());
         String systemPrompt = promptBuilder.build(promptContext);
 
         int maxHistoryRounds = vesselConfig.getMaxHistoryRounds() != null

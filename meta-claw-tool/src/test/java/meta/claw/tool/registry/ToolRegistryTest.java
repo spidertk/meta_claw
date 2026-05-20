@@ -32,7 +32,7 @@ class ToolRegistryTest {
 
     @Test
     void register_shouldScanAnnotatedMethods() {
-        ToolRegistry registry = new ToolRegistry();
+        ToolRegistry registry = new ToolRegistry(null);
         registry.register(new TestTool());
 
         List<SpiToolDefinition> defs = registry.getToolDefinitions();
@@ -43,7 +43,7 @@ class ToolRegistryTest {
 
     @Test
     void register_shouldSkipDuplicateNames() {
-        ToolRegistry registry = new ToolRegistry();
+        ToolRegistry registry = new ToolRegistry(null);
         registry.register(new TestTool());
         registry.register(new DuplicateTool());
 
@@ -57,20 +57,20 @@ class ToolRegistryTest {
 
     @Test
     void findMethod_shouldReturnNullForUnknownTool() {
-        ToolRegistry registry = new ToolRegistry();
+        ToolRegistry registry = new ToolRegistry(null);
         assertNull(registry.findMethod("unknown"));
     }
 
     @Test
     void register_shouldIgnoreNull() {
-        ToolRegistry registry = new ToolRegistry();
+        ToolRegistry registry = new ToolRegistry(null);
         registry.register(null);
         assertTrue(registry.getToolDefinitions().isEmpty());
     }
 
     @Test
     void getToolDefinitions_shouldBeUnmodifiable() {
-        ToolRegistry registry = new ToolRegistry();
+        ToolRegistry registry = new ToolRegistry(null);
         registry.register(new TestTool());
 
         List<SpiToolDefinition> defs = registry.getToolDefinitions();

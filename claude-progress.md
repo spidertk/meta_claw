@@ -607,9 +607,51 @@
 - 已知风险或未解决问题：
   - `VesselRuntime` 尚未集成工具调用循环（单次 tool call → 执行 → 结果回注）
   - `ToolCallback` 与 Spring AI `ChatClient` 的 tools API 适配仍待确认
+### Session 020
+
+- 日期：2026-05-20
+- 本轮目标：ToolRegistry Spring 化 + 动态热注入能力；编写 Java 组件热进化设计文档
+- 已完成：
+  - `ToolRegistry` 改为 Spring `@Component`，构造注入 `ApplicationContext`
+  - 新增 `@PostConstruct scanAndRegisterBeans()`，启动时自动扫描容器中所有 bean 的 `@Tool` 方法
+  - 新增 `unregister(String)` 和 `reregister(Object)`，支持运行时热卸载与热替换
+  - 使用 `CopyOnWriteArrayList` + `ConcurrentHashMap` + `synchronized` 块保证并发安全
+  - 新增 `meta.claw.core.spi.tool.ToolDefinitionProvider` 窄接口，`ToolRegistry` 实现该接口
+  - `VesselRuntime` 与 `ChatCommand` 改为注入 `ToolDefinitionProvider`，避免 core 反向依赖 tool 模块
+  - `meta-claw-tool/pom.xml` 补充 `spring-context` 和 `jakarta.annotation-api` 依赖
+  - 所有测试适配后通过：`ToolRegistryTest` 5/5、`ToolExecutorTest` 5/5、`JsonSchemaGeneratorTest` 4/4、`CalculatorToolTest` 11/11
+  - 编写 `java-component-hot-evolution-design.md`：详细分析 Java 热进化技术挑战、方案选型（OSGi/JVM Agent/ClassLoader/Groovy/Janino）、推荐架构、安全回滚机制、与 meta-claw 集成路径
+- 运行过的验证：
+  - `./init.sh`（真实环境，Java 21）→ 成功；10 个 reactor 模块全部 SUCCESS
+  - `SystemPromptBuilderTest` → 10/10 通过
+  - `ChatCommandTest` → 5/5 通过
+  - `JsonlShortMemoryStoreTest` → 10/10 通过
+  - `MessageFlowIntegrationTest` → 3/3 通过
+  - `JsonSchemaGeneratorTest` → 4/4 通过
+  - `ToolRegistryTest` → 5/5 通过
+  - `ToolExecutorTest` → 5/5 通过
+  - `CalculatorToolTest` → 11/11 通过
+- 更新过的文件或工件：
+  - `meta-claw-tool/src/main/java/meta/claw/tool/registry/ToolRegistry.java`
+  - `meta-claw-tool/src/main/java/meta/claw/tool/annotation/ToolParam.java`
+  - `meta-claw-tool/src/main/java/meta/claw/tool/schema/JsonSchemaGenerator.java`
+  - `meta-claw-tool/src/main/java/meta/claw/tool/executor/ToolExecutor.java`
+  - `meta-claw-tool/src/test/java/meta/claw/tool/registry/ToolRegistryTest.java`
+  - `meta-claw-tool/src/test/java/meta/claw/tool/executor/ToolExecutorTest.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/spi/tool/ToolDefinitionProvider.java`（新增）
+  - `meta-claw-core/src/main/java/meta/claw/core/runtime/VesselRuntime.java`
+  - `meta-claw-cli/src/main/java/meta/claw/cli/ChatCommand.java`
+  - `meta-claw-core/src/test/java/meta/claw/core/runtime/VesselManagerTest.java`
+  - `meta-claw-tool/pom.xml`
+  - `.rwa/expert_project/java-component-hot-evolution-design.md`（新增）
+  - `feature_list.json`、`claude-progress.md`
+- 已知风险或未解决的问题：
+  - `VesselRuntime` 工具调用循环（单次 tool call → 执行 → 结果回注 LLM）尚未实现
+  - 热进化设计文档中的 `meta-claw-evo` 模块尚未落地
 - 下一步最佳动作：
   1. 继续实现 `VesselRuntime` 工具调用循环
-  2. 由用户决定下一项功能优先级
+  2. 由用户决定是否优先落地 Janino 编译器 + `ToolEvoRegistry`
+  3. 由用户决定下一项功能优先级
 
 - 下一步最佳动作：
   1. 运行标准入口 `./init.sh`
