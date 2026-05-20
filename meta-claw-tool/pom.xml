@@ -1,50 +1,30 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Meta-Claw Tool 模块 POM
+    作用：工具引擎，负责 @Tool 注解扫描、JSON Schema 生成、本地方法反射执行
+    依赖：meta-claw-core（复用 SpiToolDefinition / SpiToolCall / SpiJsonSchema）
+    被依赖：meta-claw-bootstrap、meta-claw-cli
+-->
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
                              http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
+
     <parent>
         <groupId>com.meta</groupId>
         <artifactId>meta-claw</artifactId>
         <version>0.1.0-SNAPSHOT</version>
     </parent>
-    <artifactId>meta-claw-cli</artifactId>
-    <name>Meta-Claw CLI</name>
-    <description>命令行交互模块，支持配置管理、数字员工对话和后台守护模式</description>
+
+    <artifactId>meta-claw-tool</artifactId>
+    <name>Meta-Claw Tool</name>
+    <description>工具引擎模块，支持 @Tool 注解扫描、JSON Schema 生成与本地反射执行</description>
+
     <dependencies>
         <dependency>
             <groupId>com.meta</groupId>
             <artifactId>meta-claw-core</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.meta</groupId>
-            <artifactId>meta-claw-vessel</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.meta</groupId>
-            <artifactId>meta-claw-store</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.meta</groupId>
-            <artifactId>meta-claw-tool</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>info.picocli</groupId>
-            <artifactId>picocli-spring-boot-starter</artifactId>
-            <version>4.7.7</version>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.ai</groupId>
-            <artifactId>spring-ai-starter-model-openai</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.jline</groupId>
-            <artifactId>jline-terminal</artifactId>
         </dependency>
         <dependency>
             <groupId>org.projectlombok</groupId>
@@ -57,6 +37,7 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
+
     <build>
         <plugins>
             <plugin>
@@ -73,13 +54,6 @@
                             <version>${lombok.version}</version>
                         </path>
                     </annotationProcessorPaths>
-                </configuration>
-            </plugin>
-            <plugin>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-maven-plugin</artifactId>
-                <configuration>
-                    <mainClass>meta.claw.cli.CliApplication</mainClass>
                 </configuration>
             </plugin>
         </plugins>

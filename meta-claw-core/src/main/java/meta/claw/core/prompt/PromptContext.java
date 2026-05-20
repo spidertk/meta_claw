@@ -8,6 +8,7 @@ import java.nio.file.Path;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import meta.claw.core.spi.llm.SpiToolDefinition;
 
 @Getter
 @Builder
@@ -21,7 +22,7 @@ public class PromptContext {
     private String capabilities;
     private String guidelines;
     @Builder.Default
-    private List<ToolInfo> tools = Collections.emptyList();
+    private List<SpiToolDefinition> tools = Collections.emptyList();
     @Builder.Default
     private List<SkillInfo> skills = Collections.emptyList();
     @Builder.Default

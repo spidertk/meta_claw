@@ -71,7 +71,7 @@ public class VesselRuntime {
         }
         // Phase 2: Fall back to SystemPromptBuilder if no static systemPrompt configured
         try {
-            PromptContext ctx = promptContextFactory.create(config, Path.of("."));
+            PromptContext ctx = promptContextFactory.create(config, Path.of("."), java.util.Collections.emptyList());
             return systemPromptBuilder.build(ctx);
         } catch (Exception e) {
             log.warn("Failed to build dynamic system prompt for vessel {}, fallback to null", config.getId(), e);

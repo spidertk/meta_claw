@@ -573,5 +573,43 @@
   1. 提交本轮修改
   2. 由用户决定是否继续下一项功能
 
+### Session 019
+
+- 日期：2026-05-20
+- 本轮目标：创建 `meta-claw-tool` 模块并实现工具引擎骨架
+- 已完成：
+  - 新增 `meta-claw-tool` 模块：包含 `@Tool`/`@ToolParam` 注解、`ToolRegistry`、`JsonSchemaGenerator`、`ToolExecutor`、`CalculatorTool`
+  - 根 `pom.xml` 添加 `meta-claw-tool` 模块与 `dependencyManagement` 版本声明；`meta-claw-cli/pom.xml` 添加依赖
+  - `PromptContext` 中 `tools` 字段从 `List<ToolInfo>` 统一为 `List<SpiToolDefinition>`，删除冗余的 `ToolInfo`
+  - `SystemPromptBuilder` 与对应测试适配 `SpiToolDefinition` record 访问器
+  - `PromptContextFactory.create()` 签名已接受 `List<SpiToolDefinition>` 参数
+  - `@ToolParam` 新增 `name()` 属性，解决 Java 反射参数名不可靠问题（`-parameters` 未开启时默认名称为 `arg0`）
+  - 新增 4 个单元测试类共 25 个测试，全部通过
+- 运行过的验证：
+  - `./init.sh`（真实环境，Java 21）→ 成功；10 个 reactor 模块全部 SUCCESS（含新增 meta-claw-tool）
+  - `SystemPromptBuilderTest` → 10/10 通过
+  - `ChatCommandTest` → 5/5 通过
+  - `JsonlShortMemoryStoreTest` → 10/10 通过
+  - `MessageFlowIntegrationTest` → 3/3 通过
+  - `JsonSchemaGeneratorTest` → 4/4 通过
+  - `ToolRegistryTest` → 5/5 通过
+  - `ToolExecutorTest` → 5/5 通过
+  - `CalculatorToolTest` → 11/11 通过
+- 更新过的文件或工件：
+  - `meta-claw-tool/`（新模块：pom.xml + 6 个源文件 + 4 个测试类）
+  - `meta-claw-core/src/main/java/meta/claw/core/spi/llm/SpiToolResult.java`（新增）
+  - `meta-claw-core/src/main/java/meta/claw/core/prompt/PromptContext.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/prompt/PromptContextFactory.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/prompt/SystemPromptBuilder.java`
+  - `meta-claw-core/src/test/java/meta/claw/core/prompt/SystemPromptBuilderTest.java`
+  - `pom.xml`、`meta-claw-cli/pom.xml`
+  - `feature_list.json`、`claude-progress.md`
+- 已知风险或未解决问题：
+  - `VesselRuntime` 尚未集成工具调用循环（单次 tool call → 执行 → 结果回注）
+  - `ToolCallback` 与 Spring AI `ChatClient` 的 tools API 适配仍待确认
+- 下一步最佳动作：
+  1. 继续实现 `VesselRuntime` 工具调用循环
+  2. 由用户决定下一项功能优先级
+
 - 下一步最佳动作：
   1. 运行标准入口 `./init.sh`

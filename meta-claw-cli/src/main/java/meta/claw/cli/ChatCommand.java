@@ -30,6 +30,8 @@ import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
 
 import meta.claw.store.memory.MemoryManagerProvider;
+import meta.claw.tool.registry.ToolRegistry;
+import meta.claw.tool.sample.CalculatorTool;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -166,9 +168,11 @@ public class ChatCommand implements Runnable {
         terminal.writer().println();
         terminal.flush();
 
-        // Phase 2: Build static system prompt (persona + preferences + runtime)
+        // Phase 2: Build static system prompt (persona + preferences + runtime + tools)
         Path vesselWorkspaceDir = vesselsDir.resolve(vesselName);
-        PromptContext promptContext = contextFactory.create(vesselConfig, vesselWorkspaceDir);
+        ToolRegistry toolRegistry = new ToolRegistry();
+        toolRegistry.register(new CalculatorTool());
+        PromptContext promptContext = contextFactory.create(vesselConfig, vesselWorkspaceDir, toolRegistry.getToolDefinitions());
         String systemPrompt = promptBuilder.build(promptContext);
 
         int maxHistoryRounds = vesselConfig.getMaxHistoryRounds() != null

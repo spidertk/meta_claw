@@ -71,7 +71,7 @@ public class SystemPromptBuilder {
         StringBuilder sb = new StringBuilder();
         sb.append("## Tools\n\n");
         sb.append(context.getTools().stream()
-                .map(t -> "- **" + t.getName() + "**: " + orDefault(t.getDescription(), ""))
+                .map(t -> "- **" + t.name() + "**: " + orDefault(t.description(), ""))
                 .collect(Collectors.joining("\n")));
         return sb.toString();
     }

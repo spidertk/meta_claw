@@ -31,6 +31,7 @@
         <module>meta-claw-bootstrap</module>
         <module>meta-claw-vessel</module>
         <module>meta-claw-store</module>
+        <module>meta-claw-tool</module>
         <module>meta-claw-cli</module>
     </modules>
 
@@ -110,6 +111,12 @@
             <dependency>
                 <groupId>com.meta</groupId>
                 <artifactId>meta-claw-store</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <!-- 内部模块版本管理：meta-claw-tool 工具引擎模块 -->
+            <dependency>
+                <groupId>com.meta</groupId>
+                <artifactId>meta-claw-tool</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <!-- 内部模块版本管理：meta-claw-cli 命令行交互模块 -->

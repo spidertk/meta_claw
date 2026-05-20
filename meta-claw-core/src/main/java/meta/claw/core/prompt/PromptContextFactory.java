@@ -8,6 +8,8 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Collections;
+import java.util.List;
+import meta.claw.core.spi.llm.SpiToolDefinition;
 import org.springframework.stereotype.Component;
 
 /**
@@ -28,9 +30,10 @@ public class PromptContextFactory {
      *
      * @param config       Vessel 配置
      * @param workspaceDir 当前工作区目录
+     * @param tools        可用工具列表
      * @return 构建好的 PromptContext
      */
-    public PromptContext create(VesselConfig config, Path workspaceDir) {
+    public PromptContext create(VesselConfig config, Path workspaceDir, List<SpiToolDefinition> tools) {
         return PromptContext.builder()
                 .vesselName(orDefault(config.getName(), "Vessel"))
                 .vesselDescription(orDefault(config.getDescription(), ""))
@@ -44,6 +47,7 @@ public class PromptContextFactory {
                 .currentTime(formatCurrentTime())
                 .location(detectLocation())
                 .runtimeInfo(Collections.emptyMap())
+                .tools(tools != null ? tools : Collections.emptyList())
                 .build();
     }
 

@@ -493,6 +493,50 @@
         }
       ],
       "notes": "当前仅建立会话摘要存储能力，自动摘要生成仍保持后续能力。"
+    },
+    {
+      "id": "tool-001",
+      "priority": 17,
+      "area": "tool-engine",
+      "title": "工具引擎骨架（meta-claw-tool）",
+      "user_visible_behavior": "系统能够扫描 @Tool 注解、生成 JSON Schema、执行本地工具方法，并把工具定义注入到 Vessel 的系统提示中。",
+      "status": "in_progress",
+      "verification": [
+        "确认 meta-claw-tool 模块已加入 reactor 并编译通过。",
+        "确认 @Tool / @ToolParam、ToolRegistry、JsonSchemaGenerator、ToolExecutor、CalculatorTool 已存在。",
+        "确认 PromptContext 已支持 tools 字段，SystemPromptBuilder 能在系统提示中列出可用工具。",
+        "运行 ./init.sh 全量编译与 P0 测试通过。"
+      ],
+      "evidence": [
+        {
+          "date": "2026-05-20",
+          "result": "passing",
+          "detail": "新增 meta-claw-tool 模块，包含 @Tool/@ToolParam 注解、ToolRegistry、JsonSchemaGenerator、ToolExecutor、CalculatorTool；根 pom 与 meta-claw-cli pom 已添加依赖；全仓编译通过。"
+        },
+        {
+          "date": "2026-05-20",
+          "result": "verified",
+          "detail": "PromptContext 的 tools 字段从 ToolInfo 统一为 SpiToolDefinition，SystemPromptBuilderTest 适配后 10/10 通过；./init.sh 全量编译 + P0 测试通过。"
+        }
+      ],
+      "evidence": [
+        {
+          "date": "2026-05-20",
+          "result": "passing",
+          "detail": "新增 meta-claw-tool 模块，包含 @Tool/@ToolParam 注解、ToolRegistry、JsonSchemaGenerator、ToolExecutor、CalculatorTool；根 pom 与 meta-claw-cli pom 已添加依赖；全仓编译通过。"
+        },
+        {
+          "date": "2026-05-20",
+          "result": "verified",
+          "detail": "PromptContext 的 tools 字段从 ToolInfo 统一为 SpiToolDefinition，SystemPromptBuilderTest 适配后 10/10 通过；./init.sh 全量编译 + P0 测试通过。"
+        },
+        {
+          "date": "2026-05-20",
+          "result": "verified",
+          "detail": "meta-claw-tool 新增 4 个测试类共 25 个测试：JsonSchemaGeneratorTest 4/4、ToolRegistryTest 5/5、ToolExecutorTest 5/5、CalculatorToolTest 11/11 全部通过。"
+        }
+      ],
+      "notes": "工具调用循环（VesselRuntime 集成、单次 tool call 执行与结果回注）仍在实现中；@ToolParam 已增加 name() 属性以解决 Java 反射参数名不可靠问题。"
     }
   ]
 }

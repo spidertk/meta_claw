@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
+import meta.claw.core.spi.llm.SpiToolDefinition;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -58,8 +59,8 @@ class SystemPromptBuilderTest {
         PromptContext ctx = PromptContext.builder()
                 .vesselName("V")
                 .tools(List.of(
-                        ToolInfo.builder().name("search").description("Search the web.").build(),
-                        ToolInfo.builder().name("calc").description("Calculate expressions.").build()
+                        SpiToolDefinition.builder().name("search").description("Search the web.").parameters(null).build(),
+                        SpiToolDefinition.builder().name("calc").description("Calculate expressions.").parameters(null).build()
                 ))
                 .build();
 
