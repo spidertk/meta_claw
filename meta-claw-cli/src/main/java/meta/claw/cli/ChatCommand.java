@@ -4,7 +4,7 @@ import lombok.extern.slf4j.Slf4j;
 import meta.claw.core.memory.MemoryMessage;
 import meta.claw.core.memory.MemoryMessageConverter;
 import meta.claw.core.memory.shortterm.ShortMemoryManager;
-import meta.claw.core.memory.longterm.LongMemoryManager;
+
 import meta.claw.core.prompt.PromptContext;
 import meta.claw.core.prompt.PromptContextFactory;
 import meta.claw.core.prompt.SystemPromptBuilder;
@@ -125,7 +125,6 @@ public class ChatCommand implements Runnable {
         // Initialize memory managers and session
         Path vesselsDir = configDir.resolve("vessels");
         this.shortMemoryManager = memoryManagerProvider.createShortTerm(vesselsDir, vesselConfig.getMemory(), vesselName);
-        LongMemoryManager longMemoryManager = memoryManagerProvider.createLongTerm(vesselsDir, vesselConfig.getMemory());
         Path historyFilePath;
         try {
             this.sessionKey = selectSession(shortMemoryManager, vesselName, resumeSessionId, () -> UUID.randomUUID().toString(),
@@ -171,12 +170,11 @@ public class ChatCommand implements Runnable {
         terminal.writer().println();
         terminal.flush();
 
-        // Phase 2: Build dynamic system prompt via SystemPromptBuilder
+        // Phase 2: Build static system prompt (persona + preferences + runtime)
         Path vesselWorkspaceDir = vesselsDir.resolve(vesselName);
-        PromptContext promptContext = contextFactory.create(vesselConfig, vesselWorkspaceDir, longMemoryManager);
+        PromptContext promptContext = contextFactory.create(vesselConfig, vesselWorkspaceDir);
         String systemPrompt = promptBuilder.build(promptContext);
 
-        ShortMemoryManager memoryManager = shortMemoryManager;
         int maxHistoryRounds = vesselConfig.getMaxHistoryRounds() != null
                 ? vesselConfig.getMaxHistoryRounds() : 20;
 
@@ -220,13 +218,10 @@ public class ChatCommand implements Runnable {
                     log.error("Failed to persist user message", e);
                 }
 
-                // Phase 2: Build the LLM context from persisted history.
-                List<SpiMessage> truncatedHistory = new ArrayList<>();
-                if (systemPrompt != null && !systemPrompt.isBlank()) {
-                    truncatedHistory.add(SpiMessage.system(systemPrompt));
-                }
-                truncatedHistory.addAll(toSpiMessages(memoryManager.getHistory(sessionKey, maxHistoryRounds)));
-                SpiChatRequest request = SpiChatRequest.builder().messages(truncatedHistory).build();
+                // Build LLM request: static system prompt + dynamic conversation history
+                SpiChatRequest request = SpiChatRequest.builder()
+                        .messages(buildLlmRequest(sessionKey, systemPrompt, maxHistoryRounds))
+                        .build();
 
                 terminal.writer().print("AI: ");
                 terminal.writer().flush();
@@ -277,6 +272,15 @@ public class ChatCommand implements Runnable {
 
         terminal.writer().println("Goodbye!");
         terminal.writer().flush();
+    }
+
+    private List<SpiMessage> buildLlmRequest(String sessionKey, String systemPrompt, int maxHistoryRounds) {
+        List<SpiMessage> messages = new ArrayList<>();
+        if (systemPrompt != null && !systemPrompt.isBlank()) {
+            messages.add(SpiMessage.system(systemPrompt));
+        }
+        messages.addAll(toSpiMessages(shortMemoryManager.getHistory(sessionKey, maxHistoryRounds)));
+        return messages;
     }
 
     static List<SpiMessage> toSpiMessages(List<MemoryMessage> entries) {

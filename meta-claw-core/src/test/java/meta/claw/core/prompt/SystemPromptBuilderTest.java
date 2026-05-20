@@ -1,6 +1,5 @@
 package meta.claw.core.prompt;
 
-import meta.claw.core.spi.llm.SpiMessage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -109,14 +108,13 @@ class SystemPromptBuilderTest {
     }
 
     @Test
-    void build_shouldSeparateKnowledgePreferencesAndConversationHistory() {
-        SpiMessage msg = SpiMessage.user("Hello");
+    void build_shouldSeparateKnowledgePreferencesAndRuntime() {
         PromptContext ctx = PromptContext.builder()
                 .vesselName("V")
                 .knowledge("Domain: AI agents.")
                 .preferences("- User likes dark mode.")
-                .conversationSummary("User asked about Java.")
-                .recentMessages(List.of(msg))
+                .currentTime("2026-05-08 12:00:00 CST")
+                .location("Asia/Shanghai")
                 .build();
 
         String prompt = builder.build(ctx);
@@ -125,13 +123,9 @@ class SystemPromptBuilderTest {
         assertTrue(prompt.contains("Domain: AI agents."));
         assertTrue(prompt.contains("## User Preferences"));
         assertTrue(prompt.contains("- User likes dark mode."));
-        assertTrue(prompt.contains("## Conversation History"));
+        assertTrue(prompt.contains("## Runtime"));
         assertFalse(prompt.contains("## Memory"));
         assertTrue(prompt.indexOf("## User Preferences") > prompt.indexOf("## Runtime"));
-        assertTrue(prompt.contains("Conversation Summary"));
-        assertTrue(prompt.contains("User asked about Java."));
-        assertTrue(prompt.contains("Recent Messages"));
-        assertTrue(prompt.contains("Hello"));
     }
 
     @Test

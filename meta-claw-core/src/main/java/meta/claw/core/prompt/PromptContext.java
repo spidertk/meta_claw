@@ -4,8 +4,6 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import meta.claw.core.spi.llm.SpiMessage;
-
 import java.nio.file.Path;
 import java.util.Collections;
 import java.util.List;
@@ -35,8 +33,4 @@ public class PromptContext {
     private String location;
     @Builder.Default
     private Map<String, String> runtimeInfo = Collections.emptyMap();
-    @Builder.Default
-    private List<SpiMessage> recentMessages = Collections.emptyList();
-    @Builder.Default
-    private String conversationSummary = "";
 }

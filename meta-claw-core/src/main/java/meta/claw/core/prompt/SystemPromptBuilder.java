@@ -43,7 +43,6 @@ public class SystemPromptBuilder {
         template = template.replace("<WORKSPACE_SECTION/>", buildWorkspaceSection(context));
         template = template.replace("<RUNTIME_SECTION/>", buildRuntimeSection(context));
         template = template.replace("<PREFERENCES_SECTION/>", buildPreferencesSection(context));
-        template = template.replace("<CONVERSATION_HISTORY_SECTION/>", buildConversationHistorySection(context));
         return template.trim();
     }
 
@@ -118,25 +117,6 @@ public class SystemPromptBuilder {
         if (context.getRuntimeInfo() != null && !context.getRuntimeInfo().isEmpty()) {
             context.getRuntimeInfo().forEach((k, v) ->
                     sb.append("- **").append(k).append("**: ").append(v).append("\n"));
-        }
-        return sb.toString().trim();
-    }
-
-    private String buildConversationHistorySection(PromptContext context) {
-        if (isBlank(context.getConversationSummary())
-                && (context.getRecentMessages() == null || context.getRecentMessages().isEmpty())) {
-            return "";
-        }
-        StringBuilder sb = new StringBuilder();
-        sb.append("## Conversation History\n\n");
-        if (!isBlank(context.getConversationSummary())) {
-            sb.append("### Conversation Summary\n\n").append(context.getConversationSummary()).append("\n\n");
-        }
-        if (context.getRecentMessages() != null && !context.getRecentMessages().isEmpty()) {
-            sb.append("### Recent Messages\n\n");
-            context.getRecentMessages().forEach(m -> {
-                sb.append("**").append(m.role()).append(":** ").append(orDefault(m.content(), "")).append("\n\n");
-            });
         }
         return sb.toString().trim();
     }

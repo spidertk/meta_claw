@@ -2,16 +2,12 @@ package meta.claw.core.prompt;
 
 import lombok.RequiredArgsConstructor;
 import meta.claw.core.config.VesselConfig;
-import meta.claw.core.memory.PreferenceMemory;
-import meta.claw.core.memory.longterm.LongMemoryStore;
 
 import java.nio.file.Path;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Collections;
-import java.util.List;
-import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
 
 /**
@@ -25,16 +21,16 @@ public class PromptContextFactory {
     private static final DateTimeFormatter TIME_FORMATTER =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss z");
 
+    private final PreferenceProvider preferenceProvider;
+
     /**
      * 创建 PromptContext。
      *
-     * @param config          Vessel 配置
-     * @param workspaceDir    当前工作区目录
-     * @param preferenceStore 用户偏好存储（可为 null）
+     * @param config       Vessel 配置
+     * @param workspaceDir 当前工作区目录
      * @return 构建好的 PromptContext
      */
-    public PromptContext create(VesselConfig config, Path workspaceDir,
-                                 LongMemoryStore preferenceStore) {
+    public PromptContext create(VesselConfig config, Path workspaceDir) {
         return PromptContext.builder()
                 .vesselName(orDefault(config.getName(), "Vessel"))
                 .vesselDescription(orDefault(config.getDescription(), ""))
@@ -43,27 +39,19 @@ public class PromptContextFactory {
                 .capabilities(orDefault(config.getCapabilities(), ""))
                 .guidelines(orDefault(config.getGuidelines(), ""))
                 .knowledge(orDefault(config.getDomainKnowledge(), ""))
-                .preferences(loadPreferences(config, preferenceStore))
+                .preferences(loadPreferences(config))
                 .workspaceDir(workspaceDir)
                 .currentTime(formatCurrentTime())
                 .location(detectLocation())
                 .runtimeInfo(Collections.emptyMap())
-                .recentMessages(Collections.emptyList())
-                .conversationSummary("")
                 .build();
     }
 
-    private String loadPreferences(VesselConfig config, LongMemoryStore store) {
-        if (store == null || !config.isPreferencesEnabled() || config.getId() == null) {
+    private String loadPreferences(VesselConfig config) {
+        if (!config.isPreferencesEnabled() || config.getId() == null) {
             return "";
         }
-        List<PreferenceMemory> entries = store.listRecentPreferences(config.getId(), 20);
-        if (entries.isEmpty()) {
-            return "";
-        }
-        return entries.stream()
-                .map(e -> "- " + orDefault(e.getContent(), ""))
-                .collect(Collectors.joining("\n"));
+        return preferenceProvider.getPreferences(config.getId());
     }
 
     private String formatCurrentTime() {

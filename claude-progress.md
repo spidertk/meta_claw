@@ -514,5 +514,41 @@
   1. 提交本轮修改
   2. 由用户决定是否继续下一项功能
 
+### Session 017
+
+- 日期：2026-05-20
+- 本轮目标：重构 ChatCommand / PromptContext，解耦 prompt 构建与历史管理
+- 已完成：
+  - 新增 `PreferenceProvider` 窄接口 + `LongMemoryPreferenceProvider` Spring 组件，将偏好查询/格式化从 `PromptContextFactory` 中剥离
+  - `PromptContext` 删除 `recentMessages`、`conversationSummary` 死字段，只保留 system prompt 所需的上下文（persona + preferences + runtime）
+  - `PromptContextFactory.create()` 签名从 3 参数降为 2 参数，不再直接依赖 `LongMemoryStore`
+  - `SystemPromptBuilder` 删除 `buildConversationHistorySection()`，历史完全由 `ShortMemoryManager` 管理
+  - `ChatCommand` 提取 `buildLlmRequest()` 私有方法，主循环只做 I/O；删除未使用的 `LongMemoryManager` 本地变量
+  - 修复 `VesselRuntime`、`VesselManagerTest` 中旧签名的调用点
+- 运行过的验证：
+  - `./init.sh`（真实环境，Java 21）→ 成功；9 个 reactor 模块全部 SUCCESS
+  - `SystemPromptBuilderTest` → 10/10 通过
+  - `ChatCommandTest` → 6/6 通过
+  - `JsonlShortMemoryStoreTest` → 10/10 通过
+  - `MessageFlowIntegrationTest` → 3/3 通过
+- 已记录证据：
+  - 新增 `LongMemoryPreferenceProviderTest` 覆盖格式化逻辑
+- 更新过的文件或工件：
+  - `meta-claw-core/src/main/java/meta/claw/core/prompt/PreferenceProvider.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/prompt/LongMemoryPreferenceProvider.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/prompt/PromptContext.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/prompt/PromptContextFactory.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/prompt/SystemPromptBuilder.java`
+  - `meta-claw-cli/src/main/java/meta/claw/cli/ChatCommand.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/runtime/VesselRuntime.java`
+  - `meta-claw-core/src/test/java/meta/claw/core/prompt/SystemPromptBuilderTest.java`
+  - `meta-claw-core/src/test/java/meta/claw/core/prompt/LongMemoryPreferenceProviderTest.java`
+  - `meta-claw-core/src/test/java/meta/claw/core/runtime/VesselManagerTest.java`
+- 已知风险或未解决问题：
+  - 当前无新增 blocker
+- 下一步最佳动作：
+  1. 提交本轮修改
+  2. 由用户决定是否继续下一项功能
+
 - 下一步最佳动作：
   1. 运行标准入口 `./init.sh`
