@@ -550,5 +550,28 @@
   1. 提交本轮修改
   2. 由用户决定是否继续下一项功能
 
+### Session 018
+
+- 日期：2026-05-20
+- 本轮目标：把 CLI 层的文件预创建逻辑完全下沉到 JsonlShortMemoryStore
+- 已完成：
+  - 删除 `ChatCommand.initializeHistoryFile` 静态方法，空文件创建由 `ShortMemoryManager.initializeConversation` 统一负责
+  - 简化 `ChatCommand.selectSession` 签名，移除 `historyFiles` 参数
+  - 清理 `ChatCommand` 未使用的 import（`FileChannel`、`Files`、`StandardOpenOption`）
+  - 更新 `ChatCommandTest`：删除 `initializeHistoryFile` 测试，`selectSession` 测试不再断言文件存在性
+- 运行过的验证：
+  - `./init.sh`（真实环境，Java 21）→ 成功；9 个 reactor 模块全部 SUCCESS
+  - `ChatCommandTest` → 5/5 通过
+  - `JsonlShortMemoryStoreTest` → 10/10 通过
+  - `MessageFlowIntegrationTest` → 3/3 通过
+- 更新过的文件或工件：
+  - `meta-claw-cli/src/main/java/meta/claw/cli/ChatCommand.java`
+  - `meta-claw-cli/src/test/java/meta/claw/cli/ChatCommandTest.java`
+- 已知风险或未解决问题：
+  - 当前无新增 blocker
+- 下一步最佳动作：
+  1. 提交本轮修改
+  2. 由用户决定是否继续下一项功能
+
 - 下一步最佳动作：
   1. 运行标准入口 `./init.sh`
