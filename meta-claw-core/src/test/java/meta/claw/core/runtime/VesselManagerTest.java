@@ -115,7 +115,7 @@ class VesselManagerTest {
         VesselRuntime mockRuntime = new VesselRuntime(
                 manager.getConfig("runtime-test"),
                 null,
-                new PromptContextFactory(vesselId -> ""),
+                new PromptContextFactory(vesselId -> "", null, null),
                 new SystemPromptBuilder(new TemplateLoader()),
                 null
         );

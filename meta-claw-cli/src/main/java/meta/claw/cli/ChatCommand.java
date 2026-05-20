@@ -171,9 +171,7 @@ public class ChatCommand implements Runnable {
         terminal.flush();
 
         // Phase 2: Build static system prompt (persona + preferences + runtime + tools)
-        Path vesselWorkspaceDir = vesselsDir.resolve(vesselName);
-        PromptContext promptContext = contextFactory.create(vesselConfig, vesselWorkspaceDir,
-                toolProvider != null ? toolProvider.getToolDefinitions() : java.util.Collections.emptyList());
+        PromptContext promptContext = contextFactory.create(vesselConfig);
         String systemPrompt = promptBuilder.build(promptContext);
 
         int maxHistoryRounds = vesselConfig.getMaxHistoryRounds() != null

@@ -648,10 +648,36 @@
 - 已知风险或未解决的问题：
   - `VesselRuntime` 工具调用循环（单次 tool call → 执行 → 结果回注 LLM）尚未实现
   - 热进化设计文档中的 `meta-claw-evo` 模块尚未落地
+### Session 021
+
+- 日期：2026-05-20
+- 本轮目标：简化 PromptContextFactory 调用签名，将 workspace 和 tools 推导下沉到内部
+- 已完成：
+  - 新增 `meta.claw.core.spi.workspace.WorkspaceProvider` 接口
+  - 新增 `MetaClawWorkspaceProvider` 实现，每个 Vessel 的 workspace 固定为 `.meta-claw/vessels/<vesselId>/workspace`
+  - `PromptContextFactory.create()` 签名从 `(VesselConfig, Path, List<SpiToolDefinition>)` 简化为 `(VesselConfig)`
+  - `PromptContextFactory` 注入 `WorkspaceProvider` 和 `ToolDefinitionProvider`，内部自动解析 workspace 和工具列表
+  - `ChatCommand` 和 `VesselRuntime` 的调用点全部简化
+  - `VesselManagerTest` 适配新构造函数
+- 运行过的验证：
+  - `./init.sh`（真实环境，Java 21）→ 成功；10 个 reactor 模块全部 SUCCESS
+  - `SystemPromptBuilderTest` → 10/10 通过
+  - `ChatCommandTest` → 5/5 通过
+  - `VesselManagerTest` → 4/4 通过
+  - `MessageFlowIntegrationTest` → 3/3 通过
+- 更新过的文件或工件：
+  - `meta-claw-core/src/main/java/meta/claw/core/spi/workspace/WorkspaceProvider.java`（新增）
+  - `meta-claw-core/src/main/java/meta/claw/core/prompt/PromptContextFactory.java`
+  - `meta-claw-cli/src/main/java/meta/claw/cli/workspace/MetaClawWorkspaceProvider.java`（新增）
+  - `meta-claw-cli/src/main/java/meta/claw/cli/ChatCommand.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/runtime/VesselRuntime.java`
+  - `meta-claw-core/src/test/java/meta/claw/core/runtime/VesselManagerTest.java`
+  - `feature_list.json`、`claude-progress.md`
+- 已知风险或未解决的问题：
+  - `VesselRuntime` 工具调用循环尚未实现
 - 下一步最佳动作：
   1. 继续实现 `VesselRuntime` 工具调用循环
-  2. 由用户决定是否优先落地 Janino 编译器 + `ToolEvoRegistry`
-  3. 由用户决定下一项功能优先级
+  2. 由用户决定下一项功能优先级
 
 - 下一步最佳动作：
   1. 运行标准入口 `./init.sh`

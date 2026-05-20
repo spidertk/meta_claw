@@ -558,6 +558,33 @@
           "detail": "ToolRegistry 已 Spring 化：改为 @Component，启动时自动扫描所有 bean 的 @Tool 方法，支持 register/unregister/reregister 动态热注入；通过 ToolDefinitionProvider 接口与 core 模块解耦；VesselRuntime 与 ChatCommand 已注入工具列表。"
         }
       ],
+      "evidence": [
+        {
+          "date": "2026-05-20",
+          "result": "passing",
+          "detail": "新增 meta-claw-tool 模块，包含 @Tool/@ToolParam 注解、ToolRegistry、JsonSchemaGenerator、ToolExecutor、CalculatorTool；根 pom 与 meta-claw-cli pom 已添加依赖；全仓编译通过。"
+        },
+        {
+          "date": "2026-05-20",
+          "result": "verified",
+          "detail": "PromptContext 的 tools 字段从 ToolInfo 统一为 SpiToolDefinition，SystemPromptBuilderTest 适配后 10/10 通过；./init.sh 全量编译 + P0 测试通过。"
+        },
+        {
+          "date": "2026-05-20",
+          "result": "verified",
+          "detail": "meta-claw-tool 新增 4 个测试类共 25 个测试，全部通过。"
+        },
+        {
+          "date": "2026-05-20",
+          "result": "verified",
+          "detail": "ToolRegistry 已 Spring 化：改为 @Component，启动时自动扫描所有 bean 的 @Tool 方法，支持 register/unregister/reregister 动态热注入；通过 ToolDefinitionProvider 接口与 core 模块解耦；VesselRuntime 与 ChatCommand 已注入工具列表。"
+        },
+        {
+          "date": "2026-05-20",
+          "result": "verified",
+          "detail": "PromptContextFactory.create() 签名从 3 参数简化为 1 参数（仅 VesselConfig）；新增 WorkspaceProvider 接口和 MetaClawWorkspaceProvider 实现，每个 Vessel 的 workspace 固定为 .meta-claw/vessels/<vessel>/workspace；工具列表由注入的 ToolDefinitionProvider 内部解析。"
+        }
+      ],
       "notes": "工具调用循环（VesselRuntime 集成、单次 tool call 执行与结果回注）仍在实现中；Java 组件热进化设计文档已输出到 .rwa/expert_project/java-component-hot-evolution-design.md。"
     }
   ]
