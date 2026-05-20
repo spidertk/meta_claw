@@ -3,8 +3,7 @@ package meta.claw.cli;
 import meta.claw.core.config.VesselConfig;
 import meta.claw.core.memory.SessionMemory;
 import meta.claw.core.memory.shortterm.ShortMemoryManager;
-import meta.claw.store.memory.MemoryManagerProvider;
-import meta.claw.vessel.ProjectRootFinder;
+import meta.claw.core.util.ProjectRootFinder;
 import meta.claw.vessel.VesselConfigResolver;
 import org.springframework.stereotype.Component;
 import picocli.CommandLine.Command;
@@ -21,11 +20,11 @@ public class SessionsCommand implements Runnable {
     private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
     private final VesselConfigResolver resolver;
-    private final MemoryManagerProvider memoryManagerProvider;
+    private final ShortMemoryManager shortMemoryManager;
 
-    public SessionsCommand(VesselConfigResolver resolver, MemoryManagerProvider memoryManagerProvider) {
+    public SessionsCommand(VesselConfigResolver resolver, ShortMemoryManager shortMemoryManager) {
         this.resolver = resolver;
-        this.memoryManagerProvider = memoryManagerProvider;
+        this.shortMemoryManager = shortMemoryManager;
     }
 
     @Parameters(index = "0", defaultValue = "default", description = "Vessel name")
@@ -37,15 +36,12 @@ public class SessionsCommand implements Runnable {
         try {
             var resolved = resolver.resolve(configDir, vesselName);
             VesselConfig config = resolved.getVesselConfig();
-            ShortMemoryManager memoryManager = memoryManagerProvider.createShortTerm(
-                    configDir.resolve("vessels"), config.getMemory(), vesselName);
-            printSessions(vesselName, memoryManager.listSessions(vesselName));
+            printSessions(vesselName, shortMemoryManager.listSessions(vesselName));
             return;
         } catch (IllegalStateException | IllegalArgumentException e) {
             System.err.println(e.getMessage());
             return;
         }
-
     }
 
     static void printSessions(String vesselName, List<SessionMemory> sessions) {

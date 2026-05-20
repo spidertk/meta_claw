@@ -13,6 +13,7 @@ import meta.claw.core.memory.MemoryMessageConverter;
 import meta.claw.core.memory.SessionMemory;
 import meta.claw.core.memory.shortterm.ShortMemoryStore;
 import meta.claw.core.spi.llm.SpiMessage;
+import meta.claw.core.util.ProjectRootFinder;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -31,15 +32,13 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
 
 /**
- * 基于 JSONL 文件的短期记忆 backend。
+ * 基于 JSONL 文件的短期记忆 backend。Spring 单例，按 vesselId 隔离数据。
  */
 @Slf4j
-@Component
-@Scope("prototype")
+@Component("jsonl")
 public class JsonlShortMemoryStore implements ShortMemoryStore {
 
     private static final Pattern BASE64_PATTERN = Pattern.compile(
@@ -47,24 +46,15 @@ public class JsonlShortMemoryStore implements ShortMemoryStore {
     );
     private static final DateTimeFormatter TIMESTAMP_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
-    private final Path baseDir;
-    private final String boundVesselId;
     private final ObjectMapper objectMapper;
     private final ConcurrentHashMap<String, ReentrantReadWriteLock> lockMap = new ConcurrentHashMap<>();
 
-    public JsonlShortMemoryStore(Path baseDir) {
-        this(baseDir, null);
-    }
-
-    public JsonlShortMemoryStore(Path baseDir, String vesselId) {
-        this.baseDir = baseDir;
-        this.boundVesselId = vesselId;
+    public JsonlShortMemoryStore() {
         this.objectMapper = createObjectMapper();
     }
 
     @Override
-    public void initializeConversation(String sessionKey) {
-        String vesselId = resolveVesselId(sessionKey);
+    public void initializeConversation(String vesselId, String sessionKey) {
         Path filePath = getHistoryFilePath(vesselId, sessionKey);
         ReentrantReadWriteLock lock = getLock(sessionKey);
         lock.writeLock().lock();
@@ -83,13 +73,12 @@ public class JsonlShortMemoryStore implements ShortMemoryStore {
     }
 
     @Override
-    public void appendMessage(String sessionKey, MemoryMessage message) {
-        String vesselId = resolveVesselId(sessionKey);
+    public void appendMessage(String vesselId, String sessionKey, MemoryMessage message) {
         ReentrantReadWriteLock lock = getLock(sessionKey);
         lock.writeLock().lock();
         try {
             Path filePath = getHistoryFilePath(vesselId, sessionKey);
-            initializeConversation(sessionKey);
+            initializeConversation(vesselId, sessionKey);
             message.setContent(stripBase64(message.getContent()));
             String jsonLine = objectMapper.writeValueAsString(message) + "\n";
             try (FileChannel channel = FileChannel.open(filePath,
@@ -106,8 +95,7 @@ public class JsonlShortMemoryStore implements ShortMemoryStore {
     }
 
     @Override
-    public List<MemoryMessage> getHistory(String sessionKey, int limit) {
-        String vesselId = resolveVesselId(sessionKey);
+    public List<MemoryMessage> getHistory(String vesselId, String sessionKey, int limit) {
         Path filePath = getHistoryFilePath(vesselId, sessionKey);
         if (!Files.exists(filePath)) {
             return Collections.emptyList();
@@ -135,7 +123,7 @@ public class JsonlShortMemoryStore implements ShortMemoryStore {
     @Override
     public List<SessionMemory> listSessions(String vesselId) {
         List<SessionMemory> result = new ArrayList<>();
-        Path conversationsDir = baseDir.resolve(vesselId).resolve("conversations");
+        Path conversationsDir = resolveBaseDir().resolve(vesselId).resolve("conversations");
         if (!Files.exists(conversationsDir)) {
             return result;
         }
@@ -163,8 +151,7 @@ public class JsonlShortMemoryStore implements ShortMemoryStore {
     }
 
     @Override
-    public boolean clearHistory(String sessionKey) {
-        String vesselId = resolveVesselId(sessionKey);
+    public boolean clearHistory(String vesselId, String sessionKey) {
         Path filePath = getHistoryFilePath(vesselId, sessionKey);
         ReentrantReadWriteLock lock = getLock(sessionKey);
         lock.writeLock().lock();
@@ -182,81 +169,22 @@ public class JsonlShortMemoryStore implements ShortMemoryStore {
     }
 
     @Override
-    public boolean conversationExists(String sessionKey) {
-        return Files.exists(getHistoryFilePath(resolveVesselId(sessionKey), sessionKey));
-    }
-
-    private List<MemoryMessage> trimByRound(List<MemoryMessage> history, int maxRounds) {
-        if (maxRounds <= 0 || history == null || history.isEmpty()) {
-            return history == null ? new ArrayList<>() : new ArrayList<>(history);
-        }
-
-        int roundsFound = 0;
-        int cutoffIndex = 0;
-        for (int i = history.size() - 1; i >= 0; i--) {
-            if ("assistant".equalsIgnoreCase(history.get(i).getRole())) {
-                roundsFound++;
-                if (roundsFound > maxRounds) {
-                    cutoffIndex = i + 1;
-                    break;
-                }
-            }
-        }
-
-        List<MemoryMessage> result = new ArrayList<>();
-        for (int i = 0; i < history.size(); i++) {
-            MemoryMessage message = history.get(i);
-            if ("system".equalsIgnoreCase(message.getRole()) || i >= cutoffIndex) {
-                result.add(message);
-            }
-        }
-        return result;
+    public boolean conversationExists(String vesselId, String sessionKey) {
+        return Files.exists(getHistoryFilePath(vesselId, sessionKey));
     }
 
     @Override
-    public List<MemoryMessage> getHistoryByToken(String sessionKey, int maxTokens) {
-        return trimByToken(getHistory(sessionKey), maxTokens);
-    }
-
-    private List<MemoryMessage> trimByToken(List<MemoryMessage> history, int maxTokens) {
-        if (maxTokens <= 0 || history == null || history.isEmpty()) {
-            return history == null ? new ArrayList<>() : new ArrayList<>(history);
-        }
-
-        int currentTokens = 0;
-        int cutoffIndex = 0;
-        for (int i = history.size() - 1; i >= 0; i--) {
-            MemoryMessage message = history.get(i);
-            int tokens = estimateTokens(message.getContent());
-            if ("system".equalsIgnoreCase(message.getRole())) {
-                currentTokens += tokens;
-                continue;
-            }
-            if (currentTokens + tokens > maxTokens) {
-                cutoffIndex = i + 1;
-                break;
-            }
-            currentTokens += tokens;
-        }
-
-        List<MemoryMessage> result = new ArrayList<>();
-        for (int i = 0; i < history.size(); i++) {
-            MemoryMessage message = history.get(i);
-            if ("system".equalsIgnoreCase(message.getRole()) || i >= cutoffIndex) {
-                result.add(message);
-            }
-        }
-        return result;
+    public List<MemoryMessage> getHistoryByToken(String vesselId, String sessionKey, int maxTokens) {
+        return trimByToken(getHistory(vesselId, sessionKey), maxTokens);
     }
 
     @Override
-    public SessionMemory loadSummary(String sessionKey) {
-        return loadSummaryForVessel(resolveVesselId(sessionKey), sessionKey);
+    public SessionMemory loadSummary(String vesselId, String sessionKey) {
+        return loadSummaryForVessel(vesselId, sessionKey);
     }
 
     @Override
-    public void saveSummary(String sessionKey, SessionMemory summary) {
-        String vesselId = resolveVesselId(sessionKey);
+    public void saveSummary(String vesselId, String sessionKey, SessionMemory summary) {
         Path filePath = getSummaryFilePath(vesselId, sessionKey);
         ReentrantReadWriteLock lock = getLock(sessionKey);
         lock.writeLock().lock();
@@ -272,7 +200,7 @@ public class JsonlShortMemoryStore implements ShortMemoryStore {
     }
 
     @Override
-    public String summarizeConversation(List<MemoryMessage> history) {
+    public String summarizeConversation(String vesselId, List<MemoryMessage> history) {
         return "Earlier conversation summarized.";
     }
 
@@ -338,30 +266,16 @@ public class JsonlShortMemoryStore implements ShortMemoryStore {
         return lockMap.computeIfAbsent(sessionKey, k -> new ReentrantReadWriteLock());
     }
 
-    private String resolveVesselId(String sessionKey) {
-        if (boundVesselId != null && !boundVesselId.isBlank()) {
-            return boundVesselId;
-        }
-        if (!Files.exists(baseDir)) {
-            return "default";
-        }
-        try (var vessels = Files.list(baseDir)) {
-            return vessels
-                    .filter(vesselDir -> Files.exists(getHistoryFilePath(vesselDir.getFileName().toString(), sessionKey)))
-                    .map(vesselDir -> vesselDir.getFileName().toString())
-                    .findFirst()
-                    .orElse("default");
-        } catch (IOException e) {
-            return "default";
-        }
+    private Path resolveBaseDir() {
+        return ProjectRootFinder.getMetaClawDir().resolve("vessels");
     }
 
     private Path getHistoryFilePath(String vesselId, String sessionKey) {
-        return baseDir.resolve(vesselId).resolve("conversations").resolve(sessionKey).resolve("history.jsonl");
+        return resolveBaseDir().resolve(vesselId).resolve("conversations").resolve(sessionKey).resolve("history.jsonl");
     }
 
     private Path getSummaryFilePath(String vesselId, String sessionKey) {
-        return baseDir.resolve(vesselId).resolve("conversations").resolve(sessionKey).resolve("summary.json");
+        return resolveBaseDir().resolve(vesselId).resolve("conversations").resolve(sessionKey).resolve("summary.json");
     }
 
     private SessionMemory loadSummaryForVessel(String vesselId, String sessionKey) {
@@ -423,5 +337,63 @@ public class JsonlShortMemoryStore implements ShortMemoryStore {
             }
         }
         return chineseChars + (otherChars / 4) + 1;
+    }
+
+    private List<MemoryMessage> trimByRound(List<MemoryMessage> history, int maxRounds) {
+        if (maxRounds <= 0 || history == null || history.isEmpty()) {
+            return history == null ? new ArrayList<>() : new ArrayList<>(history);
+        }
+
+        int roundsFound = 0;
+        int cutoffIndex = 0;
+        for (int i = history.size() - 1; i >= 0; i--) {
+            if ("assistant".equalsIgnoreCase(history.get(i).getRole())) {
+                roundsFound++;
+                if (roundsFound > maxRounds) {
+                    cutoffIndex = i + 1;
+                    break;
+                }
+            }
+        }
+
+        List<MemoryMessage> result = new ArrayList<>();
+        for (int i = 0; i < history.size(); i++) {
+            MemoryMessage message = history.get(i);
+            if ("system".equalsIgnoreCase(message.getRole()) || i >= cutoffIndex) {
+                result.add(message);
+            }
+        }
+        return result;
+    }
+
+    private List<MemoryMessage> trimByToken(List<MemoryMessage> history, int maxTokens) {
+        if (maxTokens <= 0 || history == null || history.isEmpty()) {
+            return history == null ? new ArrayList<>() : new ArrayList<>(history);
+        }
+
+        int currentTokens = 0;
+        int cutoffIndex = 0;
+        for (int i = history.size() - 1; i >= 0; i--) {
+            MemoryMessage message = history.get(i);
+            int tokens = estimateTokens(message.getContent());
+            if ("system".equalsIgnoreCase(message.getRole())) {
+                currentTokens += tokens;
+                continue;
+            }
+            if (currentTokens + tokens > maxTokens) {
+                cutoffIndex = i + 1;
+                break;
+            }
+            currentTokens += tokens;
+        }
+
+        List<MemoryMessage> result = new ArrayList<>();
+        for (int i = 0; i < history.size(); i++) {
+            MemoryMessage message = history.get(i);
+            if ("system".equalsIgnoreCase(message.getRole()) || i >= cutoffIndex) {
+                result.add(message);
+            }
+        }
+        return result;
     }
 }

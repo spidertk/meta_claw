@@ -11,7 +11,7 @@ import java.util.Map;
 import meta.claw.core.spi.llm.SpiToolDefinition;
 
 @Getter
-@Builder
+@Builder(toBuilder = true)
 @NoArgsConstructor
 @AllArgsConstructor
 public class PromptContext {

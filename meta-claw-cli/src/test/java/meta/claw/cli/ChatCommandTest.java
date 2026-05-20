@@ -6,11 +6,11 @@ import meta.claw.core.memory.SessionMemory;
 import meta.claw.core.config.MemoryConfig;
 import meta.claw.core.memory.shortterm.ShortMemoryManager;
 import meta.claw.core.memory.shortterm.ShortMemoryStore;
+import meta.claw.core.memory.shortterm.ShortMemoryStoreFactory;
 import meta.claw.core.spi.llm.SpiMessage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -45,12 +45,13 @@ class ChatCommandTest {
     void selectSession_shouldInitializeNewConversationImmediately() {
         RecordingShortMemoryStore store = new RecordingShortMemoryStore();
         ShortMemoryManager manager = shortMemoryManager(store);
+        MemoryConfig config = new MemoryConfig();
 
-        String sessionId = ChatCommand.selectSession(manager, "default", null, () -> "new-session");
+        String sessionId = ChatCommand.selectSession(manager, config, "default", null, () -> "new-session");
 
         assertEquals("new-session", sessionId);
         assertTrue(store.initializedSessions.contains("new-session"));
-        assertTrue(manager.conversationExists("new-session"));
+        assertTrue(manager.conversationExists(config, "default", "new-session"));
     }
 
     @Test
@@ -58,8 +59,9 @@ class ChatCommandTest {
         RecordingShortMemoryStore store = new RecordingShortMemoryStore();
         store.existingSessions.add("existing-session");
         ShortMemoryManager manager = shortMemoryManager(store);
+        MemoryConfig config = new MemoryConfig();
 
-        String sessionId = ChatCommand.selectSession(manager, "default", "existing-session", () -> "new-session");
+        String sessionId = ChatCommand.selectSession(manager, config, "default", "existing-session", () -> "new-session");
 
         assertEquals("existing-session", sessionId);
         assertFalse(store.initializedSessions.contains("new-session"));
@@ -69,9 +71,10 @@ class ChatCommandTest {
     @Test
     void selectSession_shouldRejectMissingResumeSession() {
         ShortMemoryManager manager = shortMemoryManager(new RecordingShortMemoryStore());
+        MemoryConfig config = new MemoryConfig();
 
         IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
-                () -> ChatCommand.selectSession(manager, "default", "missing-session", () -> "new-session"));
+                () -> ChatCommand.selectSession(manager, config, "default", "missing-session", () -> "new-session"));
 
         assertEquals("Session not found for vessel 'default': missing-session", error.getMessage());
     }
@@ -86,7 +89,7 @@ class ChatCommandTest {
     }
 
     private static ShortMemoryManager shortMemoryManager(ShortMemoryStore store) {
-        return new ShortMemoryManager(new MemoryConfig(), Map.of("jsonl", store));
+        return new ShortMemoryManager(new ShortMemoryStoreFactory(Map.of("jsonl", store)));
     }
 
     private static class RecordingShortMemoryStore implements ShortMemoryStore {
@@ -94,18 +97,18 @@ class ChatCommandTest {
         private final Set<String> existingSessions = new HashSet<>();
 
         @Override
-        public void initializeConversation(String sessionKey) {
+        public void initializeConversation(String vesselId, String sessionKey) {
             initializedSessions.add(sessionKey);
             existingSessions.add(sessionKey);
         }
 
         @Override
-        public void appendMessage(String sessionKey, MemoryMessage message) {
+        public void appendMessage(String vesselId, String sessionKey, MemoryMessage message) {
             existingSessions.add(sessionKey);
         }
 
         @Override
-        public List<MemoryMessage> getHistory(String sessionKey, int limit) {
+        public List<MemoryMessage> getHistory(String vesselId, String sessionKey, int limit) {
             return new ArrayList<>();
         }
 
@@ -115,31 +118,31 @@ class ChatCommandTest {
         }
 
         @Override
-        public boolean clearHistory(String sessionKey) {
+        public boolean clearHistory(String vesselId, String sessionKey) {
             return existingSessions.remove(sessionKey);
         }
 
         @Override
-        public boolean conversationExists(String sessionKey) {
+        public boolean conversationExists(String vesselId, String sessionKey) {
             return existingSessions.contains(sessionKey);
         }
 
         @Override
-        public List<MemoryMessage> getHistoryByToken(String sessionKey, int maxTokens) {
+        public List<MemoryMessage> getHistoryByToken(String vesselId, String sessionKey, int maxTokens) {
             return new ArrayList<>();
         }
 
         @Override
-        public SessionMemory loadSummary(String sessionKey) {
+        public SessionMemory loadSummary(String vesselId, String sessionKey) {
             return null;
         }
 
         @Override
-        public void saveSummary(String sessionKey, SessionMemory summary) {
+        public void saveSummary(String vesselId, String sessionKey, SessionMemory summary) {
         }
 
         @Override
-        public String summarizeConversation(List<MemoryMessage> history) {
+        public String summarizeConversation(String vesselId, List<MemoryMessage> history) {
             return "";
         }
     }

@@ -4,6 +4,7 @@ import lombok.extern.slf4j.Slf4j;
 import meta.claw.core.memory.MemoryMessage;
 import meta.claw.core.memory.MemoryMessageConverter;
 import meta.claw.core.memory.shortterm.ShortMemoryManager;
+import meta.claw.core.memory.longterm.LongMemoryManager;
 
 import meta.claw.core.prompt.PromptContext;
 import meta.claw.core.prompt.PromptContextFactory;
@@ -17,9 +18,11 @@ import meta.claw.core.spi.llm.SpiProviderMeta;
 import meta.claw.core.spi.llm.SpiStreamingCallback;
 import meta.claw.core.spi.llm.SpiToolCall;
 import meta.claw.vessel.ResolvedVesselConfig;
+import meta.claw.core.config.MemoryConfig;
 import meta.claw.core.config.VesselConfig;
-import meta.claw.vessel.ProjectRootFinder;
+import meta.claw.core.util.ProjectRootFinder;
 import meta.claw.vessel.VesselConfigResolver;
+import meta.claw.tool.registry.ToolRegistry;
 import org.jline.terminal.Terminal;
 import org.jline.terminal.TerminalBuilder;
 import org.springframework.ai.chat.client.ChatClient;
@@ -28,12 +31,6 @@ import org.springframework.stereotype.Component;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
-
-import meta.claw.store.memory.MemoryManagerProvider;
-import meta.claw.core.spi.tool.ToolDefinitionProvider;
-import meta.claw.store.memory.longterm.FileLongMemoryStore;
-import meta.claw.core.prompt.LongMemoryPreferenceProvider;
-import meta.claw.core.prompt.PreferenceProvider;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -51,25 +48,27 @@ public class ChatCommand implements Runnable {
 
     private final LlmClientFactoryManager factoryManager;
     private final VesselConfigResolver resolver;
-    private final MemoryManagerProvider memoryManagerProvider;
+    private final ShortMemoryManager shortMemoryManager;
+    private final LongMemoryManager longMemoryManager;
     private final PromptContextFactory contextFactory;
     private final SystemPromptBuilder promptBuilder;
     private final ObjectProvider<SpringAiLlmClient> llmClients;
-    private final ToolDefinitionProvider toolProvider;
+    private final ToolRegistry toolRegistry;
 
     public ChatCommand(LlmClientFactoryManager factoryManager, VesselConfigResolver resolver,
-                       MemoryManagerProvider memoryManagerProvider,
+                       ShortMemoryManager shortMemoryManager, LongMemoryManager longMemoryManager,
                        PromptContextFactory contextFactory,
                        SystemPromptBuilder promptBuilder,
                        ObjectProvider<SpringAiLlmClient> llmClients,
-                       ToolDefinitionProvider toolProvider) {
+                       ToolRegistry toolRegistry) {
         this.factoryManager = factoryManager;
         this.resolver = resolver;
-        this.memoryManagerProvider = memoryManagerProvider;
+        this.shortMemoryManager = shortMemoryManager;
+        this.longMemoryManager = longMemoryManager;
         this.contextFactory = contextFactory;
         this.promptBuilder = promptBuilder;
         this.llmClients = llmClients;
-        this.toolProvider = toolProvider;
+        this.toolRegistry = toolRegistry;
     }
 
     @Parameters(index = "0", defaultValue = "default", description = "Vessel name")
@@ -78,7 +77,6 @@ public class ChatCommand implements Runnable {
     @Option(names = "--resume", description = "Resume an existing session id for this vessel")
     private String resumeSessionId;
 
-    private ShortMemoryManager shortMemoryManager;
     private String sessionKey;
 
     @Override
@@ -126,12 +124,10 @@ public class ChatCommand implements Runnable {
                 providerConfig.getBaseUrl(),
                 providerConfig.getModel());
 
-        // Initialize memory managers and session
         Path vesselsDir = configDir.resolve("vessels");
-        this.shortMemoryManager = memoryManagerProvider.createShortTerm(vesselsDir, vesselConfig.getMemory(), vesselName);
         Path historyFilePath;
         try {
-            this.sessionKey = selectSession(shortMemoryManager, vesselName, resumeSessionId, () -> UUID.randomUUID().toString());
+            this.sessionKey = selectSession(shortMemoryManager, vesselConfig.getMemory(), vesselName, resumeSessionId, () -> UUID.randomUUID().toString());
             historyFilePath = historyFilePath(vesselsDir, vesselName, sessionKey);
         } catch (IllegalArgumentException e) {
             System.err.println(e.getMessage());
@@ -152,7 +148,6 @@ public class ChatCommand implements Runnable {
         String emoji = vesselConfig.getEmoji() != null ? vesselConfig.getEmoji() : "🤖";
         String description = vesselConfig.getDescription() != null ? vesselConfig.getDescription() : "A general-purpose AI assistant.";
 
-        // Welcome screen (inspired by vessel_cli/cli.py print_welcome)
         terminal.writer().println();
         terminal.writer().println("╔══════════════════════════════════════════════════════════════════╗");
         terminal.writer().println("║                                                                  ║");
@@ -173,10 +168,11 @@ public class ChatCommand implements Runnable {
         terminal.writer().println();
         terminal.flush();
 
-        // Phase 2: Build static system prompt (persona + preferences + runtime + tools)
-        PreferenceProvider preferenceProvider = new LongMemoryPreferenceProvider(
-                new FileLongMemoryStore(vesselsDir));
-        PromptContext promptContext = contextFactory.create(vesselConfig, preferenceProvider);
+        // Phase 2: Build static system prompt
+        PromptContext baseCtx = contextFactory.create(vesselConfig);
+        PromptContext promptContext = baseCtx.toBuilder()
+                .tools(toolRegistry.getToolDefinitions())
+                .build();
         String systemPrompt = promptBuilder.build(promptContext);
 
         int maxHistoryRounds = vesselConfig.getMaxHistoryRounds() != null
@@ -188,7 +184,7 @@ public class ChatCommand implements Runnable {
             history.add(SpiMessage.system(systemPrompt));
         }
         if (resumeSessionId != null && !resumeSessionId.isBlank()) {
-            history.addAll(toSpiMessages(shortMemoryManager.getHistory(sessionKey)));
+            history.addAll(toSpiMessages(shortMemoryManager.getHistory(vesselConfig.getMemory(), vesselName, sessionKey)));
         }
 
         try {
@@ -205,7 +201,7 @@ public class ChatCommand implements Runnable {
                         history.add(SpiMessage.system(systemPrompt));
                     }
                     try {
-                        shortMemoryManager.clearHistory(sessionKey);
+                        shortMemoryManager.clearHistory(vesselConfig.getMemory(), vesselName, sessionKey);
                     } catch (Exception e) {
                         log.warn("Failed to clear persisted history for session {}", sessionKey, e);
                     }
@@ -216,15 +212,14 @@ public class ChatCommand implements Runnable {
 
                 history.add(SpiMessage.user(input));
                 try {
-                    shortMemoryManager.appendMessage(sessionKey,
+                    shortMemoryManager.appendMessage(vesselConfig.getMemory(), vesselName, sessionKey,
                             MemoryMessageConverter.fromSpiMessage(SpiMessage.user(input)));
                 } catch (Exception e) {
                     log.error("Failed to persist user message", e);
                 }
 
-                // Build LLM request: static system prompt + dynamic conversation history
                 SpiChatRequest request = SpiChatRequest.builder()
-                        .messages(buildLlmRequest(sessionKey, systemPrompt, maxHistoryRounds))
+                        .messages(buildLlmRequest(vesselConfig.getMemory(), vesselName, sessionKey, systemPrompt, maxHistoryRounds))
                         .build();
 
                 terminal.writer().print("AI: ");
@@ -255,7 +250,7 @@ public class ChatCommand implements Runnable {
                         String responseText = responseBuffer.toString();
                         history.add(SpiMessage.assistant(responseText));
                         try {
-                            shortMemoryManager.appendMessage(sessionKey,
+                            shortMemoryManager.appendMessage(vesselConfig.getMemory(), vesselName, sessionKey,
                                     MemoryMessageConverter.fromSpiMessage(SpiMessage.assistant(responseText)));
                         } catch (Exception e) {
                             log.error("Failed to persist assistant message", e);
@@ -278,12 +273,12 @@ public class ChatCommand implements Runnable {
         terminal.writer().flush();
     }
 
-    private List<SpiMessage> buildLlmRequest(String sessionKey, String systemPrompt, int maxHistoryRounds) {
+    private List<SpiMessage> buildLlmRequest(MemoryConfig memoryConfig, String vesselId, String sessionKey, String systemPrompt, int maxHistoryRounds) {
         List<SpiMessage> messages = new ArrayList<>();
         if (systemPrompt != null && !systemPrompt.isBlank()) {
             messages.add(SpiMessage.system(systemPrompt));
         }
-        messages.addAll(toSpiMessages(shortMemoryManager.getHistory(sessionKey, maxHistoryRounds)));
+        messages.addAll(toSpiMessages(shortMemoryManager.getHistory(memoryConfig, vesselId, sessionKey, maxHistoryRounds)));
         return messages;
     }
 
@@ -306,23 +301,21 @@ public class ChatCommand implements Runnable {
         return restored;
     }
 
-    static String selectSession(ShortMemoryManager memoryManager, String vesselName, String resumeSessionId,
+    static String selectSession(ShortMemoryManager memoryManager, MemoryConfig memoryConfig, String vesselName, String resumeSessionId,
                                 Supplier<String> newSessionIds) {
         if (resumeSessionId != null && !resumeSessionId.isBlank()) {
-            if (!memoryManager.conversationExists(resumeSessionId)) {
+            if (!memoryManager.conversationExists(memoryConfig, vesselName, resumeSessionId)) {
                 throw new IllegalArgumentException("Session not found for vessel '" + vesselName + "': " + resumeSessionId);
             }
             return resumeSessionId;
         }
 
         String sessionId = newSessionIds.get();
-        memoryManager.initializeConversation(sessionId);
+        memoryManager.initializeConversation(memoryConfig, vesselName, sessionId);
         return sessionId;
     }
 
     static Path historyFilePath(Path vesselsDir, String vesselName, String sessionKey) {
         return vesselsDir.resolve(vesselName).resolve("conversations").resolve(sessionKey).resolve("history.jsonl");
     }
-
-
 }

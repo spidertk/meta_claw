@@ -7,7 +7,6 @@ import meta.claw.core.config.VesselConfig;
 import meta.claw.core.prompt.PromptContext;
 import meta.claw.core.prompt.PromptContextFactory;
 import meta.claw.core.prompt.SystemPromptBuilder;
-import meta.claw.core.spi.tool.ToolDefinitionProvider;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.messages.SystemMessage;
@@ -32,34 +31,18 @@ import org.springframework.stereotype.Component;
 @Scope("prototype")
 public class VesselRuntime {
 
-    /**
-     * Vessel 配置对象，包含系统提示词、模型参数等元数据
-     */
     private final VesselConfig config;
-
-    /**
-     * Spring AI 对话客户端，负责与底层 AI 模型进行交互
-     */
     private final ChatClient chatClient;
     private final PromptContextFactory promptContextFactory;
     private final SystemPromptBuilder systemPromptBuilder;
-    private final ToolDefinitionProvider toolProvider;
 
-    /**
-     * 构造方法：根据 Vessel 配置和 ChatClient 初始化运行时实例
-     *
-     * @param config     Vessel 配置对象，包含系统提示词等元数据
-     * @param chatClient Spring AI ChatClient，底层 AI 模型对话客户端
-     */
     public VesselRuntime(VesselConfig config, ChatClient chatClient,
                          PromptContextFactory promptContextFactory,
-                         SystemPromptBuilder systemPromptBuilder,
-                         ToolDefinitionProvider toolProvider) {
+                         SystemPromptBuilder systemPromptBuilder) {
         this.config = config;
         this.chatClient = chatClient;
         this.promptContextFactory = promptContextFactory;
         this.systemPromptBuilder = systemPromptBuilder;
-        this.toolProvider = toolProvider;
         if (config != null) {
             log.info("VesselRuntime 初始化完成: vesselId={}, model={}, systemPromptLength={}",
                     config.getId(), config.getModel(),
@@ -73,77 +56,50 @@ public class VesselRuntime {
         if (config.getSystemPrompt() != null && !config.getSystemPrompt().isBlank()) {
             return config.getSystemPrompt();
         }
-        // Phase 2: Fall back to SystemPromptBuilder if no static systemPrompt configured
         try {
             PromptContext ctx = promptContextFactory.create(config);
             return systemPromptBuilder.build(ctx);
         } catch (Exception e) {
-            log.warn("Failed to build dynamic system prompt for vessel {}, fallback to null", config.getId(), e);
+            log.warn("Failed to build system prompt for vessel {}: {}", config.getId(), e.getMessage());
             return null;
         }
     }
 
     /**
-     * 执行用户对话
-     * <p>
-     * 将用户消息通过 ChatClient 发送至 AI 模型，获取文本回复。
-     * 若调用成功，返回 TEXT 类型的 Reply；若发生异常，返回 ERROR 类型的 Reply，
-     * 并记录错误日志以便排查问题。
-     * </p>
+     * 向 AI 模型发送用户消息，并返回标准化的回复对象。
      *
-     * @param userMessage 用户输入的消息内容
-     * @return 标准化的 Reply 对象，包含 AI 回复文本或错误信息
+     * @param userMessage 用户输入的文本消息
+     * @return 包含 AI 回复内容和元数据的标准化 Reply 对象
      */
     public Reply chat(String userMessage) {
-        log.debug("Vessel 开始处理用户消息: vesselId={}, messageLength={}",
-                config != null ? config.getId() : "null", userMessage != null ? userMessage.length() : 0);
-
-        try {
-            // 通过 ChatClient 调用 AI 模型获取回复内容
-            // 若配置了 systemPrompt，则先注入 SystemMessage
-            String response;
-            String systemPrompt = resolveSystemPrompt(config);
-            if (systemPrompt != null && !systemPrompt.isBlank()) {
-                Prompt prompt = new Prompt(List.of(
-                        new SystemMessage(systemPrompt),
-                        new UserMessage(userMessage)
-                ));
-                ChatResponse chatResponse = chatClient.prompt(prompt).call().chatResponse();
-                response = safeExtractContent(chatResponse);
-            } else {
-                response = chatClient.prompt().user(userMessage).call().content();
-            }
-
-            log.debug("Vessel 成功获取 AI 回复: vesselId={}, responseLength={}",
-                    config != null ? config.getId() : "null", response != null ? response.length() : 0);
-
-            // 返回文本类型的标准化回复对象
-            return new Reply(ReplyType.TEXT, response);
-        } catch (Exception e) {
-            // 记录异常日志，包含 Vessel 标识和异常详情，便于后续问题定位
-            log.error("Vessel 对话调用异常: vesselId={}, errorMessage={}",
-                    config != null ? config.getId() : "null", e.getMessage(), e);
-
-            // 返回错误类型的标准化回复对象，向用户展示友好的错误提示
-            return new Reply(ReplyType.ERROR, "服务异常，请稍后重试");
+        if (chatClient == null) {
+            return new Reply(ReplyType.TEXT, "ChatClient 未初始化，无法处理消息。");
         }
+
+        String systemPrompt = resolveSystemPrompt(config);
+
+        ChatResponse response;
+        if (systemPrompt != null && !systemPrompt.isBlank()) {
+            response = chatClient.prompt()
+                    .system(systemPrompt)
+                    .user(userMessage)
+                    .call()
+                    .chatResponse();
+        } else {
+            response = chatClient.prompt()
+                    .user(userMessage)
+                    .call()
+                    .chatResponse();
+        }
+
+        String content = response != null && response.getResult() != null
+                ? response.getResult().getOutput().getText()
+                : "";
+
+        return new Reply(ReplyType.TEXT, content);
     }
 
-    /**
-     * 获取当前 Vessel 的唯一标识
-     *
-     * @return Vessel 的 id，对应配置文件中的 id 字段
-     */
-    public String getVesselId() {
-        return config != null ? config.getId() : "null";
-    }
-
-    private String safeExtractContent(ChatResponse response) {
-        if (response == null || response.getResult() == null || response.getResult().getOutput() == null) {
-            log.warn("VesselRuntime 收到空响应或响应结构不完整");
-            return "";
-        }
-        String text = response.getResult().getOutput().getText();
-        return text != null ? text : "";
+    public VesselConfig getConfig() {
+        return config;
     }
 }

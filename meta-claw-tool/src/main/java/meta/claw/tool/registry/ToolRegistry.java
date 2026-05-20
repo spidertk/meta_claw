@@ -2,7 +2,6 @@ package meta.claw.tool.registry;
 
 import lombok.extern.slf4j.Slf4j;
 import meta.claw.core.spi.llm.SpiToolDefinition;
-import meta.claw.core.spi.tool.ToolDefinitionProvider;
 import meta.claw.tool.annotation.Tool;
 import meta.claw.tool.schema.JsonSchemaGenerator;
 import org.springframework.context.ApplicationContext;
@@ -28,7 +27,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
  */
 @Slf4j
 @Component
-public class ToolRegistry implements ToolDefinitionProvider {
+public class ToolRegistry {
 
     private final JsonSchemaGenerator schemaGenerator = new JsonSchemaGenerator();
     private final Map<String, ToolMethod> methods = new ConcurrentHashMap<>();

@@ -4,72 +4,60 @@ import meta.claw.core.config.MemoryConfig;
 import meta.claw.core.memory.MemoryMessage;
 import meta.claw.core.memory.SessionMemory;
 import java.util.List;
-import java.util.Map;
-import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
 
 /**
- * 短期记忆编排器。
+ * 短期记忆编排器。Spring 单例，通过 Factory 按配置选择 Store 实现。
  */
 @Component
-@Scope("prototype")
 public class ShortMemoryManager {
-    private final ShortMemoryStore store;
+    private final ShortMemoryStoreFactory storeFactory;
 
-    public ShortMemoryManager(MemoryConfig config, Map<String, ShortMemoryStore> stores) {
-        String backend = config != null && config.getShortTermStore() != null
-                ? config.getShortTermStore() : "jsonl";
-        this.store = requireStore(stores, backend);
+    public ShortMemoryManager(ShortMemoryStoreFactory storeFactory) {
+        this.storeFactory = storeFactory;
     }
 
-    public void appendMessage(String sessionKey, MemoryMessage message) {
-        store.appendMessage(sessionKey, message);
+    public void appendMessage(MemoryConfig config, String vesselId, String sessionKey, MemoryMessage message) {
+        storeFactory.getStore(config).appendMessage(vesselId, sessionKey, message);
     }
 
-    public void initializeConversation(String sessionKey) {
-        store.initializeConversation(sessionKey);
+    public void initializeConversation(MemoryConfig config, String vesselId, String sessionKey) {
+        storeFactory.getStore(config).initializeConversation(vesselId, sessionKey);
     }
 
-    public List<MemoryMessage> getHistory(String sessionKey) {
-        return store.getHistory(sessionKey);
+    public List<MemoryMessage> getHistory(MemoryConfig config, String vesselId, String sessionKey) {
+        return storeFactory.getStore(config).getHistory(vesselId, sessionKey);
     }
 
-    public List<MemoryMessage> getHistory(String sessionKey, int limit) {
-        return store.getHistory(sessionKey, limit);
+    public List<MemoryMessage> getHistory(MemoryConfig config, String vesselId, String sessionKey, int limit) {
+        return storeFactory.getStore(config).getHistory(vesselId, sessionKey, limit);
     }
 
     public List<SessionMemory> listSessions(String vesselId) {
-        return store.listSessions(vesselId);
+        return storeFactory.getStore("jsonl").listSessions(vesselId);
     }
 
-    public boolean clearHistory(String sessionKey) {
-        return store.clearHistory(sessionKey);
+    public boolean clearHistory(MemoryConfig config, String vesselId, String sessionKey) {
+        return storeFactory.getStore(config).clearHistory(vesselId, sessionKey);
     }
 
-    public boolean conversationExists(String sessionKey) {
-        return store.conversationExists(sessionKey);
+    public boolean conversationExists(MemoryConfig config, String vesselId, String sessionKey) {
+        return storeFactory.getStore(config).conversationExists(vesselId, sessionKey);
     }
 
-    public List<MemoryMessage> getHistoryByToken(String sessionKey, int maxTokens) {
-        return store.getHistoryByToken(sessionKey, maxTokens);
+    public List<MemoryMessage> getHistoryByToken(MemoryConfig config, String vesselId, String sessionKey, int maxTokens) {
+        return storeFactory.getStore(config).getHistoryByToken(vesselId, sessionKey, maxTokens);
     }
 
-    public SessionMemory loadSummary(String sessionKey) {
-        return store.loadSummary(sessionKey);
+    public SessionMemory loadSummary(MemoryConfig config, String vesselId, String sessionKey) {
+        return storeFactory.getStore(config).loadSummary(vesselId, sessionKey);
     }
 
-    public void saveSummary(String sessionKey, SessionMemory summary) {
-        store.saveSummary(sessionKey, summary);
+    public void saveSummary(MemoryConfig config, String vesselId, String sessionKey, SessionMemory summary) {
+        storeFactory.getStore(config).saveSummary(vesselId, sessionKey, summary);
     }
 
-    public String summarizeConversation(List<MemoryMessage> history) {
-        return store.summarizeConversation(history);
-    }
-
-    private static ShortMemoryStore requireStore(Map<String, ShortMemoryStore> stores, String backend) {
-        if (stores == null || !stores.containsKey(backend)) {
-            throw new IllegalArgumentException("Unsupported short-term memory backend: " + backend);
-        }
-        return stores.get(backend);
+    public String summarizeConversation(MemoryConfig config, String vesselId, List<MemoryMessage> history) {
+        return storeFactory.getStore(config).summarizeConversation(vesselId, history);
     }
 }

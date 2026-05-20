@@ -4,53 +4,36 @@ import meta.claw.core.config.MemoryConfig;
 import meta.claw.core.memory.PreferenceMemory;
 
 import java.util.List;
-import java.util.Map;
-import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
 
 /**
- * 长期记忆编排器。
+ * 长期记忆编排器。Spring 单例，通过 Factory 按配置选择 Store 实现。
  */
 @Component
-@Scope("prototype")
-public class LongMemoryManager implements LongMemoryStore {
-    private final LongMemoryStore store;
+public class LongMemoryManager {
+    private final LongMemoryStoreFactory storeFactory;
 
-    public LongMemoryManager(MemoryConfig config, Map<String, LongMemoryStore> stores) {
-        String backend = config != null && config.getLongTermStore() != null
-                ? config.getLongTermStore() : "file";
-        this.store = requireStore(stores, backend);
+    public LongMemoryManager(LongMemoryStoreFactory storeFactory) {
+        this.storeFactory = storeFactory;
     }
 
-    @Override
-    public void addPreference(String vesselId, PreferenceMemory entry) {
-        store.addPreference(vesselId, entry);
+    public void addPreference(MemoryConfig config, String vesselId, PreferenceMemory entry) {
+        storeFactory.getStore(config).addPreference(vesselId, entry);
     }
 
-    @Override
-    public List<PreferenceMemory> lookupPreference(String vesselId, String query) {
-        return store.lookupPreference(vesselId, query);
+    public List<PreferenceMemory> lookupPreference(MemoryConfig config, String vesselId, String query) {
+        return storeFactory.getStore(config).lookupPreference(vesselId, query);
     }
 
-    @Override
-    public List<PreferenceMemory> listRecentPreferences(String vesselId, int limit) {
-        return store.listRecentPreferences(vesselId, limit);
+    public List<PreferenceMemory> listRecentPreferences(MemoryConfig config, String vesselId, int limit) {
+        return storeFactory.getStore(config).listRecentPreferences(vesselId, limit);
     }
 
-    @Override
-    public boolean deletePreference(String vesselId, String preferenceId) {
-        return store.deletePreference(vesselId, preferenceId);
+    public boolean deletePreference(MemoryConfig config, String vesselId, String preferenceId) {
+        return storeFactory.getStore(config).deletePreference(vesselId, preferenceId);
     }
 
-    @Override
-    public boolean clearPreferences(String vesselId) {
-        return store.clearPreferences(vesselId);
-    }
-
-    private static LongMemoryStore requireStore(Map<String, LongMemoryStore> stores, String backend) {
-        if (stores == null || !stores.containsKey(backend)) {
-            throw new IllegalArgumentException("Unsupported long-term memory backend: " + backend);
-        }
-        return stores.get(backend);
+    public boolean clearPreferences(MemoryConfig config, String vesselId) {
+        return storeFactory.getStore(config).clearPreferences(vesselId);
     }
 }

@@ -705,3 +705,78 @@
   - 当前无新增 blocker
 - 下一步最佳动作：
   1. 由用户决定下一项功能优先级
+
+
+### Session 023
+
+- 日期：2026-05-20
+- 本轮目标：调研当前 Provider/Store 全景，产出"统一 TypedService + 自动注册工厂"的设计和改动文档
+- 已完成：
+  - 全面调研当前所有 Provider 接口（WorkspaceProvider/ToolDefinitionProvider/PreferenceProvider）和 Store 接口（ShortMemoryStore/LongMemoryStore）及其实现类的分布、注入点、构造函数
+  - 分析当前架构的 4 大痛点：Provider 碎片化、Store 多实现冲突、MemoryManagerProvider 手写 Map 不封闭、Manager 构造函数需要调用方手动组装 Map
+  - 设计目标架构：TypedService 类型标识接口 + ServiceRegistry（@PostConstruct 自动扫描注册）+ TypedServiceFactory（按配置 + 运行时参数获取 prototype bean）
+  - 明确 5 个 Provider 的去除方案：WorkspaceProvider/PreferenceProvider 内联到 PromptContextFactory，ToolDefinitionProvider 由调用方直接处理，MemoryManagerProvider 被 Factory + ObjectProvider 取代
+  - LongMemoryManager 不再 implements LongMemoryStore，彻底消除注入冲突根因
+  - PromptContextFactory 构造函数只保留 LongMemoryStoreFactory，create(VesselConfig) 保持单参数
+  - PromptContext 增加 `@Builder(toBuilder = true)`，允许调用方补充 tools
+  - ProjectRootFinder 从 vessel 模块移入 core 模块，解决 workspace 内联的跨模块依赖
+  - 输出完整改动清单（27 个文件），覆盖 core/store/cli/tool 四个模块及全部测试
+- 运行过的验证：
+  - 无代码改动，仅设计文档
+- 更新过的文件或工件：
+  - `docs/superpowers/plans/2026-05-20-unify-provider-to-typed-service-factory.md`（新增设计文档）
+  - `claude-progress.md`
+- 已知风险或未解决的问题：
+  - 方案待用户 review 确认后再编码实施
+  - Spring `applicationContext.getBean(beanName, args...)` 在 prototype scope 下的参数解析需实际验证
+- 下一步最佳动作：
+  1. 用户 review 设计文档并确认方案
+  2. 按设计文档逐模块实施改动
+  3. 全量回归 `./init.sh`
+
+
+### Session 024
+
+- 日期：2026-05-20
+- 本轮目标：按 v3 设计文档实施"统一 Provider 为 TypedService + 自动注册工厂"架构重构
+- 已完成：
+  - 删除 7 个废弃文件：WorkspaceProvider、MetaClawWorkspaceProvider、ToolDefinitionProvider、PreferenceProvider、LongMemoryPreferenceProvider、MemoryManagerProvider、LongMemoryPreferenceProviderTest
+  - ShortMemoryStore 接口所有方法增加 `vesselId` 参数；LongMemoryStore 已有 vesselId，保持不变
+  - JsonlShortMemoryStore / FileLongMemoryStore 改为无参构造 + Spring 单例，内部通过 `ProjectRootFinder` 按 vesselId 计算路径
+  - LongMemoryManager 去掉 `implements LongMemoryStore`，改为单例注入 `LongMemoryStoreFactory`
+  - ShortMemoryManager / LongMemoryManager 改为单例，方法调用时传入 `MemoryConfig` 由 Factory 选择 Store
+  - 新增 `ShortMemoryStoreFactory` / `LongMemoryStoreFactory`，通过 Spring `Map<String, Store>` 注入持有单例实例
+  - ProjectRootFinder 从 vessel 模块移入 core 模块
+  - PromptContextFactory 构造函数只保留 `LongMemoryStoreFactory`，create(VesselConfig) 保持单参数
+  - PromptContext 添加 `@Builder(toBuilder = true)`，支持调用方补充 tools
+  - VesselRuntime 去掉 `ToolDefinitionProvider` 注入
+  - ToolRegistry 去掉 `implements ToolDefinitionProvider`
+  - ChatCommand 直接注入 `ToolRegistry` + `ShortMemoryManager` / `LongMemoryManager` 单例，适配所有 Manager 调用
+  - SessionsCommand 适配 Manager 单例调用
+  - VesselManagerTest / ChatCommandTest / JsonlShortMemoryStoreTest / FileLongMemoryStoreTest 全部适配新接口
+- 运行过的验证：
+  - `./init.sh`（真实环境，Java 21）→ 成功；10 个 reactor 模块全部 SUCCESS
+  - 全量测试：core 16/16、store 18/18、bootstrap 3/3、cli 5/5、tool 全部通过
+- 更新过的文件或工件：
+  - `meta-claw-core/src/main/java/meta/claw/core/memory/shortterm/ShortMemoryStore.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/memory/shortterm/ShortMemoryManager.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/memory/shortterm/ShortMemoryStoreFactory.java`（新增）
+  - `meta-claw-core/src/main/java/meta/claw/core/memory/longterm/LongMemoryManager.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/memory/longterm/LongMemoryStoreFactory.java`（新增）
+  - `meta-claw-core/src/main/java/meta/claw/core/prompt/PromptContextFactory.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/prompt/PromptContext.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/runtime/VesselRuntime.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/util/ProjectRootFinder.java`（新增，从 vessel 移入）
+  - `meta-claw-store/src/main/java/meta/claw/store/memory/shortterm/JsonlShortMemoryStore.java`
+  - `meta-claw-store/src/main/java/meta/claw/store/memory/longterm/FileLongMemoryStore.java`
+  - `meta-claw-tool/src/main/java/meta/claw/tool/registry/ToolRegistry.java`
+  - `meta-claw-cli/src/main/java/meta/claw/cli/ChatCommand.java`
+  - `meta-claw-cli/src/main/java/meta/claw/cli/SessionsCommand.java`
+  - 测试文件 4 个适配
+  - 删除文件 7 个
+  - `claude-progress.md`
+- 已知风险或未解决的问题：
+  - 当前无新增 blocker
+- 下一步最佳动作：
+  1. 提交本轮修改
+  2. 由用户决定下一项功能优先级

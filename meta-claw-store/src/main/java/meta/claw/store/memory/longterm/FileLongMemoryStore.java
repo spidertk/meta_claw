@@ -6,6 +6,7 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import lombok.extern.slf4j.Slf4j;
 import meta.claw.core.memory.PreferenceMemory;
 import meta.claw.core.memory.longterm.LongMemoryStore;
+import meta.claw.core.util.ProjectRootFinder;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -16,34 +17,28 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.stream.Collectors;
-import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
 
 /**
- * 基于 JSONL 文件的用户偏好存储实现
- * 每个 Vessel 拥有独立的 preferences.jsonl 文件，存储用户偏好、个人习惯等信息
+ * 基于 JSONL 文件的用户偏好存储实现。Spring 单例，按 vesselId 隔离数据。
  */
 @Slf4j
-@Component
-@Scope("prototype")
+@Component("file")
 public class FileLongMemoryStore implements LongMemoryStore {
 
-    private final Path baseDir;
     private final ObjectMapper objectMapper;
 
-    /**
-     * 构造文件偏好存储
-     *
-     * @param baseDir 存储根目录，通常指向 vessels 目录，如 ~/.meta-claw/vessels/
-     */
-    public FileLongMemoryStore(Path baseDir) {
-        this.baseDir = baseDir;
+    public FileLongMemoryStore() {
         this.objectMapper = new ObjectMapper();
         this.objectMapper.registerModule(new JavaTimeModule());
     }
 
     private Path getPreferencesFilePath(String vesselId) {
-        return baseDir.resolve(vesselId).resolve("preferences").resolve("preferences.jsonl");
+        return ProjectRootFinder.getMetaClawDir()
+                .resolve("vessels")
+                .resolve(vesselId)
+                .resolve("preferences")
+                .resolve("preferences.jsonl");
     }
 
     @Override
