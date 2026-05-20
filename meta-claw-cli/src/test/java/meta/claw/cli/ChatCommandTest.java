@@ -8,7 +8,9 @@ import meta.claw.core.memory.shortterm.ShortMemoryManager;
 import meta.claw.core.memory.shortterm.ShortMemoryStore;
 import meta.claw.core.spi.llm.SpiMessage;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -22,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ChatCommandTest {
+    @TempDir Path tempDir;
 
     @Test
     void toSpiMessages_shouldRestoreConversationMessagesButSkipSystem() {
@@ -43,9 +46,12 @@ class ChatCommandTest {
         RecordingShortMemoryStore store = new RecordingShortMemoryStore();
         ShortMemoryManager manager = shortMemoryManager(store);
 
-        String sessionId = ChatCommand.selectSession(manager, "default", null, () -> "new-session");
+        Path historyFile = tempDir.resolve("vessels/default/conversations/new-session/history.jsonl");
+        String sessionId = ChatCommand.selectSession(manager, "default", null, () -> "new-session",
+                ignored -> historyFile);
 
         assertEquals("new-session", sessionId);
+        assertTrue(Files.exists(historyFile));
         assertTrue(store.initializedSessions.contains("new-session"));
         assertTrue(manager.conversationExists("new-session"));
     }
@@ -56,9 +62,12 @@ class ChatCommandTest {
         store.existingSessions.add("existing-session");
         ShortMemoryManager manager = shortMemoryManager(store);
 
-        String sessionId = ChatCommand.selectSession(manager, "default", "existing-session", () -> "new-session");
+        Path historyFile = tempDir.resolve("vessels/default/conversations/new-session/history.jsonl");
+        String sessionId = ChatCommand.selectSession(manager, "default", "existing-session", () -> "new-session",
+                ignored -> historyFile);
 
         assertEquals("existing-session", sessionId);
+        assertFalse(Files.exists(historyFile));
         assertFalse(store.initializedSessions.contains("new-session"));
         assertFalse(store.initializedSessions.contains("existing-session"));
     }
@@ -68,7 +77,8 @@ class ChatCommandTest {
         ShortMemoryManager manager = shortMemoryManager(new RecordingShortMemoryStore());
 
         IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
-                () -> ChatCommand.selectSession(manager, "default", "missing-session", () -> "new-session"));
+                () -> ChatCommand.selectSession(manager, "default", "missing-session", () -> "new-session",
+                        ignored -> tempDir.resolve("history.jsonl")));
 
         assertEquals("Session not found for vessel 'default': missing-session", error.getMessage());
     }
@@ -80,6 +90,15 @@ class ChatCommandTest {
 
         assertEquals(Path.of(".meta-claw", "vessels", "default",
                 "conversations", "session-1", "history.jsonl"), historyFile);
+    }
+
+    @Test
+    void initializeHistoryFile_shouldCreateParentDirectoriesAndHistoryFile() {
+        Path historyFile = tempDir.resolve("vessels/default/conversations/session-1/history.jsonl");
+
+        ChatCommand.initializeHistoryFile(historyFile);
+
+        assertTrue(Files.exists(historyFile));
     }
 
     private static ShortMemoryManager shortMemoryManager(ShortMemoryStore store) {

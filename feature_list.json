@@ -375,9 +375,14 @@
           "date": "2026-05-20",
           "result": "verified",
           "detail": "`JsonlShortMemoryStore.initializeConversation` 改为通过 `FileChannel` 创建并 `force(true)` 刷新空 history 文件；CLI 欢迎区显示当前 `Session` 和 `History` 绝对路径。真实启动 `mvn -f meta-claw-cli/pom.xml -q exec:java -Dexec.mainClass=meta.claw.cli.CliApplication -Dexec.args='chat default'` 时，在进程停留于输入提示符期间已能看到对应 history 文件。"
+        },
+        {
+          "date": "2026-05-20",
+          "result": "verified",
+          "detail": "`ChatCommand` 现在在新 session 生成后直接按 `History` 绝对路径预创建并校验 `history.jsonl`，再调用 memory store 初始化；如果文件不可见会在进入聊天界面前失败。`ChatCommandTest` 6/6 通过，真实 CLI 停在 `>` 时已能 `find` 到对应 history 文件。"
         }
       ],
-      "notes": "会话目录现在在 session ID 生成后、LLM client 构建前就创建并刷新；CLI 会显示本轮 history 文件绝对路径，便于运行中核对。workspace 以当前 Vessel 为边界。"
+      "notes": "会话目录现在由 CLI 在 session ID 生成后直接按输出的 History 绝对路径预创建并校验，然后再进入聊天界面；workspace 以当前 Vessel 为边界。"
     },
     {
       "id": "memory-003",

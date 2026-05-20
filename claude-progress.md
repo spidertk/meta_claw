@@ -31,7 +31,7 @@
 
 - `./init.sh` 已迁移到当前 Java/Maven 实际启动路径，并已于 2026-05-16 完整跑通
 - `ChatCommand` 默认仍会创建新 `sessionKey`，但已支持 `sessions <vessel>` 与 `chat <vessel> --resume <session-id>` 的显式恢复
-- `ChatCommand` 新会话生成 `sessionKey` 后会在 LLM client 构建前调用 `initializeConversation(sessionKey)`，立即创建并刷新 `<vessel>/conversations/<session-id>/history.jsonl`；CLI 欢迎区会显示当前 `Session` 与 `History` 绝对路径
+- `ChatCommand` 新会话生成 `sessionKey` 后会先按 CLI 输出的 `History` 绝对路径直接预创建并校验 `history.jsonl`，再调用 memory store 初始化；CLI 欢迎区会显示当前 `Session` 与 `History` 绝对路径
 - `serve/start/stop/restart/status/logs`、工具引擎、MCP、Skill 系统仍未实现
 
 ## 会话记录
@@ -467,3 +467,28 @@
   - 若用户通过其他未纳入仓库的包装命令启动，需要先确认该命令是否指向本仓当前 `CliApplication`
 - 下一步最佳动作：
   1. 用户按 CLI 输出的 `History:` 绝对路径在另一个终端直接 `ls -l <path>`，确认不是在看旧路径或旧入口
+
+### Session 015
+
+- 日期：2026-05-20
+- 本轮目标：处理 `FileChannel.force(true)` 仍未解决用户本地实时可见性的反馈
+- 已完成：
+  - 不再只依赖 `JsonlShortMemoryStore.initializeConversation`
+  - `ChatCommand` 在新 session ID 生成后，直接按 `History` 绝对路径预创建 parent directories 与 `history.jsonl`
+  - 预创建后立即 `Files.exists(historyFile)` 校验；失败则在进入聊天界面前报错
+  - memory store 初始化仍保留，作为后端一致性保障
+- 运行过的验证：
+  - `mvn test -pl meta-claw-cli -am -Dtest=ChatCommandTest -Dsurefire.failIfNoSpecifiedTests=false` → 成功，`ChatCommandTest` 6/6 通过
+  - 真实 CLI 启动验收：`mvn -f meta-claw-cli/pom.xml -q exec:java -Dexec.mainClass=meta.claw.cli.CliApplication -Dexec.args='chat default'` → 停留在 `>` 输入提示符期间，`find .meta-claw/vessels/default/conversations -maxdepth 2 -type f` 已能看到本轮 session 的 `history.jsonl`
+- 已记录证据：
+  - `ChatCommandTest` 新增 CLI 直接创建 history 文件的断言
+  - `feature_list.json` 的 `chat-002` 已补充第三条 2026-05-20 验证记录
+- 更新过的文件或工件：
+  - `meta-claw-cli/src/main/java/meta/claw/cli/ChatCommand.java`
+  - `meta-claw-cli/src/test/java/meta/claw/cli/ChatCommandTest.java`
+  - `feature_list.json`
+  - `claude-progress.md`
+- 已知风险或未解决问题：
+  - 若用户仍观察不到 CLI 输出的 `History` 路径，优先确认实际运行命令是否使用当前源码编译出的 `CliApplication`
+- 下一步最佳动作：
+  1. 运行标准入口 `./init.sh`

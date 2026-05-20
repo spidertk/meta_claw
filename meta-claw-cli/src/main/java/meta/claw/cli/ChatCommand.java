@@ -34,8 +34,10 @@ import meta.claw.store.memory.MemoryManagerProvider;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.nio.channels.FileChannel;
+import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Supplier;
@@ -124,8 +126,11 @@ public class ChatCommand implements Runnable {
         Path vesselsDir = configDir.resolve("vessels");
         this.shortMemoryManager = memoryManagerProvider.createShortTerm(vesselsDir, vesselConfig.getMemory(), vesselName);
         LongMemoryManager longMemoryManager = memoryManagerProvider.createLongTerm(vesselsDir, vesselConfig.getMemory());
+        Path historyFilePath;
         try {
-            this.sessionKey = selectSession(shortMemoryManager, vesselName, resumeSessionId, () -> UUID.randomUUID().toString());
+            this.sessionKey = selectSession(shortMemoryManager, vesselName, resumeSessionId, () -> UUID.randomUUID().toString(),
+                    sessionId -> historyFilePath(vesselsDir, vesselName, sessionId));
+            historyFilePath = historyFilePath(vesselsDir, vesselName, sessionKey);
         } catch (IllegalArgumentException e) {
             System.err.println(e.getMessage());
             return;
@@ -159,7 +164,7 @@ public class ChatCommand implements Runnable {
         terminal.writer().println("╚══════════════════════════════════════════════════════════════════╝");
         terminal.writer().println();
         terminal.writer().println("Session: " + sessionKey);
-        terminal.writer().println("History: " + historyFilePath(vesselsDir, vesselName, sessionKey));
+        terminal.writer().println("History: " + historyFilePath);
         terminal.writer().println();
         terminal.writer().println("Commands: /exit  /clear");
         terminal.writer().println("Press Ctrl+D to quit");
@@ -293,8 +298,8 @@ public class ChatCommand implements Runnable {
         return restored;
     }
 
-    static String selectSession(ShortMemoryManager memoryManager, String vesselName,
-                                String resumeSessionId, Supplier<String> newSessionIds) {
+    static String selectSession(ShortMemoryManager memoryManager, String vesselName, String resumeSessionId,
+                                Supplier<String> newSessionIds, java.util.function.Function<String, Path> historyFiles) {
         if (resumeSessionId != null && !resumeSessionId.isBlank()) {
             if (!memoryManager.conversationExists(resumeSessionId)) {
                 throw new IllegalArgumentException("Session not found for vessel '" + vesselName + "': " + resumeSessionId);
@@ -303,11 +308,27 @@ public class ChatCommand implements Runnable {
         }
 
         String sessionId = newSessionIds.get();
+        initializeHistoryFile(historyFiles.apply(sessionId));
         memoryManager.initializeConversation(sessionId);
         return sessionId;
     }
 
     static Path historyFilePath(Path vesselsDir, String vesselName, String sessionKey) {
         return vesselsDir.resolve(vesselName).resolve("conversations").resolve(sessionKey).resolve("history.jsonl");
+    }
+
+    static void initializeHistoryFile(Path historyFile) {
+        try {
+            Files.createDirectories(historyFile.getParent());
+            try (FileChannel ignored = FileChannel.open(historyFile,
+                    StandardOpenOption.CREATE, StandardOpenOption.WRITE)) {
+                // Opening and closing the channel makes the file visible before the input loop starts.
+            }
+            if (!Files.exists(historyFile)) {
+                throw new IOException("history file was not created: " + historyFile);
+            }
+        } catch (IOException e) {
+            throw new IllegalArgumentException("Failed to initialize conversation history: " + historyFile, e);
+        }
     }
 }
