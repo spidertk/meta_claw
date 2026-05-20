@@ -38,6 +38,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Supplier;
 import java.util.UUID;
 
 @Slf4j
@@ -119,6 +120,17 @@ public class ChatCommand implements Runnable {
                 providerConfig.getBaseUrl(),
                 providerConfig.getModel());
 
+        // Initialize memory managers and session
+        Path vesselsDir = configDir.resolve("vessels");
+        this.shortMemoryManager = memoryManagerProvider.createShortTerm(vesselsDir, vesselConfig.getMemory(), vesselName);
+        LongMemoryManager longMemoryManager = memoryManagerProvider.createLongTerm(vesselsDir, vesselConfig.getMemory());
+        try {
+            this.sessionKey = selectSession(shortMemoryManager, vesselName, resumeSessionId, () -> UUID.randomUUID().toString());
+        } catch (IllegalArgumentException e) {
+            System.err.println(e.getMessage());
+            return;
+        }
+
         ChatClient chatClient = factoryManager.create(providerName, providerConfig);
 
         SpiProviderMeta meta = SpiProviderMeta.builder()
@@ -128,21 +140,6 @@ public class ChatCommand implements Runnable {
                 .build();
 
         SpringAiLlmClient llmClient = llmClients.getObject(chatClient, meta);
-
-        // Initialize memory managers and session
-        Path vesselsDir = configDir.resolve("vessels");
-        this.shortMemoryManager = memoryManagerProvider.createShortTerm(vesselsDir, vesselConfig.getMemory(), vesselName);
-        LongMemoryManager longMemoryManager = memoryManagerProvider.createLongTerm(vesselsDir, vesselConfig.getMemory());
-        if (resumeSessionId != null && !resumeSessionId.isBlank()) {
-            if (!shortMemoryManager.conversationExists(resumeSessionId)) {
-                System.err.println("Session not found for vessel '" + vesselName + "': " + resumeSessionId);
-                return;
-            }
-            this.sessionKey = resumeSessionId;
-        } else {
-            this.sessionKey = UUID.randomUUID().toString();
-            shortMemoryManager.initializeConversation(sessionKey);
-        }
 
         String displayName = vesselConfig.getName() != null ? vesselConfig.getName() : vesselName;
         String emoji = vesselConfig.getEmoji() != null ? vesselConfig.getEmoji() : "🤖";
@@ -291,5 +288,19 @@ public class ChatCommand implements Runnable {
             }
         }
         return restored;
+    }
+
+    static String selectSession(ShortMemoryManager memoryManager, String vesselName,
+                                String resumeSessionId, Supplier<String> newSessionIds) {
+        if (resumeSessionId != null && !resumeSessionId.isBlank()) {
+            if (!memoryManager.conversationExists(resumeSessionId)) {
+                throw new IllegalArgumentException("Session not found for vessel '" + vesselName + "': " + resumeSessionId);
+            }
+            return resumeSessionId;
+        }
+
+        String sessionId = newSessionIds.get();
+        memoryManager.initializeConversation(sessionId);
+        return sessionId;
     }
 }

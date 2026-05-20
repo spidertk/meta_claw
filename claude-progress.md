@@ -6,7 +6,7 @@
 - 当前架构基线：Java 21 + Maven 多模块仓库；已存在 `meta-claw-core`、`meta-claw-vessel`、`meta-claw-store`、`meta-claw-cli`、`meta-claw-gateway*`、`meta-claw-bootstrap`
 - 标准启动路径：`./init.sh`
 - 标准验证路径：`./init.sh` 先执行全仓编译，再运行初始化阶段 P0 测试集
-- 最近已通过证据：2026-05-18 在真实 Maven 环境中执行新版 `./init.sh`，完成全仓编译并通过 7 个 P0 测试类
+- 最近已通过证据：2026-05-20 在真实 Maven 环境中执行新版 `./init.sh`，完成全仓编译并通过 P0 测试集；`ChatCommandTest` 4/4 覆盖新会话即时初始化
 - 当前最高优先级未完成功能：暂无新的已选定功能
 - 当前 blocker：
   1. 当前无 blocker
@@ -31,6 +31,7 @@
 
 - `./init.sh` 已迁移到当前 Java/Maven 实际启动路径，并已于 2026-05-16 完整跑通
 - `ChatCommand` 默认仍会创建新 `sessionKey`，但已支持 `sessions <vessel>` 与 `chat <vessel> --resume <session-id>` 的显式恢复
+- `ChatCommand` 新会话生成 `sessionKey` 后会在 LLM client 构建前调用 `initializeConversation(sessionKey)`，立即创建 `<vessel>/conversations/<session-id>/history.jsonl`
 - `serve/start/stop/restart/status/logs`、工具引擎、MCP、Skill 系统仍未实现
 
 ## 会话记录
@@ -415,3 +416,29 @@
   - `getHistory(sessionKey, limit)` 仍保留为历史读取 API，未来若需要更强的窗口查询，可以再单独设计更明确的 query 形态
 - 下一步最佳动作：
   1. 由用户决定下一项优先级
+
+### Session 013
+
+- 日期：2026-05-20
+- 本轮目标：修复历史验收中发现的新会话记录不实时出现在 Vessel conversations 目录的问题
+- 已完成：
+  - 将 `ChatCommand` 的 session 选择/创建逻辑提取为可测试的 `selectSession(...)`
+  - 新会话生成 session ID 后立即调用 `ShortMemoryManager.initializeConversation(sessionId)`
+  - 将新会话初始化提前到 LLM client 构建之前，避免被模型客户端初始化、输入循环或进程退出时机影响
+  - 恢复已有会话时仍只校验存在性，不会误创建新会话目录
+- 运行过的验证：
+  - `mvn test -pl meta-claw-cli -am -Dtest=ChatCommandTest -Dsurefire.failIfNoSpecifiedTests=false` → 成功，`ChatCommandTest` 4/4 通过
+  - `./init.sh`（沙箱内）→ 失败：`MessageFlowIntegrationTest` 仍受 Mockito/ByteBuddy 自附加限制影响
+  - `./init.sh`（沙箱外真实环境）→ 成功；完成全仓编译并通过 P0 测试集
+- 已记录证据：
+  - `ChatCommandTest` 覆盖新会话立即初始化、恢复已有会话不新建、恢复缺失会话报错
+  - `feature_list.json` 的 `chat-002` 已补充 2026-05-20 验证记录
+- 更新过的文件或工件：
+  - `meta-claw-cli/src/main/java/meta/claw/cli/ChatCommand.java`
+  - `meta-claw-cli/src/test/java/meta/claw/cli/ChatCommandTest.java`
+  - `feature_list.json`
+  - `claude-progress.md`
+- 已知风险或未解决问题：
+  - 沙箱内标准验证仍可能因 Mockito/ByteBuddy 自附加受限失败；真实环境验证已通过
+- 下一步最佳动作：
+  1. 由用户继续做手动 CLI 验收：启动新会话后，在另一个终端检查 `.meta-claw/vessels/default/conversations/<session-id>/history.jsonl` 是否立即出现
