@@ -323,6 +323,7 @@ public class ChatCommand implements Runnable {
             try (FileChannel ignored = FileChannel.open(historyFile,
                     StandardOpenOption.CREATE, StandardOpenOption.WRITE)) {
                 // Opening and closing the channel makes the file visible before the input loop starts.
+                ignored.force(true);
             }
             if (!Files.exists(historyFile)) {
                 throw new IOException("history file was not created: " + historyFile);

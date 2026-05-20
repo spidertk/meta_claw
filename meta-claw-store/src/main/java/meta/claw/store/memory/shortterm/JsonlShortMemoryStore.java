@@ -74,6 +74,7 @@ public class JsonlShortMemoryStore implements ShortMemoryStore {
                     StandardOpenOption.CREATE, StandardOpenOption.WRITE)) {
                 channel.force(true);
             }
+            syncParentDirectory(filePath);
         } catch (IOException e) {
             throw new RuntimeException("Conversation initialization failed", e);
         } finally {
@@ -96,6 +97,7 @@ public class JsonlShortMemoryStore implements ShortMemoryStore {
                 channel.write(ByteBuffer.wrap(jsonLine.getBytes(StandardCharsets.UTF_8)));
                 channel.force(true);
             }
+            syncParentDirectory(filePath);
         } catch (IOException e) {
             throw new RuntimeException("Message append failed", e);
         } finally {
@@ -112,8 +114,8 @@ public class JsonlShortMemoryStore implements ShortMemoryStore {
         }
         ReentrantReadWriteLock lock = getLock(sessionKey);
         lock.readLock().lock();
-        try {
-            List<MemoryMessage> messages = Files.lines(filePath)
+        try (var lines = Files.lines(filePath)) {
+            List<MemoryMessage> messages = lines
                     .filter(line -> !line.isBlank())
                     .map(this::parseMessage)
                     .filter(msg -> msg != null)
@@ -279,8 +281,8 @@ public class JsonlShortMemoryStore implements ShortMemoryStore {
         if (!Files.exists(filePath)) {
             return Collections.emptyList();
         }
-        try {
-            return Files.lines(filePath)
+        try (var lines = Files.lines(filePath)) {
+            return lines
                     .filter(line -> !line.isBlank())
                     .map(this::parseMessage)
                     .filter(msg -> msg != null)
@@ -389,6 +391,20 @@ public class JsonlShortMemoryStore implements ShortMemoryStore {
         }
         return BASE64_PATTERN.matcher(content).replaceAll(match ->
                 "[media:" + match.group(1) + ":base64:<stripped>]");
+    }
+
+    private void syncParentDirectory(Path filePath) {
+        try {
+            Path parent = filePath.getParent();
+            if (parent != null && Files.exists(parent)) {
+                try (FileChannel dirChannel = FileChannel.open(parent, StandardOpenOption.READ)) {
+                    dirChannel.force(true);
+                }
+            }
+        } catch (IOException e) {
+            // 部分文件系统（如 Windows）不支持对目录调用 force，忽略即可
+            log.debug("Failed to sync parent directory for {}: {}", filePath, e.getMessage());
+        }
     }
 
     private int estimateTokens(String text) {

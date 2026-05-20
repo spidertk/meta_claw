@@ -490,5 +490,29 @@
   - `claude-progress.md`
 - 已知风险或未解决问题：
   - 若用户仍观察不到 CLI 输出的 `History` 路径，优先确认实际运行命令是否使用当前源码编译出的 `CliApplication`
+### Session 016
+
+- 日期：2026-05-20
+- 本轮目标：修复 `JsonlShortMemoryStore` 流泄漏并确保新会话文件实时可见
+- 已完成：
+  - 修复 `getHistory()` 与 `getHistoryForVessel()` 中 `Files.lines` 未关闭的资源泄漏
+  - 新增 `syncParentDirectory()`，在 `initializeConversation()` 与 `appendMessage()` 写入后对父目录执行 `FileChannel.force(true)`
+  - 修复 `ChatCommand.initializeHistoryFile()` 中 `FileChannel` 创建空文件后未 `force` 的问题
+- 运行过的验证：
+  - `./init.sh`（真实环境，Java 21）→ 成功；9 个 reactor 模块全部 SUCCESS
+  - `JsonlShortMemoryStoreTest` → 10/10 通过
+  - `ChatCommandTest` → 6/6 通过
+  - `MessageFlowIntegrationTest` → 3/3 通过
+- 已记录证据：
+  - `git diff` 已确认修改范围：`JsonlShortMemoryStore.java` 关闭读流 + 目录 sync；`ChatCommand.java` 预创建空文件后 `force(true)`
+- 更新过的文件或工件：
+  - `meta-claw-store/src/main/java/meta/claw/store/memory/shortterm/JsonlShortMemoryStore.java`
+  - `meta-claw-cli/src/main/java/meta/claw/cli/ChatCommand.java`
+- 已知风险或未解决问题：
+  - 当前无新增 blocker
+- 下一步最佳动作：
+  1. 提交本轮修改
+  2. 由用户决定是否继续下一项功能
+
 - 下一步最佳动作：
   1. 运行标准入口 `./init.sh`
