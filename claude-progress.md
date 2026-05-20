@@ -780,3 +780,25 @@
 - 下一步最佳动作：
   1. 提交本轮修改
   2. 由用户决定下一项功能优先级
+
+### Session 025
+
+- 日期：2026-05-20
+- 本轮目标：修正 Factory Map 注入方式，从构造注入改为 `@Autowired` 字段注入 + setter
+- 已完成：
+  - 将 `ShortMemoryStoreFactory` 和 `LongMemoryStoreFactory` 的 Map 注入从构造器改为 `@Autowired` 字段 + `public void setStores(...)` setter
+  - 修复测试编译：`ChatCommandTest` 改为无参构造 + `factory.setStores(...)`；`VesselManagerTest` 改为 `new LongMemoryStoreFactory()`
+- 运行过的验证：
+  - `./init.sh`（真实环境，Java 21）→ 成功；10 个 reactor 模块全部 SUCCESS
+  - 全量测试：core 16/16、store 18/18、bootstrap 3/3、cli 5/5、tool 全部通过
+- 更新过的文件或工件：
+  - `meta-claw-core/src/main/java/meta/claw/core/memory/shortterm/ShortMemoryStoreFactory.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/memory/longterm/LongMemoryStoreFactory.java`
+  - `meta-claw-core/src/test/java/meta/claw/core/runtime/VesselManagerTest.java`
+  - `meta-claw-cli/src/test/java/meta/claw/cli/ChatCommandTest.java`
+  - `claude-progress.md`
+- 已知风险或未解决的问题：
+  - 当前无新增 blocker
+- 下一步最佳动作：
+  1. 提交本轮修改
+  2. 由用户决定下一项功能优先级

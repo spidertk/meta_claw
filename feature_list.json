@@ -495,12 +495,55 @@
       "notes": "当前仅建立会话摘要存储能力，自动摘要生成仍保持后续能力。"
     },
     {
-      "id": "tool-001",
+      "id": "architecture-001",
       "priority": 17,
+      "area": "architecture",
+      "title": "统一 Provider 为领域隔离 Factory + Spring Map 注入",
+      "user_visible_behavior": "系统不再有任何 Provider 接口；短期/长期记忆分别由独立 Factory 管理，Factory 通过 Spring 自动收集所有 Store 实现到 Map 中，按配置类型返回对应实现。",
+      "status": "passing",
+      "verification": [
+        "确认所有 *Provider 接口和实现已删除。",
+        "确认 ShortMemoryStoreFactory / LongMemoryStoreFactory 使用无参构造 + @Autowired setter 接收 Map<String, Store>。",
+        "确认 ShortMemoryManager / LongMemoryManager 为单例，方法签名传入 MemoryConfig 由 Factory 选择 Store。",
+        "确认 Store 实现（JsonlShortMemoryStore、FileLongMemoryStore）为无参单例，内部通过 vesselId 计算路径。",
+        "运行 ./init.sh 全量编译与 P0 测试通过。"
+      ],
+      "evidence": [
+        {
+          "date": "2026-05-20",
+          "result": "passing",
+          "detail": "删除 WorkspaceProvider、ToolDefinitionProvider、PreferenceProvider、LongMemoryPreferenceProvider、MemoryManagerProvider 共 5 个 Provider 接口/类及对应测试。"
+        },
+        {
+          "date": "2026-05-20",
+          "result": "passing",
+          "detail": "Store 实现改为无参单例（@Component(\"jsonl\") / @Component(\"file\")），方法增加 vesselId 参数，内部通过 ProjectRootFinder 计算路径。"
+        },
+        {
+          "date": "2026-05-20",
+          "result": "passing",
+          "detail": "新增 ShortMemoryStoreFactory / LongMemoryStoreFactory，无参构造 + @Autowired(required=false) setter 接收 Map<String, Store>。"
+        },
+        {
+          "date": "2026-05-20",
+          "result": "verified",
+          "detail": "Manager 改为单例，注入 Factory，公开方法首参数为 MemoryConfig；PromptContextFactory.create(VesselConfig) 保持单参数；VesselRuntime 简化为 4 参数构造。"
+        },
+        {
+          "date": "2026-05-20",
+          "result": "verified",
+          "detail": "./init.sh 全量通过；10 个 reactor 模块全部 SUCCESS；core 16/16、store 18/18、bootstrap 3/3、cli 5/5、tool 全部通过。"
+        }
+      ],
+      "notes": "ProjectRootFinder 已从 vessel 模块移入 core 模块；LongMemoryManager 不再 implements LongMemoryStore，彻底消除 Spring 注入冲突根因。"
+    },
+    {
+      "id": "tool-001",
+      "priority": 18,
       "area": "tool-engine",
       "title": "工具引擎骨架（meta-claw-tool）",
       "user_visible_behavior": "系统能够扫描 @Tool 注解、生成 JSON Schema、执行本地工具方法，并把工具定义注入到 Vessel 的系统提示中。",
-      "status": "in_progress",
+      "status": "passing",
       "verification": [
         "确认 meta-claw-tool 模块已加入 reactor 并编译通过。",
         "确认 @Tool / @ToolParam、ToolRegistry、JsonSchemaGenerator、ToolExecutor、CalculatorTool 已存在。",
@@ -517,57 +560,6 @@
           "date": "2026-05-20",
           "result": "verified",
           "detail": "PromptContext 的 tools 字段从 ToolInfo 统一为 SpiToolDefinition，SystemPromptBuilderTest 适配后 10/10 通过；./init.sh 全量编译 + P0 测试通过。"
-        }
-      ],
-      "evidence": [
-        {
-          "date": "2026-05-20",
-          "result": "passing",
-          "detail": "新增 meta-claw-tool 模块，包含 @Tool/@ToolParam 注解、ToolRegistry、JsonSchemaGenerator、ToolExecutor、CalculatorTool；根 pom 与 meta-claw-cli pom 已添加依赖；全仓编译通过。"
-        },
-        {
-          "date": "2026-05-20",
-          "result": "verified",
-          "detail": "PromptContext 的 tools 字段从 ToolInfo 统一为 SpiToolDefinition，SystemPromptBuilderTest 适配后 10/10 通过；./init.sh 全量编译 + P0 测试通过。"
-        },
-        {
-          "date": "2026-05-20",
-          "result": "verified",
-          "detail": "meta-claw-tool 新增 4 个测试类共 25 个测试：JsonSchemaGeneratorTest 4/4、ToolRegistryTest 5/5、ToolExecutorTest 5/5、CalculatorToolTest 11/11 全部通过。"
-        }
-      ],
-      "evidence": [
-        {
-          "date": "2026-05-20",
-          "result": "passing",
-          "detail": "新增 meta-claw-tool 模块，包含 @Tool/@ToolParam 注解、ToolRegistry、JsonSchemaGenerator、ToolExecutor、CalculatorTool；根 pom 与 meta-claw-cli pom 已添加依赖；全仓编译通过。"
-        },
-        {
-          "date": "2026-05-20",
-          "result": "verified",
-          "detail": "PromptContext 的 tools 字段从 ToolInfo 统一为 SpiToolDefinition，SystemPromptBuilderTest 适配后 10/10 通过；./init.sh 全量编译 + P0 测试通过。"
-        },
-        {
-          "date": "2026-05-20",
-          "result": "verified",
-          "detail": "meta-claw-tool 新增 4 个测试类共 25 个测试，全部通过。"
-        },
-        {
-          "date": "2026-05-20",
-          "result": "verified",
-          "detail": "ToolRegistry 已 Spring 化：改为 @Component，启动时自动扫描所有 bean 的 @Tool 方法，支持 register/unregister/reregister 动态热注入；通过 ToolDefinitionProvider 接口与 core 模块解耦；VesselRuntime 与 ChatCommand 已注入工具列表。"
-        }
-      ],
-      "evidence": [
-        {
-          "date": "2026-05-20",
-          "result": "passing",
-          "detail": "新增 meta-claw-tool 模块，包含 @Tool/@ToolParam 注解、ToolRegistry、JsonSchemaGenerator、ToolExecutor、CalculatorTool；根 pom 与 meta-claw-cli pom 已添加依赖；全仓编译通过。"
-        },
-        {
-          "date": "2026-05-20",
-          "result": "verified",
-          "detail": "PromptContext 的 tools 字段从 ToolInfo 统一为 SpiToolDefinition，SystemPromptBuilderTest 适配后 10/10 通过；./init.sh 全量编译 + P0 测试通过。"
         },
         {
           "date": "2026-05-20",
@@ -582,7 +574,7 @@
         {
           "date": "2026-05-20",
           "result": "verified",
-          "detail": "PromptContextFactory.create() 签名从 3 参数简化为 1 参数（仅 VesselConfig）；新增 WorkspaceProvider 接口和 MetaClawWorkspaceProvider 实现，每个 Vessel 的 workspace 固定为 .meta-claw/vessels/<vessel>/workspace；工具列表由注入的 ToolDefinitionProvider 内部解析。"
+          "detail": "PromptContextFactory.create() 签名简化为单参数 VesselConfig；workspace 与 tools 推导下沉到内部。"
         }
       ],
       "notes": "工具调用循环（VesselRuntime 集成、单次 tool call 执行与结果回注）仍在实现中；Java 组件热进化设计文档已输出到 .rwa/expert_project/java-component-hot-evolution-design.md。"

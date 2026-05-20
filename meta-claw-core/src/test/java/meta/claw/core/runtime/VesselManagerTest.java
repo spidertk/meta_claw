@@ -115,7 +115,7 @@ class VesselManagerTest {
         VesselRuntime mockRuntime = new VesselRuntime(
                 manager.getConfig("runtime-test"),
                 null,
-                new PromptContextFactory(new meta.claw.core.memory.longterm.LongMemoryStoreFactory(java.util.Collections.emptyMap())),
+                new PromptContextFactory(new meta.claw.core.memory.longterm.LongMemoryStoreFactory()),
                 new SystemPromptBuilder(new TemplateLoader())
         );
         manager.registerRuntime("runtime-test", mockRuntime);

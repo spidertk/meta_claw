@@ -1,18 +1,28 @@
 package meta.claw.core.memory.shortterm;
 
 import meta.claw.core.config.MemoryConfig;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
 
 /**
- * 短期记忆 Store 工厂。通过 Spring Map 注入持有所有单例实现，按配置或类型获取。
+ * 短期记忆 Store 工厂。Spring 自动将所有 ShortMemoryStore 实现注入到 Map 中。
  */
 @Component
 public class ShortMemoryStoreFactory {
-    private final Map<String, ShortMemoryStore> stores;
 
-    public ShortMemoryStoreFactory(Map<String, ShortMemoryStore> stores) {
+    /**
+     * Spring 自动收集所有 {@link ShortMemoryStore} 实现，以 bean name 为 key 注入。
+     * 例如：{"jsonl": JsonlShortMemoryStore 实例}
+     */
+    @Autowired
+    private Map<String, ShortMemoryStore> stores;
+
+    /**
+     * 测试用：手动设置 stores Map。
+     */
+    public void setStores(Map<String, ShortMemoryStore> stores) {
         this.stores = stores;
     }
 

@@ -89,7 +89,9 @@ class ChatCommandTest {
     }
 
     private static ShortMemoryManager shortMemoryManager(ShortMemoryStore store) {
-        return new ShortMemoryManager(new ShortMemoryStoreFactory(Map.of("jsonl", store)));
+        ShortMemoryStoreFactory factory = new ShortMemoryStoreFactory();
+        factory.setStores(Map.of("jsonl", store));
+        return new ShortMemoryManager(factory);
     }
 
     private static class RecordingShortMemoryStore implements ShortMemoryStore {
