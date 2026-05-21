@@ -1,7 +1,7 @@
 package meta.claw.app;
 
 import meta.claw.core.config.GlobalConfigLoader;
-import meta.claw.vessel.ProjectRootFinder;
+import meta.claw.core.vessel.ProjectRootFinder;
 import meta.claw.core.config.GlobalConfig;
 import meta.claw.gateway.Gateway;
 import meta.claw.gateway.weixin.WeixinChannel;
@@ -19,7 +19,6 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationListener;
 
 import java.nio.file.Path;
-import java.nio.file.Paths;
 
 /**
  * Meta-Claw 系统启动类
@@ -113,8 +112,8 @@ public class MetaClawApplication implements CommandLineRunner {
     @Override
     public void run(String... args) {
         // 步骤 1：为所有已加载的 Vessel 创建运行时实例
-        ChatClient chatClient = chatClientBuilder.build();
-        appConfig.initializeRuntimes(vesselManager, chatClient, vesselRuntimes);
+
+        appConfig.initializeRuntimes(vesselManager,  vesselRuntimes);
 
         // 步骤 2：注册并启动微信渠道
         gateway.registerChannel(weixinChannel);

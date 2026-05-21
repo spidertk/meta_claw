@@ -19,15 +19,6 @@ import java.util.concurrent.ConcurrentHashMap;
 @Slf4j
 public class VesselManager {
 
-    /**
-     * 默认 vessels 配置目录名称
-     */
-    private static final String DEFAULT_VESSELS_DIR = "vessels";
-
-    /**
-     * Vessel 配置文件名称
-     */
-    private static final String VESSEL_CONFIG_FILE = "vessel.md";
 
     /**
      * 存储已加载的 Vessel 配置，key 为 vesselId
@@ -42,10 +33,10 @@ public class VesselManager {
     /**
      * vessels 目录的绝对路径
      */
-    private final String vesselsDir;
+    private final Path vesselsDir;
     private final VesselConfigLoader vesselConfigLoader;
 
-    public VesselManager(String vesselsDir, VesselConfigLoader vesselConfigLoader) {
+    public VesselManager(Path vesselsDir, VesselConfigLoader vesselConfigLoader) {
         this.vesselsDir = vesselsDir;
         this.vesselConfigLoader = vesselConfigLoader;
     }
@@ -58,7 +49,7 @@ public class VesselManager {
      * </p>
      */
     public void loadVessels() {
-        List<VesselConfig> loaded = vesselConfigLoader.loadFromDirectory(Path.of(vesselsDir));
+        List<VesselConfig> loaded = vesselConfigLoader.loadFromDirectory(vesselsDir);
         for (VesselConfig config : loaded) {
             if (config.getId() != null && !config.getId().isEmpty()) {
                 vessels.put(config.getId(), config);

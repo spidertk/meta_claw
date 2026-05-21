@@ -1,14 +1,13 @@
 package meta.claw.cli;
 
-import meta.claw.vessel.ProjectRootFinder;
-import meta.claw.vessel.VesselTemplate;
+import meta.claw.core.vessel.ProjectRootFinder;
+import meta.claw.core.vessel.VesselTemplate;
 import org.springframework.stereotype.Component;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
 
 import java.nio.file.Path;
-import java.nio.file.Paths;
 
 /**
  * 创建新的 Vessel。

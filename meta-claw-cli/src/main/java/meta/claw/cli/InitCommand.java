@@ -1,7 +1,7 @@
 package meta.claw.cli;
 
-import meta.claw.vessel.ProjectRootFinder;
-import meta.claw.vessel.VesselTemplate;
+import meta.claw.core.vessel.ProjectRootFinder;
+import meta.claw.core.vessel.VesselTemplate;
 import org.springframework.stereotype.Component;
 import picocli.CommandLine.Command;
 

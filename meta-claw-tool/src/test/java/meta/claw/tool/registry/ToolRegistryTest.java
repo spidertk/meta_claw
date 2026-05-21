@@ -1,8 +1,9 @@
 package meta.claw.tool.registry;
 
-import meta.claw.core.spi.llm.SpiToolDefinition;
-import meta.claw.tool.annotation.Tool;
-import meta.claw.tool.annotation.ToolParam;
+import meta.claw.core.tool.SpiToolDefinition;
+import meta.claw.core.tool.annotation.Tool;
+import meta.claw.core.tool.annotation.ToolParam;
+import meta.claw.core.tool.registry.ToolRegistry;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;

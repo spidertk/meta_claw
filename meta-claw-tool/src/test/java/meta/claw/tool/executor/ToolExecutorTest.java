@@ -1,10 +1,11 @@
 package meta.claw.tool.executor;
 
-import meta.claw.core.spi.llm.SpiToolCall;
-import meta.claw.core.spi.llm.SpiToolResult;
-import meta.claw.tool.annotation.Tool;
-import meta.claw.tool.annotation.ToolParam;
-import meta.claw.tool.registry.ToolRegistry;
+import meta.claw.core.tool.SpiToolCall;
+import meta.claw.core.tool.SpiToolResult;
+import meta.claw.core.tool.executor.ToolExecutor;
+import meta.claw.core.tool.annotation.Tool;
+import meta.claw.core.tool.annotation.ToolParam;
+import meta.claw.core.tool.registry.ToolRegistry;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;

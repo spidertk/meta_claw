@@ -1,8 +1,9 @@
 package meta.claw.tool.schema;
 
-import meta.claw.core.spi.llm.SpiJsonSchema;
-import meta.claw.tool.annotation.Tool;
-import meta.claw.tool.annotation.ToolParam;
+import meta.claw.core.llm.SpiJsonSchema;
+import meta.claw.core.tool.schema.JsonSchemaGenerator;
+import meta.claw.core.tool.annotation.Tool;
+import meta.claw.core.tool.annotation.ToolParam;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Method;

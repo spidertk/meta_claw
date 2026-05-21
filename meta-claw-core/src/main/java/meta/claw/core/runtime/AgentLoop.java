@@ -96,7 +96,7 @@ public class AgentLoop {
             }
 
             // 步骤 3：调用 Vessel 进行对话处理
-            Reply reply = runtime.chat(context.getContent());
+            Reply reply = runtime.chat(targetVesselId,sessionId,context.getContent());
             log.info("Vessel 处理完成: vesselId={}, replyType={}, sessionId={}",
                     targetVesselId, reply.getType(), sessionId);
 

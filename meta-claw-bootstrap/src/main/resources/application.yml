@@ -8,23 +8,18 @@ spring:
 
   ai:
     openai:
-      # OpenAI API 密钥，优先从环境变量 OPENAI_API_KEY 读取
-      api-key: ${OPENAI_API_KEY:}
-      # OpenAI API 基础地址，默认使用官方地址，可通过环境变量覆盖
-      base-url: ${OPENAI_BASE_URL:https://api.openai.com}
+      api-key: ${OPENAI_API_KEY:disabled}
+      base-url: https://api.openai.com
       chat:
-        options:
-          # 默认使用的对话模型
-          model: gpt-3.5-turbo
+        enabled: false
+#        options:
+#          model: gpt-3.5-turbo
 
 meta:
   claw:
     weixin:
       # 微信渠道认证令牌，用于 openilink SDK 登录，优先从环境变量 WEIXIN_TOKEN 读取
       token: ${WEIXIN_TOKEN:}
-    experts:
-      # Vessel 配置目录，系统启动时会扫描该目录下的子目录及 config.yaml / vessel.md 文件
-      dir: ./experts
 
 # 日志级别由 ~/.meta-claw/config.yaml 中的 log.debug 控制
 # 仅在 log.debug: true 时，meta.claw 包才会输出 DEBUG 级别日志

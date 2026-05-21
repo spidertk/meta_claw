@@ -5,7 +5,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import meta.claw.core.spi.llm.SpiToolCall;
+import meta.claw.core.tool.SpiToolCall;
 
 import java.time.LocalDateTime;
 import java.util.List;

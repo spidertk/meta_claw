@@ -1,7 +1,7 @@
 package meta.claw.cli;
 
 import meta.claw.core.config.GlobalConfigLoader;
-import meta.claw.vessel.ProjectRootFinder;
+import meta.claw.core.vessel.ProjectRootFinder;
 import meta.claw.core.config.GlobalConfig;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
@@ -14,7 +14,6 @@ import org.springframework.context.annotation.Bean;
 import picocli.CommandLine;
 
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Arrays;
 
 @SpringBootApplication(

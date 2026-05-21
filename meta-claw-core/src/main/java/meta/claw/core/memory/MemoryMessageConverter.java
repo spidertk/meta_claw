@@ -1,6 +1,6 @@
 package meta.claw.core.memory;
 
-import meta.claw.core.spi.llm.SpiMessage;
+import meta.claw.core.llm.SpiMessage;
 
 import java.time.LocalDateTime;
 import java.util.List;

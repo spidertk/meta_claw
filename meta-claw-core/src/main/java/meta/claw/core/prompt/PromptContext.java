@@ -8,13 +8,18 @@ import java.nio.file.Path;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import meta.claw.core.spi.llm.SpiToolDefinition;
+
+import meta.claw.core.config.MemoryConfig;
+import meta.claw.core.config.ProviderConfig;
+import meta.claw.core.config.VesselConfig;
+import meta.claw.core.tool.SpiToolDefinition;
 
 @Getter
 @Builder(toBuilder = true)
 @NoArgsConstructor
 @AllArgsConstructor
 public class PromptContext {
+    private Path vesselsDir;
     private String vesselName;
     private String vesselDescription;
     private String identity;
@@ -34,4 +39,7 @@ public class PromptContext {
     private String location;
     @Builder.Default
     private Map<String, String> runtimeInfo = Collections.emptyMap();
+    private MemoryConfig memoryConfig;
+    private ProviderConfig providerConfig;
+    private VesselConfig vesselConfig;
 }

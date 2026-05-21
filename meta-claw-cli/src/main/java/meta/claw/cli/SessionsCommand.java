@@ -4,7 +4,7 @@ import meta.claw.core.config.VesselConfig;
 import meta.claw.core.memory.SessionMemory;
 import meta.claw.core.memory.shortterm.ShortMemoryManager;
 import meta.claw.core.util.ProjectRootFinder;
-import meta.claw.vessel.VesselConfigResolver;
+import meta.claw.core.vessel.VesselConfigResolver;
 import org.springframework.stereotype.Component;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Parameters;
@@ -34,7 +34,7 @@ public class SessionsCommand implements Runnable {
     public void run() {
         Path configDir = ProjectRootFinder.getMetaClawDir();
         try {
-            var resolved = resolver.resolve(configDir, vesselName);
+            var resolved = resolver.resolve(vesselName);
             VesselConfig config = resolved.getVesselConfig();
             printSessions(vesselName, shortMemoryManager.listSessions(vesselName));
             return;

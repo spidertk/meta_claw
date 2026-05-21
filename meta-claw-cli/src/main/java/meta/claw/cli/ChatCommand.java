@@ -1,32 +1,24 @@
 package meta.claw.cli;
 
 import lombok.extern.slf4j.Slf4j;
+import meta.claw.core.config.VesselConfig;
 import meta.claw.core.memory.MemoryMessage;
 import meta.claw.core.memory.MemoryMessageConverter;
 import meta.claw.core.memory.shortterm.ShortMemoryManager;
-import meta.claw.core.memory.longterm.LongMemoryManager;
 
 import meta.claw.core.prompt.PromptContext;
-import meta.claw.core.prompt.PromptContextFactory;
+import meta.claw.core.prompt.PromptContextManager;
 import meta.claw.core.prompt.SystemPromptBuilder;
-import meta.claw.core.runtime.SpringAiLlmClient;
-import meta.claw.core.spi.llm.LlmClientFactoryManager;
-import meta.claw.core.spi.llm.SpiChatRequest;
-import meta.claw.core.spi.llm.SpiChatResponse;
-import meta.claw.core.spi.llm.SpiMessage;
-import meta.claw.core.spi.llm.SpiProviderMeta;
-import meta.claw.core.spi.llm.SpiStreamingCallback;
-import meta.claw.core.spi.llm.SpiToolCall;
-import meta.claw.vessel.ResolvedVesselConfig;
-import meta.claw.core.config.MemoryConfig;
-import meta.claw.core.config.VesselConfig;
-import meta.claw.core.util.ProjectRootFinder;
-import meta.claw.vessel.VesselConfigResolver;
-import meta.claw.tool.registry.ToolRegistry;
+
+import meta.claw.core.llm.SpiChatRequest;
+import meta.claw.core.llm.SpiChatResponse;
+import meta.claw.core.llm.SpiMessage;
+import meta.claw.core.llm.SpiStreamingCallback;
+import meta.claw.core.runtime.LlmClientManager;
+import meta.claw.core.tool.SpiToolCall;
 import org.jline.terminal.Terminal;
 import org.jline.terminal.TerminalBuilder;
-import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -46,30 +38,14 @@ import java.util.UUID;
 @Command(name = "chat", description = "Chat with a vessel")
 public class ChatCommand implements Runnable {
 
-    private final LlmClientFactoryManager factoryManager;
-    private final VesselConfigResolver resolver;
-    private final ShortMemoryManager shortMemoryManager;
-    private final LongMemoryManager longMemoryManager;
-    private final PromptContextFactory contextFactory;
-    private final SystemPromptBuilder promptBuilder;
-    private final ObjectProvider<SpringAiLlmClient> llmClients;
-    private final ToolRegistry toolRegistry;
-
-    public ChatCommand(LlmClientFactoryManager factoryManager, VesselConfigResolver resolver,
-                       ShortMemoryManager shortMemoryManager, LongMemoryManager longMemoryManager,
-                       PromptContextFactory contextFactory,
-                       SystemPromptBuilder promptBuilder,
-                       ObjectProvider<SpringAiLlmClient> llmClients,
-                       ToolRegistry toolRegistry) {
-        this.factoryManager = factoryManager;
-        this.resolver = resolver;
-        this.shortMemoryManager = shortMemoryManager;
-        this.longMemoryManager = longMemoryManager;
-        this.contextFactory = contextFactory;
-        this.promptBuilder = promptBuilder;
-        this.llmClients = llmClients;
-        this.toolRegistry = toolRegistry;
-    }
+    @Autowired
+    private ShortMemoryManager shortMemoryManager;
+    @Autowired
+    private  PromptContextManager promptContextManager;
+    @Autowired
+    private  SystemPromptBuilder promptBuilder;
+    @Autowired
+    private LlmClientManager llmClientManager;
 
     @Parameters(index = "0", defaultValue = "default", description = "Vessel name")
     private String vesselName;
@@ -92,57 +68,31 @@ public class ChatCommand implements Runnable {
             return;
         }
 
-        Path configDir = ProjectRootFinder.getMetaClawDir();
-        ResolvedVesselConfig resolved;
+
+        PromptContext baseCtx;
         try {
-            resolved = resolver.resolve(configDir, vesselName);
+            baseCtx = promptContextManager.create(vesselName);
         } catch (IllegalStateException | IllegalArgumentException e) {
             System.err.println(e.getMessage());
             return;
         }
 
-        String providerName = resolved.getProviderName();
-        meta.claw.core.config.ProviderConfig providerConfig = resolved.getProviderConfig();
-        VesselConfig vesselConfig = resolved.getVesselConfig();
 
-        String apiKey = providerConfig.getApiKey();
-        if (apiKey == null || apiKey.isBlank() || "your-api-key".equals(apiKey)) {
-            System.err.println("API key not set for provider '" + providerName + "'.");
-            System.err.println("Run 'meta-claw config set providers." + providerName + ".api_key <your-key>' to configure.");
-            return;
-        }
-
-        String model = providerConfig.getModel();
-        if (model == null || model.isBlank()) {
-            System.err.println("Model not set for provider '" + providerName + "'.");
-            System.err.println("Run 'meta-claw config set providers." + providerName + ".model <model-name>' to configure.");
-            return;
-        }
-
-        log.info("Using provider: {}", providerName);
+        log.info("Using provider: {}", baseCtx.getProviderConfig());
         log.info("Provider config - baseUrl: {}, model: {}",
-                providerConfig.getBaseUrl(),
-                providerConfig.getModel());
+                baseCtx.getProviderConfig().getBaseUrl(),
+                baseCtx.getProviderConfig().getModel());
 
-        Path vesselsDir = configDir.resolve("vessels");
+        Path vesselsDir = baseCtx.getVesselsDir();
         Path historyFilePath;
         try {
-            this.sessionKey = selectSession(shortMemoryManager, vesselConfig.getMemory(), vesselName, resumeSessionId, () -> UUID.randomUUID().toString());
+            this.sessionKey = selectSession(vesselName, resumeSessionId, () -> UUID.randomUUID().toString());
             historyFilePath = historyFilePath(vesselsDir, vesselName, sessionKey);
         } catch (IllegalArgumentException e) {
             System.err.println(e.getMessage());
             return;
         }
-
-        ChatClient chatClient = factoryManager.create(providerName, providerConfig);
-
-        SpiProviderMeta meta = SpiProviderMeta.builder()
-                .name(providerName)
-                .model(model)
-                .baseUrl(providerConfig.getBaseUrl())
-                .build();
-
-        SpringAiLlmClient llmClient = llmClients.getObject(chatClient, meta);
+        VesselConfig vesselConfig = baseCtx.getVesselConfig();
 
         String displayName = vesselConfig.getName() != null ? vesselConfig.getName() : vesselName;
         String emoji = vesselConfig.getEmoji() != null ? vesselConfig.getEmoji() : "🤖";
@@ -155,8 +105,8 @@ public class ChatCommand implements Runnable {
         terminal.writer().println("║                                                                  ║");
         terminal.writer().println(String.format("║   %-60s ║", description));
         terminal.writer().println("║                                                                  ║");
-        terminal.writer().println(String.format("║   Model: %-54s ║", model));
-        terminal.writer().println(String.format("║   Provider: %-51s ║", providerName));
+        terminal.writer().println(String.format("║   Model: %-54s ║", baseCtx.getProviderConfig().getModel()));
+        terminal.writer().println(String.format("║   Provider: %-51s ║", baseCtx.getProviderConfig().getProvider()));
         terminal.writer().println("║                                                                  ║");
         terminal.writer().println("╚══════════════════════════════════════════════════════════════════╝");
         terminal.writer().println();
@@ -168,15 +118,7 @@ public class ChatCommand implements Runnable {
         terminal.writer().println();
         terminal.flush();
 
-        // Phase 2: Build static system prompt
-        PromptContext baseCtx = contextFactory.create(vesselConfig);
-        PromptContext promptContext = baseCtx.toBuilder()
-                .tools(toolRegistry.getToolDefinitions())
-                .build();
-        String systemPrompt = promptBuilder.build(promptContext);
-
-        int maxHistoryRounds = vesselConfig.getMaxHistoryRounds() != null
-                ? vesselConfig.getMaxHistoryRounds() : 20;
+        String systemPrompt = promptBuilder.build(baseCtx);
 
         BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
         List<SpiMessage> history = new ArrayList<>();
@@ -184,7 +126,7 @@ public class ChatCommand implements Runnable {
             history.add(SpiMessage.system(systemPrompt));
         }
         if (resumeSessionId != null && !resumeSessionId.isBlank()) {
-            history.addAll(toSpiMessages(shortMemoryManager.getHistory(vesselConfig.getMemory(), vesselName, sessionKey)));
+            history.addAll(toSpiMessages(shortMemoryManager.getHistory(vesselName, sessionKey)));
         }
 
         try {
@@ -201,7 +143,7 @@ public class ChatCommand implements Runnable {
                         history.add(SpiMessage.system(systemPrompt));
                     }
                     try {
-                        shortMemoryManager.clearHistory(vesselConfig.getMemory(), vesselName, sessionKey);
+                        shortMemoryManager.clearHistory(vesselName, sessionKey);
                     } catch (Exception e) {
                         log.warn("Failed to clear persisted history for session {}", sessionKey, e);
                     }
@@ -212,20 +154,20 @@ public class ChatCommand implements Runnable {
 
                 history.add(SpiMessage.user(input));
                 try {
-                    shortMemoryManager.appendMessage(vesselConfig.getMemory(), vesselName, sessionKey,
+                    shortMemoryManager.appendMessage( vesselName, sessionKey,
                             MemoryMessageConverter.fromSpiMessage(SpiMessage.user(input)));
                 } catch (Exception e) {
                     log.error("Failed to persist user message", e);
                 }
 
                 SpiChatRequest request = SpiChatRequest.builder()
-                        .messages(buildLlmRequest(vesselConfig.getMemory(), vesselName, sessionKey, systemPrompt, maxHistoryRounds))
+                        .messages(llmClientManager.buildLlmRequest( vesselName, sessionKey, systemPrompt))
                         .build();
 
                 terminal.writer().print("AI: ");
                 terminal.writer().flush();
                 StringBuilder responseBuffer = new StringBuilder();
-                llmClient.chatStream(request, new SpiStreamingCallback() {
+                llmClientManager.chatStream(request, new SpiStreamingCallback() {
                     @Override
                     public void onStart() {
                         // no-op
@@ -250,7 +192,7 @@ public class ChatCommand implements Runnable {
                         String responseText = responseBuffer.toString();
                         history.add(SpiMessage.assistant(responseText));
                         try {
-                            shortMemoryManager.appendMessage(vesselConfig.getMemory(), vesselName, sessionKey,
+                            shortMemoryManager.appendMessage(vesselName, sessionKey,
                                     MemoryMessageConverter.fromSpiMessage(SpiMessage.assistant(responseText)));
                         } catch (Exception e) {
                             log.error("Failed to persist assistant message", e);
@@ -273,16 +215,16 @@ public class ChatCommand implements Runnable {
         terminal.writer().flush();
     }
 
-    private List<SpiMessage> buildLlmRequest(MemoryConfig memoryConfig, String vesselId, String sessionKey, String systemPrompt, int maxHistoryRounds) {
+    private List<SpiMessage> buildLlmRequest( String vesselId, String sessionKey, String systemPrompt) {
         List<SpiMessage> messages = new ArrayList<>();
         if (systemPrompt != null && !systemPrompt.isBlank()) {
             messages.add(SpiMessage.system(systemPrompt));
         }
-        messages.addAll(toSpiMessages(shortMemoryManager.getHistory(memoryConfig, vesselId, sessionKey, maxHistoryRounds)));
+        messages.addAll(toSpiMessages(shortMemoryManager.getHistory(vesselId, sessionKey)));
         return messages;
     }
 
-    static List<SpiMessage> toSpiMessages(List<MemoryMessage> entries) {
+    public List<SpiMessage> toSpiMessages(List<MemoryMessage> entries) {
         List<SpiMessage> restored = new ArrayList<>();
         for (MemoryMessage entry : entries) {
             SpiMessage message = MemoryMessageConverter.toSpiMessage(entry);
@@ -301,21 +243,21 @@ public class ChatCommand implements Runnable {
         return restored;
     }
 
-    static String selectSession(ShortMemoryManager memoryManager, MemoryConfig memoryConfig, String vesselName, String resumeSessionId,
+     String selectSession( String vesselName, String resumeSessionId,
                                 Supplier<String> newSessionIds) {
         if (resumeSessionId != null && !resumeSessionId.isBlank()) {
-            if (!memoryManager.conversationExists(memoryConfig, vesselName, resumeSessionId)) {
+            if (!shortMemoryManager.conversationExists( vesselName, resumeSessionId)) {
                 throw new IllegalArgumentException("Session not found for vessel '" + vesselName + "': " + resumeSessionId);
             }
             return resumeSessionId;
         }
 
         String sessionId = newSessionIds.get();
-        memoryManager.initializeConversation(memoryConfig, vesselName, sessionId);
+        shortMemoryManager.initializeConversation( vesselName, sessionId);
         return sessionId;
     }
 
-    static Path historyFilePath(Path vesselsDir, String vesselName, String sessionKey) {
+     Path historyFilePath(Path vesselsDir, String vesselName, String sessionKey) {
         return vesselsDir.resolve(vesselName).resolve("conversations").resolve(sessionKey).resolve("history.jsonl");
     }
 }

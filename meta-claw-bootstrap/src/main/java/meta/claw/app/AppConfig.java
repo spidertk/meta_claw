@@ -1,6 +1,7 @@
 package meta.claw.app;
 
 import meta.claw.core.eventbus.EventBusWrapper;
+import meta.claw.core.util.ProjectRootFinder;
 import meta.claw.gateway.Gateway;
 import meta.claw.gateway.channel.ChannelRegistry;
 import meta.claw.gateway.weixin.WeixinChannel;
@@ -15,6 +16,8 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+
+import java.nio.file.Path;
 
 /**
  * Meta-Claw 核心配置类
@@ -94,7 +97,7 @@ public class AppConfig {
      */
     @Bean
     public VesselManager vesselManager(VesselConfigLoader vesselConfigLoader) {
-        VesselManager manager = new VesselManager(vesselsDir, vesselConfigLoader);
+        VesselManager manager = new VesselManager(ProjectRootFinder.getMetaClawDir(), vesselConfigLoader);
         manager.loadVessels();
         return manager;
     }
@@ -142,12 +145,11 @@ public class AppConfig {
      * </p>
      *
      * @param vesselManager Vessel 管理器，包含已加载的 Vessel 配置
-     * @param chatClient    Spring AI ChatClient，底层 AI 模型对话客户端
      */
-    public void initializeRuntimes(VesselManager vesselManager, ChatClient chatClient,
+    public void initializeRuntimes(VesselManager vesselManager,
                                    ObjectProvider<VesselRuntime> runtimes) {
         for (VesselConfig config : vesselManager.listAvailableVessels()) {
-            VesselRuntime runtime = runtimes.getObject(config, chatClient);
+            VesselRuntime runtime = runtimes.getObject(config);
             vesselManager.registerRuntime(config.getId(), runtime);
         }
     }

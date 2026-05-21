@@ -14,9 +14,6 @@ public interface ShortMemoryStore {
     void appendMessage(String vesselId, String sessionKey, MemoryMessage message);
     List<MemoryMessage> getHistory(String vesselId, String sessionKey, int limit);
 
-    default List<MemoryMessage> getHistory(String vesselId, String sessionKey) {
-        return getHistory(vesselId, sessionKey, 0);
-    }
 
     List<SessionMemory> listSessions(String vesselId);
     boolean clearHistory(String vesselId, String sessionKey);

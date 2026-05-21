@@ -12,7 +12,7 @@ import meta.claw.core.memory.MemoryMessage;
 import meta.claw.core.memory.MemoryMessageConverter;
 import meta.claw.core.memory.SessionMemory;
 import meta.claw.core.memory.shortterm.ShortMemoryStore;
-import meta.claw.core.spi.llm.SpiMessage;
+import meta.claw.core.llm.SpiMessage;
 import meta.claw.core.util.ProjectRootFinder;
 
 import java.io.IOException;
@@ -180,7 +180,7 @@ public class JsonlShortMemoryStore implements ShortMemoryStore {
 
     @Override
     public List<MemoryMessage> getHistoryByToken(String vesselId, String sessionKey, int maxTokens) {
-        return trimByToken(getHistory(vesselId, sessionKey), maxTokens);
+        return trimByToken(getHistory(vesselId, sessionKey,0), maxTokens);
     }
 
     @Override

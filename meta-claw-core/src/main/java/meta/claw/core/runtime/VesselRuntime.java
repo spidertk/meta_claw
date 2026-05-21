@@ -1,20 +1,18 @@
 package meta.claw.core.runtime;
 
 import lombok.extern.slf4j.Slf4j;
+import meta.claw.core.llm.SpiChatRequest;
+import meta.claw.core.llm.SpiChatResponse;
 import meta.claw.core.message.Reply;
 import meta.claw.core.message.ReplyType;
 import meta.claw.core.config.VesselConfig;
 import meta.claw.core.prompt.PromptContext;
-import meta.claw.core.prompt.PromptContextFactory;
+import meta.claw.core.prompt.PromptContextManager;
 import meta.claw.core.prompt.SystemPromptBuilder;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatResponse;
-import org.springframework.ai.chat.messages.SystemMessage;
-import org.springframework.ai.chat.messages.UserMessage;
-import org.springframework.ai.chat.prompt.Prompt;
 
-import java.nio.file.Path;
-import java.util.List;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
 
@@ -28,78 +26,49 @@ import org.springframework.stereotype.Component;
  */
 @Slf4j
 @Component
-@Scope("prototype")
 public class VesselRuntime {
 
-    private final VesselConfig config;
-    private final ChatClient chatClient;
-    private final PromptContextFactory promptContextFactory;
-    private final SystemPromptBuilder systemPromptBuilder;
+    @Autowired
+    private  PromptContextManager promptContextManager;
+    @Autowired
+    private  SystemPromptBuilder systemPromptBuilder;
+    @Autowired
+    private LlmClientManager llmClientManager;
 
-    public VesselRuntime(VesselConfig config, ChatClient chatClient,
-                         PromptContextFactory promptContextFactory,
-                         SystemPromptBuilder systemPromptBuilder) {
-        this.config = config;
-        this.chatClient = chatClient;
-        this.promptContextFactory = promptContextFactory;
-        this.systemPromptBuilder = systemPromptBuilder;
-        if (config != null) {
-            log.info("VesselRuntime 初始化完成: vesselId={}, model={}, systemPromptLength={}",
-                    config.getId(), config.getModel(),
-                    resolveSystemPrompt(config) != null ? resolveSystemPrompt(config).length() : 0);
-        } else {
-            log.info("VesselRuntime 初始化完成: config=null");
-        }
-    }
 
-    private String resolveSystemPrompt(VesselConfig config) {
-        if (config.getSystemPrompt() != null && !config.getSystemPrompt().isBlank()) {
-            return config.getSystemPrompt();
-        }
+
+    private String resolveSystemPrompt(String vesselId) {
+
         try {
-            PromptContext ctx = promptContextFactory.create(config);
+            PromptContext ctx = promptContextManager.create(vesselId);
             return systemPromptBuilder.build(ctx);
         } catch (Exception e) {
-            log.warn("Failed to build system prompt for vessel {}: {}", config.getId(), e.getMessage());
+            log.warn("Failed to build system prompt for vessel {}: {}", vesselId, e.getMessage());
             return null;
         }
     }
 
     /**
      * 向 AI 模型发送用户消息，并返回标准化的回复对象。
-     *
+     * @param vesselId vesselId
      * @param userMessage 用户输入的文本消息
      * @return 包含 AI 回复内容和元数据的标准化 Reply 对象
      */
-    public Reply chat(String userMessage) {
-        if (chatClient == null) {
-            return new Reply(ReplyType.TEXT, "ChatClient 未初始化，无法处理消息。");
-        }
+    public Reply chat(String vesselId,String sessionId,String userMessage) {
 
-        String systemPrompt = resolveSystemPrompt(config);
 
-        ChatResponse response;
-        if (systemPrompt != null && !systemPrompt.isBlank()) {
-            response = chatClient.prompt()
-                    .system(systemPrompt)
-                    .user(userMessage)
-                    .call()
-                    .chatResponse();
-        } else {
-            response = chatClient.prompt()
-                    .user(userMessage)
-                    .call()
-                    .chatResponse();
-        }
+        String systemPrompt = resolveSystemPrompt(vesselId);
+        SpiChatRequest request = SpiChatRequest.builder()
+                .messages(llmClientManager.buildLlmRequest( vesselId, sessionId, systemPrompt))
+                .build();
+        SpiChatResponse  response =llmClientManager.chat(request);
 
-        String content = response != null && response.getResult() != null
-                ? response.getResult().getOutput().getText()
+        String content = response != null && response.content() != null
+                ? response.content()
                 : "";
 
         return new Reply(ReplyType.TEXT, content);
     }
 
-    public VesselConfig getConfig() {
-        return config;
-    }
+
 }
