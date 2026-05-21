@@ -43,3 +43,5 @@ knowledge
 */.meta-claw/
 target/*
 logs
+*.jar
+*/target/*
