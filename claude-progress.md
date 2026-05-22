@@ -828,3 +828,26 @@
 - 下一步最佳动作：
   1. 提交本轮修改
   2. 由用户决定下一项功能优先级
+
+### Session 027
+
+- 日期：2026-05-22
+- 本轮目标：修复 Spring Boot 启动失败——`VesselConfigResolver` bean 名称冲突
+- 已完成：
+  - 诊断根因：`meta-claw-vessel` 模块目录已不存在（内容已迁移到 `meta-claw-core`），但根 pom.xml 的 `dependencyManagement` 仍声明了它，`meta-claw-bootstrap` 和 `meta-claw-cli` 仍依赖它
+  - 本地 Maven 仓库 `~/.m2/repository/com/meta/meta-claw-vessel` 中缓存了旧 jar，类路径上同时存在 `meta.claw.vessel.VesselConfigResolver`（旧 jar）和 `meta.claw.core.vessel.VesselConfigResolver`（core 模块），Spring bean name 冲突导致启动失败
+  - 修复：从根 pom.xml 注释和 `dependencyManagement` 中移除 `meta-claw-vessel`；从 `meta-claw-bootstrap/pom.xml` 和 `meta-claw-cli/pom.xml` 中移除依赖；清理本地 Maven 缓存
+- 运行过的验证：
+  - `mvn clean install -DskipTests` → 成功；9 个 reactor 模块全部 SUCCESS
+  - `mvn spring-boot:run -pl meta-claw-cli` → 成功启动，无 `ConflictingBeanDefinitionException`
+  - `./init.sh` → 成功；P0 测试全部通过
+- 更新过的文件或工件：
+  - `pom.xml`
+  - `meta-claw-bootstrap/pom.xml`
+  - `meta-claw-cli/pom.xml`
+  - `claude-progress.md`
+- 已知风险或未解决的问题：
+  - 当前无新增 blocker
+- 下一步最佳动作：
+  1. 提交本轮修改
+  2. 由用户决定下一项功能优先级

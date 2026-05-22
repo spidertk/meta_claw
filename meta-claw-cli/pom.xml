@@ -19,10 +19,6 @@
         </dependency>
         <dependency>
             <groupId>com.meta</groupId>
-            <artifactId>meta-claw-vessel</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.meta</groupId>
             <artifactId>meta-claw-store</artifactId>
         </dependency>
         <dependency>
