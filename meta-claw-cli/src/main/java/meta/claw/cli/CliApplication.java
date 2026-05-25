@@ -17,7 +17,7 @@ import java.nio.file.Path;
 import java.util.Arrays;
 
 @SpringBootApplication(
-        scanBasePackages = {"meta.claw.cli", "meta.claw.core", "meta.claw.vessel", "meta.claw.store"},
+        scanBasePackages = {"meta.claw.cli", "meta.claw.core", "meta.claw.tool", "meta.claw.store"},
         exclude = {
                 org.springframework.ai.model.openai.autoconfigure.OpenAiChatAutoConfiguration.class
         }

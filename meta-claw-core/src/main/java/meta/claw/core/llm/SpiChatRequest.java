@@ -1,11 +1,18 @@
 package meta.claw.core.llm;
 
 import lombok.Builder;
-import meta.claw.core.tool.SpiToolDefinition;
+import lombok.Getter;
+import lombok.Setter;
 
 import java.util.List;
 import java.util.Map;
 
 @Builder
-public record SpiChatRequest(String vesselName,List<SpiMessage> messages, List<SpiToolDefinition> tools, Map<String, Object> options) {
+@Getter
+@Setter
+public class SpiChatRequest {
+
+   private  String vesselName;
+   private List<SpiMessage> messages;
+   private Map<String, Object> options;
 }

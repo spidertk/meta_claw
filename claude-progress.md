@@ -851,3 +851,38 @@
 - 下一步最佳动作：
   1. 提交本轮修改
   2. 由用户决定下一项功能优先级
+
+### Session 028
+
+- 日期：2026-05-25
+- 本轮目标：简化工具调用实现，用 Spring AI 原生能力替换自建中间层
+- 已完成：
+  - 删除自定义注解 `meta.claw.core.tool.annotation.Tool` 和 `ToolParam`
+  - 保留 `@ToolService` 作为 `@Component` 组合注解，用于标记工具服务类
+  - 迁移 `CalculatorTool` 到 Spring AI 原生 `@org.springframework.ai.tool.annotation.Tool`
+  - 删除自建桥接层：`MetaClawToolCallback.java`、`ToolExecutor.java`、`JsonSchemaGenerator.java`、`SpiToolResult.java`
+  - 重写 `ToolRegistry`：从 199 行缩减至 ~40 行，职责从"扫描+注册+生成schema+执行+包装callback"简化为"收集工具 Bean 实例列表"
+  - 大幅简化 `LlmClientManager`：
+    - `chat()` 从 65 行手动 tool call 循环 → 10 行，直接用 `.tools()` + `.call()`
+    - `chatStream()` 从 125 行分段逻辑 → 25 行，不再手动处理 tool call 再切流式
+  - `OpenAiLlmClientProvider` 添加 `ToolCallAdvisor.builder().build()`，自动处理流式 Tool Calling 缓冲
+  - `PromptContextManager` 移除对 `ToolRegistry.getToolDefinitions()` 的依赖（Spring AI 自动传递工具定义）
+  - 重写 `ToolRegistryTest`，删除 `JsonSchemaGeneratorTest`
+- 运行过的验证：
+  - `mvn compile`（全仓） → 成功，无编译错误
+  - `mvn test -pl meta-claw-core,meta-claw-tool` → 成功，ToolRegistryTest 通过
+- 更新过的文件或工件：
+  - `meta-claw-core/src/main/java/meta/claw/core/tool/annotation/ToolService.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/tool/registry/ToolRegistry.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/runtime/LlmClientManager.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/llm/provider/OpenAiLlmClientProvider.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/prompt/PromptContextManager.java`
+  - `meta-claw-tool/src/main/java/meta/claw/tool/CalculatorTool.java`
+  - `meta-claw-tool/src/test/java/meta/claw/tool/registry/ToolRegistryTest.java`
+  - 删除：`Tool.java`、`ToolParam.java`、`MetaClawToolCallback.java`、`ToolExecutor.java`、`JsonSchemaGenerator.java`、`SpiToolResult.java`、`JsonSchemaGeneratorTest.java`
+- 已知风险或未解决的问题：
+  - 当前无新增 blocker
+  - `SpiToolDefinition` 和 `SpiJsonSchema` 仍保留（被 `SpiChatRequest` 和 `PromptContext` 引用），但已不再由 `ToolRegistry` 生成，仅作为兼容层存在，后续可进一步清理
+- 下一步最佳动作：
+  1. 提交本轮修改
+  2. 由用户决定下一项功能优先级

@@ -32,7 +32,7 @@ public class SystemPromptBuilder {
         template = replaceOrRemove(template, "{vessel_name}", context.getVesselName());
         template = replaceOrRemove(template, "{vessel_description}", context.getVesselDescription());
         template = template.replace("<IDENTITY_SECTION/>", buildIdentitySection(context));
-        template = template.replace("<TOOLS_SECTION/>", buildToolsSection(context));
+//        template = template.replace("<TOOLS_SECTION/>", buildToolsSection(context));
         template = template.replace("<SKILLS_SECTION/>", buildSkillsSection(context));
         template = template.replace("<KNOWLEDGE_SECTION/>", buildKnowledgeSection(context));
         return template.trim();
@@ -64,17 +64,17 @@ public class SystemPromptBuilder {
         return sb.toString().trim();
     }
 
-    private String buildToolsSection(PromptContext context) {
-        if (context.getTools() == null || context.getTools().isEmpty()) {
-            return "";
-        }
-        StringBuilder sb = new StringBuilder();
-        sb.append("## Tools\n\n");
-        sb.append(context.getTools().stream()
-                .map(t -> "- **" + t.name() + "**: " + orDefault(t.description(), ""))
-                .collect(Collectors.joining("\n")));
-        return sb.toString();
-    }
+//    private String buildToolsSection(PromptContext context) {
+//        if (context.getTools() == null || context.getTools().isEmpty()) {
+//            return "";
+//        }
+//        StringBuilder sb = new StringBuilder();
+//        sb.append("## Tools\n\n");
+//        sb.append(context.getTools().stream()
+//                .map(t -> "- **" + t.getName() + "**: " + orDefault(t.getDescription(), ""))
+//                .collect(Collectors.joining("\n")));
+//        return sb.toString();
+//    }
 
     private String buildSkillsSection(PromptContext context) {
         if (context.getSkills() == null || context.getSkills().isEmpty()) {

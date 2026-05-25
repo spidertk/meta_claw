@@ -3,6 +3,7 @@ package meta.claw.core.llm.provider;
 import lombok.extern.slf4j.Slf4j;
 import meta.claw.core.config.ProviderConfig;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.advisor.ToolCallAdvisor;
 import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.ai.openai.api.OpenAiApi;
@@ -10,6 +11,7 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.http.client.ClientHttpRequestInterceptor;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.ExchangeFilterFunction;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
@@ -74,19 +76,38 @@ public class OpenAiLlmClientProvider implements LlmClientProvider {
             }
         };
     
-        ExchangeFilterFunction webFilter = ExchangeFilterFunction.ofRequestProcessor(clientRequest -> {
+        ExchangeFilterFunction requestLogFilter = ExchangeFilterFunction.ofRequestProcessor(clientRequest -> {
             long start = System.currentTimeMillis();
-            log.debug("[HTTP-REQUEST-WEB] Start: {} {}", clientRequest.method(), clientRequest.url());
+            log.debug("[HTTP-REQUEST-WEB] Start: {} {} Headers: {}", clientRequest.method(), clientRequest.url(), clientRequest.headers());
             return Mono.just(clientRequest)
                 .doOnSubscribe(s -> log.debug("[HTTP-SUBSCRIBE-WEB] Subscribed at {}ms", System.currentTimeMillis() - start))
                 .doOnSuccess(r -> log.debug("[HTTP-SENT-WEB] Sent at {}ms", System.currentTimeMillis() - start));
+        });
+
+        // 当响应状态码为错误时，打印响应体（便于排查 400 Bad Request 等）
+        ExchangeFilterFunction errorLogFilter = ExchangeFilterFunction.ofResponseProcessor(response -> {
+            if (response.statusCode().isError()) {
+                return response.bodyToMono(String.class)
+                        .defaultIfEmpty("")
+                        .flatMap(body -> {
+                            log.error("[HTTP-RESPONSE-WEB] {} {} - Body: {}",
+                                    response.statusCode(), response.request().getURI(), body);
+                            // 重建 ClientResponse，让后续处理器仍能看到 body
+                            return Mono.just(ClientResponse.create(response.statusCode())
+                                    .headers(h -> h.addAll(response.headers().asHttpHeaders()))
+                                    .body(body)
+                                    .build());
+                        });
+            }
+            return Mono.just(response);
         });
     
         OpenAiApi.Builder apiBuilder = OpenAiApi.builder()
                 .apiKey(apiKey)
                 .restClientBuilder(RestClient.builder().requestInterceptor(restInterceptor))
                 .webClientBuilder(WebClient.builder()
-                        .filter(webFilter)
+                        .filter(requestLogFilter)
+                        .filter(errorLogFilter)
                         .clientConnector(new org.springframework.http.client.reactive.ReactorClientHttpConnector(httpClient)));
         if (baseUrl != null && !baseUrl.isBlank()) {
             apiBuilder.baseUrl(baseUrl);
@@ -107,8 +128,10 @@ public class OpenAiLlmClientProvider implements LlmClientProvider {
                 .defaultOptions(chatOptions)
                 .build();
 
-        // 创建 ChatClient 并返回
-        ChatClient chatClient = ChatClient.builder(chatModel).build();
+        // 创建 ChatClient，配置 ToolCallAdvisor 以自动处理流式 Tool Calling
+        ChatClient chatClient = ChatClient.builder(chatModel)
+                .defaultAdvisors(ToolCallAdvisor.builder().build())
+                .build();
         
         // 异步预热连接（可选），在后台发起一个轻量级请求以建立连接池
         // 注意：这会增加启动时间，但能消除首次请求的延迟
@@ -136,6 +159,6 @@ public class OpenAiLlmClientProvider implements LlmClientProvider {
 
     @Override
     public String providerName() {
-        return " openai";
+        return "openai";
     }
 }

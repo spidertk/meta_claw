@@ -1,8 +1,16 @@
 package meta.claw.core.tool;
 
 import lombok.Builder;
+import lombok.Getter;
+import lombok.Setter;
+
 import java.util.Map;
 
 @Builder
-public record SpiToolCall(String id, String name, Map<String, Object> arguments) {
+@Getter
+@Setter
+public class SpiToolCall{
+   private String id;
+    private String name;
+    private Map<String, Object> arguments;
 }

@@ -1,80 +1,70 @@
 package meta.claw.tool.registry;
 
-import meta.claw.core.tool.SpiToolDefinition;
-import meta.claw.core.tool.annotation.Tool;
-import meta.claw.core.tool.annotation.ToolParam;
+import meta.claw.core.tool.annotation.ToolService;
 import meta.claw.core.tool.registry.ToolRegistry;
 import org.junit.jupiter.api.Test;
-
-import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class ToolRegistryTest {
 
+    @ToolService
     static class TestTool {
-        @Tool(name = "greet", description = "Say hello")
-        public String greet(@ToolParam(name = "name", description = "Name") String name) {
+        public String greet(String name) {
             return "Hello " + name;
         }
+    }
 
-        @Tool(name = "add", description = "Add two numbers")
-        public int add(@ToolParam(name = "a", description = "A") int a, @ToolParam(name = "b", description = "B") int b) {
+    @ToolService
+    static class AnotherTool {
+        public int add(int a, int b) {
             return a + b;
         }
     }
 
-    static class DuplicateTool {
-        @Tool(name = "greet", description = "Another greet")
-        public String greet(@ToolParam(name = "name", description = "Name") String name) {
-            return "Hi " + name;
-        }
-    }
-
     @Test
-    void register_shouldScanAnnotatedMethods() {
+    void register_shouldCollectInstances() {
         ToolRegistry registry = new ToolRegistry(null);
-        registry.register(new TestTool());
+        TestTool tool1 = new TestTool();
+        AnotherTool tool2 = new AnotherTool();
 
-        List<SpiToolDefinition> defs = registry.getToolDefinitions();
-        assertEquals(2, defs.size());
-        assertTrue(registry.hasTool("greet"));
-        assertTrue(registry.hasTool("add"));
-    }
+        registry.register(tool1);
+        registry.register(tool2);
 
-    @Test
-    void register_shouldSkipDuplicateNames() {
-        ToolRegistry registry = new ToolRegistry(null);
-        registry.register(new TestTool());
-        registry.register(new DuplicateTool());
-
-        List<SpiToolDefinition> defs = registry.getToolDefinitions();
-        assertEquals(2, defs.size());
-
-        ToolRegistry.ToolMethod method = registry.findMethod("greet");
-        assertNotNull(method);
-        assertEquals(TestTool.class, method.target().getClass());
-    }
-
-    @Test
-    void findMethod_shouldReturnNullForUnknownTool() {
-        ToolRegistry registry = new ToolRegistry(null);
-        assertNull(registry.findMethod("unknown"));
+        assertEquals(2, registry.toolCount());
+        assertTrue(registry.getToolInstances().contains(tool1));
+        assertTrue(registry.getToolInstances().contains(tool2));
     }
 
     @Test
     void register_shouldIgnoreNull() {
         ToolRegistry registry = new ToolRegistry(null);
         registry.register(null);
-        assertTrue(registry.getToolDefinitions().isEmpty());
+        assertEquals(0, registry.toolCount());
     }
 
     @Test
-    void getToolDefinitions_shouldBeUnmodifiable() {
+    void unregister_shouldRemoveInstance() {
+        ToolRegistry registry = new ToolRegistry(null);
+        TestTool tool = new TestTool();
+        registry.register(tool);
+
+        assertTrue(registry.unregister(tool));
+        assertEquals(0, registry.toolCount());
+    }
+
+    @Test
+    void unregister_shouldReturnFalseForUnknown() {
+        ToolRegistry registry = new ToolRegistry(null);
+        assertFalse(registry.unregister(new TestTool()));
+    }
+
+    @Test
+    void getToolInstances_shouldBeUnmodifiable() {
         ToolRegistry registry = new ToolRegistry(null);
         registry.register(new TestTool());
 
-        List<SpiToolDefinition> defs = registry.getToolDefinitions();
-        assertThrows(UnsupportedOperationException.class, defs::clear);
+        var instances = registry.getToolInstances();
+        assertThrows(UnsupportedOperationException.class, instances::clear);
     }
 }

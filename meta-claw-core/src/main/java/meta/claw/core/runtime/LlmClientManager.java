@@ -11,9 +11,9 @@ import meta.claw.core.llm.provider.LlmClientProviderManager;
 import meta.claw.core.memory.MemoryMessage;
 import meta.claw.core.memory.MemoryMessageConverter;
 import meta.claw.core.memory.shortterm.ShortMemoryManager;
+import meta.claw.core.tool.registry.ToolRegistry;
 import meta.claw.core.vessel.VesselConfigResolver;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.SystemMessage;
@@ -24,7 +24,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
@@ -40,12 +42,14 @@ public class LlmClientManager implements SpiLlmClient {
     private VesselConfigResolver vesselConfigResolver;
     @Autowired
     private ShortMemoryManager shortMemoryManager;
+    @Autowired
+    private ToolRegistry toolRegistry;
 
     private ChatClient buildChatClient(String vesselName) {
-        ProviderConfig providerConfig =vesselConfigResolver.loadProviderConfig(vesselName);
-
-        return  llmClientProviderManager.create(providerConfig);
+        ProviderConfig providerConfig = vesselConfigResolver.loadProviderConfig(vesselName);
+        return llmClientProviderManager.create(providerConfig);
     }
+
     public List<SpiMessage> toSpiMessages(List<MemoryMessage> entries) {
         List<SpiMessage> restored = new ArrayList<>();
         for (MemoryMessage entry : entries) {
@@ -64,7 +68,8 @@ public class LlmClientManager implements SpiLlmClient {
         }
         return restored;
     }
-    public List<SpiMessage> buildLlmRequest( String vesselId, String sessionKey, String systemPrompt) {
+
+    public List<SpiMessage> buildLlmRequest(String vesselId, String sessionKey, String systemPrompt) {
         List<SpiMessage> messages = new ArrayList<>();
         if (systemPrompt != null && !systemPrompt.isBlank()) {
             messages.add(SpiMessage.system(systemPrompt));
@@ -75,106 +80,94 @@ public class LlmClientManager implements SpiLlmClient {
 
     @Override
     public SpiChatResponse chat(SpiChatRequest request) {
-        log.debug("SpringAiLlmClient  vessel:={} , chat: messages={}",request.vesselName(), request.messages().size());
+        log.debug("LlmClientManager chat vessel={}, messages={}", request.getVesselName(), request.getMessages().size());
 
-        List<Message> springMessages = request.messages().stream()
+        List<Message> messages = request.getMessages().stream()
                 .map(this::toSpringMessage)
-                .collect(Collectors.toList());
+                .collect(Collectors.toCollection(ArrayList::new));
 
-        Prompt prompt = new Prompt(springMessages);
+        List<Object> toolInstances = toolRegistry.getToolInstances();
+        logRequestParams(messages, toolInstances);
 
-        ChatClient chatClient =  buildChatClient(request.vesselName());
-
-        ChatResponse response = chatClient.prompt(prompt).call().chatResponse();
-
-        String content = safeExtractContent(response);
+        String content = buildChatClient(request.getVesselName())
+                .prompt(new Prompt(messages))
+                .tools(toolInstances.toArray())
+                .call()
+                .content();
 
         return SpiChatResponse.builder()
-                .content(content)
-                .toolCalls(null)
-                .usage(null)
-                .metadata(null)
+                .content(content != null ? content : "")
                 .build();
-    }
-
-    private String safeExtractContent(ChatResponse response) {
-        if (response == null || response.getResult() == null || response.getResult().getOutput() == null) {
-            log.warn("SpringAiLlmClient 收到空响应或响应结构不完整");
-            return "";
-        }
-        String text = response.getResult().getOutput().getText();
-        return text != null ? text : "";
     }
 
     @Override
     public void chatStream(SpiChatRequest request, SpiStreamingCallback callback) {
         long startTime = System.currentTimeMillis();
-        
-        List<Message> springMessages = request.messages().stream()
-                .map(this::toSpringMessage)
-                .toList();
-        Prompt prompt = new Prompt(springMessages);
-
-        long buildPromptTime = System.currentTimeMillis() - startTime;
-        log.debug("[STREAM] Build prompt took {}ms, messages={}", buildPromptTime, springMessages.size());
-        
-//        log.info("[STREAM] Starting stream request with {} messages", springMessages.size());
         callback.onStart();
-        StringBuilder contentBuilder = new StringBuilder();
-        
-        try {
-            long[] firstChunkTime = {-1};
-            int[] chunkCount = {0};
-            long[] lastChunkTime = {startTime};
-            
-            log.debug("[STREAM] Calling chatClient.stream() at {}ms", System.currentTimeMillis() - startTime);
-            ChatClient chatClient =  buildChatClient(request.vesselName());
 
-            chatClient.prompt(prompt).stream().content()
-                .doOnSubscribe(s -> {
-                    log.debug("[STREAM-SUBSCRIBE] Subscribed at {}ms", System.currentTimeMillis() - startTime);
-                })
-                .doOnNext(chunk -> {
-                    chunkCount[0]++;
-                    long elapsed = System.currentTimeMillis() - startTime;
-                    long gap = elapsed - lastChunkTime[0];
-                    lastChunkTime[0] = elapsed;
-                    
-                    if (firstChunkTime[0] == -1) {
-                        firstChunkTime[0] = elapsed;
-                        log.debug("[STREAM] First chunk received after {}ms (TTFB)", elapsed);
-                    } else {
-                        log.debug("[STREAM-CHUNK #{}] at {}ms (gap: {}ms): len={}",
-                            chunkCount[0], elapsed, gap, chunk.length());
-                    }
-                    
-                    contentBuilder.append(chunk);
-                    callback.onChunk(chunk);
-                })
-                .doOnError(error -> {
-                    long totalTime = System.currentTimeMillis() - startTime;
-                    log.error("[STREAM] Error occurred after {}ms: {}", totalTime, error.getMessage(), error);
-                    callback.onError(error);
-                })
-                .doOnComplete(() -> {
-                    long totalTime = System.currentTimeMillis() - startTime;
-                    log.debug("[STREAM] Completed: totalChunks={}, totalTime={}ms, firstChunkAt={}ms, avgGap={}ms, totalLength={}",
-                        chunkCount[0], 
-                        totalTime, 
-                        firstChunkTime[0],
-                        chunkCount[0] > 1 ? (totalTime - firstChunkTime[0]) / (chunkCount[0] - 1) : 0,
-                        contentBuilder.length());
-                    
-                    SpiChatResponse response = SpiChatResponse.builder()
-                            .content(contentBuilder.toString())
-                            .toolCalls(null)
-                            .usage(null)
-                            .metadata(null)
-                            .build();
-                    callback.onComplete(response);
-                })
-                .blockLast(); // 阻塞等待流完成，但每个chunk会实时回调
-                
+        List<Message> messages = request.getMessages().stream()
+                .map(this::toSpringMessage)
+                .collect(Collectors.toCollection(ArrayList::new));
+
+        StringBuilder contentBuilder = new StringBuilder();
+        long[] firstChunkTime = {-1};
+        int[] chunkCount = {0};
+        long[] lastChunkTime = {startTime};
+
+        List<Object> toolInstances = toolRegistry.getToolInstances();
+        logRequestParams(messages, toolInstances);
+
+        try {
+            buildChatClient(request.getVesselName())
+                    .prompt(new Prompt(messages))
+                    .tools(toolInstances.toArray())
+                    .stream()
+                    .content()
+                    .doOnSubscribe(s -> {
+                        log.debug("[STREAM-SUBSCRIBE] Subscribed at {}ms", System.currentTimeMillis() - startTime);
+                    })
+                    .doOnNext(chunk -> {
+                        chunkCount[0]++;
+                        long elapsed = System.currentTimeMillis() - startTime;
+                        long gap = elapsed - lastChunkTime[0];
+                        lastChunkTime[0] = elapsed;
+
+                        if (firstChunkTime[0] == -1) {
+                            firstChunkTime[0] = elapsed;
+                            log.debug("[STREAM] First chunk received after {}ms (TTFB)", elapsed);
+                        } else {
+                            log.debug("[STREAM-CHUNK #{}] at {}ms (gap: {}ms): len={}",
+                                    chunkCount[0], elapsed, gap, chunk.length());
+                        }
+
+                        contentBuilder.append(chunk);
+                        callback.onChunk(chunk);
+                    })
+                    .doOnError(error -> {
+                        long totalTime = System.currentTimeMillis() - startTime;
+                        if (error instanceof org.springframework.web.reactive.function.client.WebClientResponseException wex) {
+                            log.error("[STREAM] HTTP Error after {}ms: status={}, body={}",
+                                    totalTime, wex.getStatusCode(), wex.getResponseBodyAsString());
+                        } else {
+                            log.error("[STREAM] Error occurred after {}ms: {}", totalTime, error.getMessage(), error);
+                        }
+                        callback.onError(error);
+                    })
+                    .doOnComplete(() -> {
+                        long totalTime = System.currentTimeMillis() - startTime;
+                        log.debug("[STREAM] Completed: totalChunks={}, totalTime={}ms, firstChunkAt={}ms, avgGap={}ms, totalLength={}",
+                                chunkCount[0],
+                                totalTime,
+                                firstChunkTime[0],
+                                chunkCount[0] > 1 ? (totalTime - firstChunkTime[0]) / (chunkCount[0] - 1) : 0,
+                                contentBuilder.length());
+
+                        SpiChatResponse spiResponse = SpiChatResponse.builder()
+                                .content(contentBuilder.toString())
+                                .build();
+                        callback.onComplete(spiResponse);
+                    })
+                    .blockLast();
         } catch (Exception e) {
             long totalTime = System.currentTimeMillis() - startTime;
             log.error("[STREAM] Exception after {}ms: {}", totalTime, e.getMessage(), e);
@@ -187,6 +180,26 @@ public class LlmClientManager implements SpiLlmClient {
         return CompletableFuture.supplyAsync(() -> chat(request));
     }
 
+    private void logRequestParams(List<Message> messages, List<Object> toolInstances) {
+        if (!log.isDebugEnabled()) {
+            return;
+        }
+        try {
+            List<Map<String, Object>> msgList = new ArrayList<>();
+            for (Message m : messages) {
+                Map<String, Object> map = new LinkedHashMap<>();
+                map.put("role", m.getMessageType().getValue());
+                map.put("content", m.getText());
+                msgList.add(map);
+            }
+            String msgsJson = new com.fasterxml.jackson.databind.ObjectMapper()
+                    .writerWithDefaultPrettyPrinter()
+                    .writeValueAsString(msgList);
+            log.debug("[LLM-REQUEST] messages={}\n[LLM-REQUEST] tools count={}", msgsJson, toolInstances.size());
+        } catch (Exception e) {
+            log.debug("[LLM-REQUEST] messages count={}, tools count={}", messages.size(), toolInstances.size());
+        }
+    }
 
     private Message toSpringMessage(SpiMessage msg) {
         return switch (msg.role()) {

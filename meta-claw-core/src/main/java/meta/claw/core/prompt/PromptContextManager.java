@@ -5,7 +5,6 @@ import meta.claw.core.memory.PreferenceMemory;
 import meta.claw.core.memory.longterm.LongMemoryManager;
 import meta.claw.core.memory.longterm.LongMemoryStore;
 import meta.claw.core.util.ProjectRootFinder;
-import meta.claw.core.tool.registry.ToolRegistry;
 import meta.claw.core.vessel.VesselConfigResolver;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -29,10 +28,6 @@ public class PromptContextManager {
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss z");
     @Autowired
     private LongMemoryManager longMemoryManager;
-    @Autowired
-    private ToolRegistry toolRegistry;
-
-
 
     /**
      * 创建 PromptContext，使用注入的 LongMemoryStoreFactory 解析偏好。
@@ -59,7 +54,6 @@ public class PromptContextManager {
                 .currentTime(formatCurrentTime())
                 .location(detectLocation())
                 .runtimeInfo(Collections.emptyMap())
-                .tools(toolRegistry.getToolDefinitions())
                 .memoryConfig(resolver.loadMemoryConfig(vesselId))
                 .providerConfig(resolver.loadProviderConfig(vesselId))
                 .vesselConfig(resolver.loadVesselConfig(vesselId))

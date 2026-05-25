@@ -1,8 +1,8 @@
 package meta.claw.tool;
 
-import meta.claw.core.tool.annotation.Tool;
-import meta.claw.core.tool.annotation.ToolParam;
-import org.springframework.stereotype.Component;
+import meta.claw.core.tool.annotation.ToolService;
+import org.springframework.ai.tool.annotation.Tool;
+import org.springframework.ai.tool.annotation.ToolParam;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
@@ -11,10 +11,10 @@ import java.util.Deque;
  * 示例工具：安全计算器。
  * 仅支持 + - * / 和括号，不支持函数调用或变量，避免脚本注入风险。
  */
-@Component
+@ToolService
 public class CalculatorTool {
 
-    @Tool(name = "calculator", description = "Evaluate a simple math expression with + - * / and parentheses")
+    @Tool(description = "Evaluate a simple math expression with + - * / and parentheses")
     public String calculate(
             @ToolParam(description = "Math expression like '1 + 2 * (3 - 4)'") String expression) {
         if (expression == null || expression.isBlank()) {

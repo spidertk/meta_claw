@@ -162,6 +162,7 @@ public class ChatCommand implements Runnable {
 
                 SpiChatRequest request = SpiChatRequest.builder()
                         .messages(llmClientManager.buildLlmRequest( vesselName, sessionKey, systemPrompt))
+                        .vesselName(vesselName)
                         .build();
 
                 terminal.writer().print("AI: ");
@@ -182,6 +183,7 @@ public class ChatCommand implements Runnable {
 
                     @Override
                     public void onToolCall(SpiToolCall toolCall) {
+                        log.debug(String.format("onToolCall function:%s,arguments:%s ", toolCall.getName(), toolCall.getArguments()));
                         // no-op
                     }
 

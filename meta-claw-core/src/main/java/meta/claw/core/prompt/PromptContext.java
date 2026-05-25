@@ -12,8 +12,6 @@ import java.util.Map;
 import meta.claw.core.config.MemoryConfig;
 import meta.claw.core.config.ProviderConfig;
 import meta.claw.core.config.VesselConfig;
-import meta.claw.core.tool.SpiToolDefinition;
-
 @Getter
 @Builder(toBuilder = true)
 @NoArgsConstructor
@@ -26,8 +24,6 @@ public class PromptContext {
     private String soul;
     private String capabilities;
     private String guidelines;
-    @Builder.Default
-    private List<SpiToolDefinition> tools = Collections.emptyList();
     @Builder.Default
     private List<SkillInfo> skills = Collections.emptyList();
     @Builder.Default

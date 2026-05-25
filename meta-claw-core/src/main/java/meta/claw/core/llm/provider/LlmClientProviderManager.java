@@ -114,7 +114,7 @@ public class LlmClientProviderManager implements ApplicationContextAware, Applic
        LlmClientProvider provider= allProviders.get(providerConfig.getProvider());
         if (provider==null){
             String    errorMsg = String.format(
-                    "No LlmClientFactory supports provider: '%s'. Available providers: '%s' ",
+                    "No LlmClientFactory supports provider: '%s'. Available providers:'%s' ",
                     providerConfig.getProvider(), allProviders.values().stream().map(LlmClientProvider::providerName).toList()
             );
             log.error(errorMsg);

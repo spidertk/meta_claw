@@ -16,9 +16,9 @@ description: {description}
 
 # ================================ LLM 配置 ================================
 # 指定 LLM 提供商（从全局 config.yaml 的 providers 中选择）
-# 可选: doubao, qwen, deepseek, moonshot, ollama 等
+# 可选: openapi, ollama 等
 # 如注释掉或未设置，使用全局 default_provider
-provider: "moonshot"       # 指定使用全局 providers 下的哪个 provider
+provider: "openapi"       # 指定使用全局 providers 下的哪个 provider
 
 # ================================ 展示配置 ================================
 # 表情图标（用于消息展示）
