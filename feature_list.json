@@ -1,6 +1,6 @@
 {
   "project": "meta-claw",
-  "last_updated": "2026-05-20",
+  "last_updated": "2026-05-27",
   "rules": {
     "single_active_feature": true,
     "passing_requires_evidence": true,
@@ -583,6 +583,33 @@
         }
       ],
       "notes": "工具调用循环（VesselRuntime 集成、单次 tool call 执行与结果回注）仍在实现中；Java 组件热进化设计文档已输出到 .rwa/expert_project/java-component-hot-evolution-design.md。"
+    },
+    {
+      "id": "llm-001",
+      "priority": 19,
+      "area": "llm",
+      "title": "Moonshot K2.5/K2.6 流式 Thinking 与 Token 消耗展示",
+      "user_visible_behavior": "CLI chat 流式显示模型的 reasoning/thinking 过程（灰色），最终答案（正常色），工具调用状态（青色），并在每轮结束时展示执行时间与 token 消耗。",
+      "status": "passing",
+      "verification": [
+        "运行 CLI chat，输入需要推理的问题，确认 Thinking 内容以灰色流式显示。",
+        "确认最终答案在 Thinking 结束后以 💡 前缀显示。",
+        "确认每轮结束时显示 ⏱️ 执行时间和 🔤 token 消耗。",
+        "运行 ./init.sh 通过编译与 P0 测试。"
+      ],
+      "evidence": [
+        {
+          "date": "2026-05-27",
+          "result": "passing",
+          "detail": "CLI 实测：🤔 Thinking... 灰色流式显示 thinking 内容；💡 显示最终答案；⏱️ 4.9s | 🔤 357 tokens (prompt: 316, completion: 41)。"
+        },
+        {
+          "date": "2026-05-27",
+          "result": "passing",
+          "detail": "./init.sh 编译全仓并通过 P0 测试集。"
+        }
+      ],
+      "notes": "Spring AI 1.1.7 将 reasoningContent 存入 AssistantMessage.metadata 而非 ChatGenerationMetadata；extractReasoningContent 已适配。streamUsage(true) 已启用以获取流式 usage。"
     }
   ]
 }

@@ -14,6 +14,7 @@ import meta.claw.core.llm.SpiChatRequest;
 import meta.claw.core.llm.SpiChatResponse;
 import meta.claw.core.llm.SpiMessage;
 import meta.claw.core.llm.SpiStreamingCallback;
+import meta.claw.core.llm.SpiUsage;
 import meta.claw.core.runtime.LlmClientManager;
 import meta.claw.core.tool.SpiToolCall;
 import org.jline.terminal.Terminal;
@@ -165,9 +166,15 @@ public class ChatCommand implements Runnable {
                         .vesselName(vesselName)
                         .build();
 
-                terminal.writer().print("AI: ");
+                terminal.writer().println();
                 terminal.writer().flush();
                 StringBuilder responseBuffer = new StringBuilder();
+                StringBuilder reasoningBuffer = new StringBuilder();
+                long[] streamStartTime = {System.currentTimeMillis()};
+                boolean[] hasReasoning = {false};
+                boolean[] hasContent = {false};
+                SpiUsage[] lastUsage = {null};
+
                 llmClientManager.chatStream(request, new SpiStreamingCallback() {
                     @Override
                     public void onStart() {
@@ -175,7 +182,32 @@ public class ChatCommand implements Runnable {
                     }
 
                     @Override
+                    public void onReasoningChunk(String chunk) {
+                        if (!hasReasoning[0]) {
+                            hasReasoning[0] = true;
+                            terminal.writer().println("\u001B[90m🤔 Thinking...\u001B[0m");
+                            terminal.writer().print("\u001B[90m  ");
+                            terminal.writer().flush();
+                        }
+                        terminal.writer().print(chunk);
+                        terminal.writer().flush();
+                        reasoningBuffer.append(chunk);
+                    }
+
+                    @Override
                     public void onChunk(String chunk) {
+                        if (hasReasoning[0] && !hasContent[0]) {
+                            hasContent[0] = true;
+                            terminal.writer().println("\u001B[0m"); // 结束灰色
+                            terminal.writer().println();
+                            terminal.writer().print("💡 ");
+                            terminal.writer().flush();
+                        }
+                        if (!hasContent[0]) {
+                            hasContent[0] = true;
+                            terminal.writer().print("💡 ");
+                            terminal.writer().flush();
+                        }
                         terminal.writer().print(chunk);
                         terminal.writer().flush();
                         responseBuffer.append(chunk);
@@ -184,13 +216,44 @@ public class ChatCommand implements Runnable {
                     @Override
                     public void onToolCall(SpiToolCall toolCall) {
                         log.debug(String.format("onToolCall function:%s,arguments:%s ", toolCall.getName(), toolCall.getArguments()));
-                        // no-op
+                        // 如果正在输出 thinking，先关闭灰色模式
+                        if (hasReasoning[0] && !hasContent[0]) {
+                            terminal.writer().println("\u001B[0m");
+                            hasContent[0] = true; // 标记已退出 thinking 模式
+                        }
+                        terminal.writer().printf("\u001B[36m🔧 Calling tool: %s(%s)\u001B[0m%n",
+                                toolCall.getName(),
+                                toolCall.getArguments() != null ? toolCall.getArguments() : "{}");
+                        terminal.writer().flush();
+                    }
+
+                    @Override
+                    public void onUsage(SpiUsage usage) {
+                        lastUsage[0] = usage;
                     }
 
                     @Override
                     public void onComplete(SpiChatResponse response) {
+                        long totalTime = System.currentTimeMillis() - streamStartTime[0];
+
+                        // 如果只有 reasoning 没有 content，需要关闭灰色模式并换行
+                        if (hasReasoning[0] && !hasContent[0]) {
+                            terminal.writer().println("\u001B[0m");
+                        }
                         terminal.writer().println();
+
+                        // 打印 usage 和执行时间
+                        if (lastUsage[0] != null) {
+                            terminal.writer().printf("\u001B[90m⏱️ %.1fs | 🔤 %d tokens (prompt: %d, completion: %d)\u001B[0m%n",
+                                    totalTime / 1000.0,
+                                    lastUsage[0].totalTokens() != null ? lastUsage[0].totalTokens() : 0,
+                                    lastUsage[0].promptTokens() != null ? lastUsage[0].promptTokens() : 0,
+                                    lastUsage[0].completionTokens() != null ? lastUsage[0].completionTokens() : 0);
+                        } else {
+                            terminal.writer().printf("\u001B[90m⏱️ %.1fs\u001B[0m%n", totalTime / 1000.0);
+                        }
                         terminal.writer().flush();
+
                         String responseText = responseBuffer.toString();
                         history.add(SpiMessage.assistant(responseText));
                         try {
@@ -203,7 +266,7 @@ public class ChatCommand implements Runnable {
 
                     @Override
                     public void onError(Throwable error) {
-                        terminal.writer().println("\nError: " + error.getMessage());
+                        terminal.writer().println("\n\u001B[91mError: " + error.getMessage() + "\u001B[0m");
                         terminal.writer().flush();
                     }
                 });

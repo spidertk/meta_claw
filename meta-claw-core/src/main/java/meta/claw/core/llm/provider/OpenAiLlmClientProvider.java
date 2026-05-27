@@ -1,24 +1,22 @@
 package meta.claw.core.llm.provider;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import meta.claw.core.config.ProviderConfig;
+import meta.claw.core.llm.advisor.ToolCallTraceAdvisor;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.ToolCallAdvisor;
 import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.ai.openai.api.OpenAiApi;
+import io.micrometer.observation.ObservationRegistry;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Primary;
-import org.springframework.http.client.ClientHttpRequestInterceptor;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
-import org.springframework.web.reactive.function.client.ClientResponse;
-import org.springframework.web.reactive.function.client.ExchangeFilterFunction;
 import org.springframework.web.reactive.function.client.WebClient;
-import reactor.core.publisher.Mono;
-import reactor.netty.http.client.HttpClient;
-import reactor.netty.resources.ConnectionProvider;
 
-import java.time.Duration;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * OpenAI 兼容协议的 ChatClient 工厂实现。
@@ -33,82 +31,60 @@ import java.time.Duration;
 @Component
 @Primary
 public class OpenAiLlmClientProvider implements LlmClientProvider {
-    // 配置 Reactor Netty 连接池，避免每次请求重新建立连接
-    ConnectionProvider connectionProvider = ConnectionProvider.builder("llm-pool")
-            .maxConnections(50)                    // 最大连接数
-            .pendingAcquireMaxCount(100)           // 最大等待获取连接的请求数
-            .pendingAcquireTimeout(Duration.ofSeconds(30))  // 获取连接超时时间
-            .maxIdleTime(Duration.ofMinutes(5))    // 连接最大空闲时间
-            .maxLifeTime(Duration.ofHours(1))      // 连接最大存活时间
-            .evictInBackground(Duration.ofMinutes(2))  // 后台清理间隔
-            .build();
 
-    // 创建优化的 HttpClient，启用连接池和 Keep-Alive
-    HttpClient httpClient = HttpClient.create(connectionProvider)
-            .keepAlive(true)                       // 启用 HTTP Keep-Alive
-            .responseTimeout(Duration.ofMinutes(5)); // 响应超时时间
+    @Autowired
+    private ObjectMapper objectMapper;
+//    @Autowired
+//    private ObservationRegistry observationRegistry;
+//    @Autowired
+//    private ToolCallTraceAdvisor toolCallTraceAdvisor;
+
+    /**
+     * ChatClient 缓存：相同配置（baseUrl + model + temperature + apiKeyHash）复用已创建的实例，
+     * 避免重复创建连接池和序列化器。
+     */
+    private final ConcurrentHashMap<String, ChatClient> clientCache = new ConcurrentHashMap<>();
+
+
     @Override
     public ChatClient create(ProviderConfig providerConfig) {
+        String cacheKey = buildCacheKey(providerConfig);
+        return clientCache.computeIfAbsent(cacheKey, k -> buildChatClient(providerConfig));
+    }
+
+    /**
+     * 构建缓存 key：baseUrl + model + temperature + timeout + apiKeyHash。
+     * 任一配置项变化都会创建新的 ChatClient。
+     */
+    private String buildCacheKey(ProviderConfig config) {
+        return String.join("#",
+                String.valueOf(config.getBaseUrl()),
+                String.valueOf(config.getModel()),
+                String.valueOf(config.getTemperature()),
+                String.valueOf(config.getTimeout()),
+                String.valueOf(config.getApiKey() != null ? config.getApiKey().hashCode() : 0));
+    }
+
+    private ChatClient buildChatClient(ProviderConfig providerConfig) {
         String apiKey = providerConfig.getApiKey();
         String baseUrl = normalizeBaseUrl(providerConfig.getBaseUrl());
         String model = providerConfig.getModel();
-    
+
         log.info("Creating ChatClient - apiKey prefix: {}, baseUrl: {}, model: {}",
                 apiKey != null && apiKey.length() > 8 ? apiKey.substring(0, 8) + "..." : "null",
                 baseUrl, model);
-    
-       
-    
-        // 使用 Spring AI 1.1.4 的 Builder API 编程式创建 OpenAiApi
-        // 添加 RestClient 拦截器（同步 call() 请求）和 WebClient 过滤器（流式 stream() 请求）
-        ClientHttpRequestInterceptor restInterceptor = (request, body, execution) -> {
-            long start = System.currentTimeMillis();
-            log.debug("[HTTP-REQUEST-REST] Start: {} {}", request.getMethod(), request.getURI());
-            try {
-                var response = execution.execute(request, body);
-                long elapsed = System.currentTimeMillis() - start;
-                log.debug("[HTTP-RESPONSE-REST] Status: {}, Time: {}ms", response.getStatusCode(), elapsed);
-                return response;
-            } catch (Exception e) {
-                long elapsed = System.currentTimeMillis() - start;
-                log.error("[HTTP-ERROR-REST] Time: {}ms, Error: {}", elapsed, e.getMessage());
-                throw e;
-            }
-        };
-    
-        ExchangeFilterFunction requestLogFilter = ExchangeFilterFunction.ofRequestProcessor(clientRequest -> {
-            long start = System.currentTimeMillis();
-            log.debug("[HTTP-REQUEST-WEB] Start: {} {} Headers: {}", clientRequest.method(), clientRequest.url(), clientRequest.headers());
-            return Mono.just(clientRequest)
-                .doOnSubscribe(s -> log.debug("[HTTP-SUBSCRIBE-WEB] Subscribed at {}ms", System.currentTimeMillis() - start))
-                .doOnSuccess(r -> log.debug("[HTTP-SENT-WEB] Sent at {}ms", System.currentTimeMillis() - start));
-        });
 
-        // 当响应状态码为错误时，打印响应体（便于排查 400 Bad Request 等）
-        ExchangeFilterFunction errorLogFilter = ExchangeFilterFunction.ofResponseProcessor(response -> {
-            if (response.statusCode().isError()) {
-                return response.bodyToMono(String.class)
-                        .defaultIfEmpty("")
-                        .flatMap(body -> {
-                            log.error("[HTTP-RESPONSE-WEB] {} {} - Body: {}",
-                                    response.statusCode(), response.request().getURI(), body);
-                            // 重建 ClientResponse，让后续处理器仍能看到 body
-                            return Mono.just(ClientResponse.create(response.statusCode())
-                                    .headers(h -> h.addAll(response.headers().asHttpHeaders()))
-                                    .body(body)
-                                    .build());
-                        });
-            }
-            return Mono.just(response);
-        });
-    
+        // 根据模型选择 ObjectMapper：Moonshot K2.5/K2.6 需要特殊序列化补丁
+        ObjectMapper mapper = selectObjectMapper(model);
+
+        // 构建 RestClient（同步 call）和 WebClient（流式 stream）
+        RestClient.Builder restClientBuilder = OpenAiRestClientFactory.create(mapper);
+        WebClient.Builder webClientBuilder = OpenAiWebClientFactory.create(mapper);
+
         OpenAiApi.Builder apiBuilder = OpenAiApi.builder()
                 .apiKey(apiKey)
-                .restClientBuilder(RestClient.builder().requestInterceptor(restInterceptor))
-                .webClientBuilder(WebClient.builder()
-                        .filter(requestLogFilter)
-                        .filter(errorLogFilter)
-                        .clientConnector(new org.springframework.http.client.reactive.ReactorClientHttpConnector(httpClient)));
+                .restClientBuilder(restClientBuilder)
+                .webClientBuilder(webClientBuilder);
         if (baseUrl != null && !baseUrl.isBlank()) {
             apiBuilder.baseUrl(baseUrl);
         }
@@ -116,29 +92,39 @@ public class OpenAiLlmClientProvider implements LlmClientProvider {
 
         // 构建 ChatOptions，设置模型及可选温度参数
         OpenAiChatOptions.Builder optionsBuilder = OpenAiChatOptions.builder()
-                .model(model);
+                .model(model)
+                .streamUsage(true);
         if (providerConfig.getTemperature() != null) {
             optionsBuilder.temperature(providerConfig.getTemperature());
         }
         OpenAiChatOptions chatOptions = optionsBuilder.build();
 
-        // 编程式创建 OpenAiChatModel
+        // 编程式创建 OpenAiChatModel，先不传入 ObservationRegistry 以激活可观测性
         OpenAiChatModel chatModel = OpenAiChatModel.builder()
                 .openAiApi(openAiApi)
                 .defaultOptions(chatOptions)
+//                .observationRegistry(observationRegistry)
                 .build();
 
-        // 创建 ChatClient，配置 ToolCallAdvisor 以自动处理流式 Tool Calling
-        ChatClient chatClient = ChatClient.builder(chatModel)
-                .defaultAdvisors(ToolCallAdvisor.builder().build())
+//        // 创建 ChatClient，传入 ObservationRegistry 以激活 ChatClient 层面的可观测性
+//        ChatClient chatClient = ChatClient.builder(chatModel, observationRegistry, null, null)
+//                .defaultAdvisors(
+//                        ToolCallAdvisor.builder().build()  // 外层：自动处理 tool calling 循环
+//                        toolCallTraceAdvisor                  // 内层：记录每次 ChatModel 调用的完整消息
+//                )
+//                .build();
+
+        ChatClient chatClient = ChatClient.builder(chatModel).defaultAdvisors(
+                        ToolCallAdvisor.builder().build()  // 外层：自动处理 tool calling 循环
+                )
                 .build();
-        
+
         // 异步预热连接（可选），在后台发起一个轻量级请求以建立连接池
         // 注意：这会增加启动时间，但能消除首次请求的延迟
         if (log.isDebugEnabled()) {
             log.debug("ChatClient created successfully for model: {}", model);
         }
-        
+
         return chatClient;
     }
 
@@ -157,8 +143,27 @@ public class OpenAiLlmClientProvider implements LlmClientProvider {
     }
 
 
+    /**
+     * 根据模型名称选择 ObjectMapper。
+     * <ul>
+     *   <li>非 Moonshot：直接复用 Spring 容器里的默认 {@link ObjectMapper}（含 {@code spring.jackson.*} 配置）</li>
+     *   <li>Moonshot K2.5/K2.6：copy 默认 ObjectMapper 并注册 {@link MoonshotSerializerModule}，避免污染共享实例</li>
+     * </ul>
+     */
+    private ObjectMapper selectObjectMapper(String model) {
+        if (model != null && model.toLowerCase().contains("kimi")) {
+            ObjectMapper copy = objectMapper.copy();
+            copy.registerModule(new MoonshotSerializerModule());
+            log.debug("Registered MoonshotSerializerModule for model: {}", model);
+            return copy;
+        }
+        return objectMapper;
+    }
+
     @Override
     public String providerName() {
         return "openai";
     }
+
+
 }

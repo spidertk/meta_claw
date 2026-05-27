@@ -9,3 +9,33 @@ spring:
         enabled: false
         options:
           model: gpt-3.5-turbo
+    chat:
+      observations:
+        # 记录发送给 LLM 的提示词内容
+        log-prompt: true
+        # 记录 LLM 返回的完成内容
+        log-completion: true
+        # 记录错误日志
+        include-error-logging: true
+
+# Actuator 可观测性端点配置（非 Web 模式下仅 JMX 端点可用）
+management:
+  endpoints:
+    jmx:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    tags:
+      application: ${spring.application.name:meta-claw-cli}
+
+# 日志级别配置
+logging:
+  level:
+    # Spring AI 内置 observation handler 关闭（由 ToolCallTraceAdvisor 替代，避免重复）
+    org.springframework.ai.chat.client.observation: WARN
+    org.springframework.ai.chat.observation: WARN
+    # meta.claw 包日志由 ~/.meta-claw/config.yaml 中的 log.debug 控制
+    meta.claw: ${META_CLAW_LOG_LEVEL:INFO}

@@ -886,3 +886,105 @@
 - 下一步最佳动作：
   1. 提交本轮修改
   2. 由用户决定下一项功能优先级
+
+### Session 028 续
+
+- 日期：2026-05-25
+- 本轮目标：修复 Moonshot K2.5 多轮 tool calling 400 Bad Request 错误
+- 问题根因（已反编译确认）：
+  - Spring AI 1.1.4 的 `OpenAiChatModel` 在把 `AssistantMessage` 序列化为 `ChatCompletionMessage` 时，`reasoningContent` 被硬编码为 `null`（`aconst_null` + `invokespecial` 第 9 个参数）
+  - Moonshot K2.5/K2.6 的 thinking 模式要求：assistant message 包含 `tool_calls` 时，必须同时包含 `reasoning_content` 字段（即使是空字符串）
+  - 这是影响 Continue.dev、LiteLLM、Cursor 等多个框架的已知兼容性问题
+- 修复方案：Jackson 序列化层修补
+  - 新建 `MoonshotSerializerModule`：注册自定义 `JsonSerializer<OpenAiApi.ChatCompletionMessage>`
+  - 序列化时先用干净的 `ObjectMapper` 转成 `JsonNode`，检测条件（`role == assistant` && 有 `tool_calls` && 无 `reasoning_content`），自动补上 `"reasoning_content": ""`
+  - 在 `OpenAiLlmClientProvider` 中：
+    - `RestClient.Builder` 配置自定义 `MappingJackson2HttpMessageConverter`
+    - `WebClient.Builder` 配置自定义 `Jackson2JsonEncoder` / `Jackson2JsonDecoder`
+    - 确保 `OpenAiApi` 的同步/流式请求都使用带修补模块的 `ObjectMapper`
+- 运行过的验证：
+  - `mvn compile`（全仓） → 成功
+  - `mvn test -pl meta-claw-core,meta-claw-tool` → 成功
+- 更新过的文件或工件：
+  - 新建：`meta-claw-core/src/main/java/meta/claw/core/llm/provider/MoonshotSerializerModule.java`
+  - 修改：`meta-claw-core/src/main/java/meta/claw/core/llm/provider/OpenAiLlmClientProvider.java`
+- 已知风险或未解决的问题：
+  - 本修补仅在 Jackson 序列化层面生效，如果 Spring AI 未来版本修复了 `OpenAiChatModel` 的 `reasoningContent` 硬编码问题，本模块可以安全移除
+- 下一步最佳动作：
+  1. 提交本轮修改
+  2. 由用户在真实 Moonshot K2.5 环境中验证 tool calling 是否恢复正常
+
+### Session 028 续 2
+
+- 日期：2026-05-25
+- 本轮目标：集成 Spring AI 生产级可观测性（Observability）
+- 已完成：
+  - 在 `meta-claw-bootstrap` 和 `meta-claw-cli` 的 `pom.xml` 中添加依赖：
+    - `spring-boot-starter-actuator` — 健康检查、指标端点
+    - `micrometer-registry-prometheus` — Prometheus 指标导出
+  - 修正并配置 `spring.ai.chat.observations`（通过反编译确认前缀为 `spring.ai.chat.observations`，非 `spring.ai.chat.client.observations`）：
+    - `log-prompt: true` — 记录发送给 LLM 的提示词
+    - `log-completion: true` — 记录 LLM 返回的完成内容
+    - `include-error-logging: true` — 记录错误日志
+  - 配置 `management.endpoints`：
+    - `meta-claw-bootstrap`（Web 模式）：暴露 `health,info,metrics,prometheus` HTTP 端点
+    - `meta-claw-cli`（Non-Web 模式）：暴露 `health,info,metrics` JMX 端点
+  - 配置全局指标标签 `management.metrics.tags.application`
+  - 配置日志级别 `logging.level.org.springframework.ai.chat.client.observation: DEBUG`
+  - 更新 `application.yml`（bootstrap）和 `application-cli.yml`（cli）
+- 运行过的验证：
+  - `mvn compile`（全仓） → 成功
+  - `mvn test -pl meta-claw-core,meta-claw-tool` → 成功
+- 更新过的文件或工件：
+  - `meta-claw-bootstrap/pom.xml`
+  - `meta-claw-cli/pom.xml`
+  - `meta-claw-bootstrap/src/main/resources/application.yml`
+  - `meta-claw-cli/src/main/resources/application-cli.yml`
+- 已知风险或未解决的问题：
+  - 当前无新增 blocker
+  - 生产环境使用 `log-prompt: true` 时，请评估敏感信息（API Key、个人隐私等）泄露风险，必要时关闭或接入日志脱敏
+  - Zipkin / OpenTelemetry 分布式链路追踪尚未配置，如需可后续添加 `micrometer-tracing-bridge-otel` 和 `opentelemetry-exporter-zipkin`
+- 下一步最佳动作：
+  1. 提交本轮修改
+  2. 在真实环境中验证：`curl http://localhost:8080/actuator/prometheus` 可看到 `spring_ai_*` 系列指标
+  3. 运行 chat 命令，确认日志中出现 `ChatClientPromptContentObservationHandler` 和 `ChatClientCompletionObservationHandler` 的 DEBUG 输出
+
+
+### Session 029
+
+- 日期：2026-05-27
+- 本轮目标：实现 Moonshot K2.5/K2.6 流式 Thinking 内容展示与 Token 消耗统计
+- 已完成：
+  - 修改 `LlmClientManager.chatStream()`：
+    - 从 `.stream().content()` 切换为 `.stream().chatResponse()`，以访问完整 `ChatResponse` 与 `Generation` metadata
+    - 新增 `extractReasoningContent(Generation)`：从 `AssistantMessage.getMetadata()` 中读取 `reasoningContent`（Spring AI 1.1.7 将其存入 message properties 而非 `ChatGenerationMetadata`）
+    - 新增 `extractUsage(ChatResponse)`：从 `ChatResponseMetadata.getUsage()` 提取 `promptTokens`/`completionTokens`/`totalTokens`
+    - 流式回调中调用 `callback.onReasoningChunk(chunk)`、`callback.onChunk(chunk)`、`callback.onUsage(usage)`
+    - 新增 tool call 检测：当 `finishReason == "tool_calls"` 时，解析 `AssistantMessage.getToolCalls()` 并调用 `callback.onToolCall()`
+  - 修改 `ChatCommand` 的 `SpiStreamingCallback` 实现：
+    - `onReasoningChunk`：首次触发时打印灰色 `🤔 Thinking...`，后续追加灰色 thinking 内容
+    - `onChunk`：首次触发时关闭灰色模式，换行并打印 `💡 ` 前缀，然后追加正常内容
+    - `onToolCall`：打印青色 `🔧 Calling tool: name(args)`
+    - `onUsage`：保存 usage 供 `onComplete` 使用
+    - `onComplete`：打印 `⏱️ X.Xs | 🔤 N tokens (prompt: N, completion: N)`
+  - 修改 `OpenAiLlmClientProvider.buildChatClient()`：
+    - 在 `OpenAiChatOptions` 中启用 `.streamUsage(true)`，使 Moonshot 在流式响应最后一个 chunk 中返回 `usage`
+  - 编译、打包、安装并通过 `./init.sh` 验证
+- 运行过的验证：
+  - `mvn install -pl meta-claw-core,meta-claw-cli -am -DskipTests` → 成功
+  - CLI 实测 `chat default` → 成功：
+    - `🤔 Thinking...` + 灰色 thinking 内容流式显示
+    - `💡 1 + 1 = **2**` 正常显示
+    - `⏱️ 4.9s | 🔤 357 tokens (prompt: 316, completion: 41)`
+  - `./init.sh`（含 PATH 修正） → 成功：全仓编译 + P0 测试通过
+- 更新过的文件或工件：
+  - `meta-claw-core/src/main/java/meta/claw/core/runtime/LlmClientManager.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/llm/provider/OpenAiLlmClientProvider.java`
+  - `meta-claw-cli/src/main/java/meta/claw/cli/ChatCommand.java`
+  - `feature_list.json`（新增 `llm-001`）
+- 已知风险或未解决的问题：
+  - Spring AI 1.1.7 `OpenAiChatModel.createRequest()` 在把 `AssistantMessage` 转回 `ChatCompletionMessage` 时，`reasoningContent` 硬编码为 `null`。当前通过 `MoonshotSerializerModule` 在序列化时注入空字符串 `""` 来满足 Moonshot API 验证，但多轮对话中会丢失实际 thinking 文本。单轮对话的 thinking 展示不受影响。
+  - 如果未来 Spring AI 修复此问题，`MoonshotSerializerModule` 可以安全移除或增强为读取 `AssistantMessage.properties` 中的实际值。
+- 下一步最佳动作：
+  1. 提交本轮修改
+  2. 在需要工具调用的场景中验证 `🔧 Calling tool: ...` 的显示是否正常
