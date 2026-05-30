@@ -35,11 +35,7 @@ public class AppConfig {
     @Value("${meta.claw.weixin.token}")
     private String weixinToken;
 
-    /**
-     * Vessel 配置目录路径，从 application.yml 中读取
-     */
-    @Value("${meta.claw.vessels.dir}")
-    private String vesselsDir;
+
 
     /**
      * 事件总线包装器 Bean
@@ -149,7 +145,7 @@ public class AppConfig {
     public void initializeRuntimes(VesselManager vesselManager,
                                    ObjectProvider<VesselRuntime> runtimes) {
         for (VesselConfig config : vesselManager.listAvailableVessels()) {
-            VesselRuntime runtime = runtimes.getObject(config);
+            VesselRuntime runtime = runtimes.getObject(config.getName());
             vesselManager.registerRuntime(config.getId(), runtime);
         }
     }

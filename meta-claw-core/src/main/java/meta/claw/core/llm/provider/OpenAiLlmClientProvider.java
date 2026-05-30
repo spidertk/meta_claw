@@ -3,13 +3,12 @@ package meta.claw.core.llm.provider;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import meta.claw.core.config.ProviderConfig;
-import meta.claw.core.llm.advisor.ToolCallTraceAdvisor;
+import meta.claw.core.llm.advisor.ShortMemoryAdvisor;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.ToolCallAdvisor;
 import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.ai.openai.api.OpenAiApi;
-import io.micrometer.observation.ObservationRegistry;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
@@ -34,6 +33,8 @@ public class OpenAiLlmClientProvider implements LlmClientProvider {
 
     @Autowired
     private ObjectMapper objectMapper;
+    @Autowired
+    private ShortMemoryAdvisor shortMemoryAdvisor;
 //    @Autowired
 //    private ObservationRegistry observationRegistry;
 //    @Autowired
@@ -115,7 +116,8 @@ public class OpenAiLlmClientProvider implements LlmClientProvider {
 //                .build();
 
         ChatClient chatClient = ChatClient.builder(chatModel).defaultAdvisors(
-                        ToolCallAdvisor.builder().build()  // 外层：自动处理 tool calling 循环
+                        ToolCallAdvisor.builder().build(),  // 外层：自动处理 tool calling 循环
+                        shortMemoryAdvisor                     // 内层：流式响应持久化到 ShortMemory
                 )
                 .build();
 

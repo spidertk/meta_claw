@@ -2,7 +2,7 @@ package meta.claw.cli;
 
 import meta.claw.core.config.VesselConfig;
 import meta.claw.core.memory.SessionMemory;
-import meta.claw.core.memory.shortterm.ShortMemoryManager;
+import meta.claw.core.memory.shortterm.ShortMemoryFactory;
 import meta.claw.core.util.ProjectRootFinder;
 import meta.claw.core.vessel.VesselConfigResolver;
 import org.springframework.stereotype.Component;
@@ -20,9 +20,9 @@ public class SessionsCommand implements Runnable {
     private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
     private final VesselConfigResolver resolver;
-    private final ShortMemoryManager shortMemoryManager;
+    private final ShortMemoryFactory shortMemoryManager;
 
-    public SessionsCommand(VesselConfigResolver resolver, ShortMemoryManager shortMemoryManager) {
+    public SessionsCommand(VesselConfigResolver resolver, ShortMemoryFactory shortMemoryManager) {
         this.resolver = resolver;
         this.shortMemoryManager = shortMemoryManager;
     }

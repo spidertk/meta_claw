@@ -1,6 +1,7 @@
 package meta.claw.app;
 
 import meta.claw.core.config.GlobalConfigLoader;
+import meta.claw.core.runtime.VesselRuntime;
 import meta.claw.core.vessel.ProjectRootFinder;
 import meta.claw.core.config.GlobalConfig;
 import meta.claw.gateway.Gateway;
@@ -45,11 +46,6 @@ public class MetaClawApplication implements CommandLineRunner {
     @Autowired
     private VesselManager vesselManager;
 
-    /**
-     * Spring AI ChatClient.Builder，由 ChatClientAutoConfiguration 自动配置注入
-     */
-    @Autowired
-    private ChatClient.Builder chatClientBuilder;
 
     /**
      * 网关中央控制器，负责渠道注册与消息路由
@@ -70,7 +66,7 @@ public class MetaClawApplication implements CommandLineRunner {
     private AgentLoop agentLoop;
 
     @Autowired
-    private ObjectProvider<meta.claw.core.runtime.VesselRuntime> vesselRuntimes;
+    private ObjectProvider<VesselRuntime> vesselRuntime;
 
     /**
      * 应用程序主入口
@@ -113,7 +109,7 @@ public class MetaClawApplication implements CommandLineRunner {
     public void run(String... args) {
         // 步骤 1：为所有已加载的 Vessel 创建运行时实例
 
-        appConfig.initializeRuntimes(vesselManager,  vesselRuntimes);
+        appConfig.initializeRuntimes(vesselManager,  vesselRuntime);
 
         // 步骤 2：注册并启动微信渠道
         gateway.registerChannel(weixinChannel);

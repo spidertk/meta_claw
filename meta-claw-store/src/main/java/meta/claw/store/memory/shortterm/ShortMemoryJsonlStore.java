@@ -11,9 +11,11 @@ import lombok.extern.slf4j.Slf4j;
 import meta.claw.core.memory.MemoryMessage;
 import meta.claw.core.memory.MemoryMessageConverter;
 import meta.claw.core.memory.SessionMemory;
-import meta.claw.core.memory.shortterm.ShortMemoryStore;
+import meta.claw.core.memory.shortterm.SessionSelection;
+import meta.claw.core.memory.shortterm.ShortMemory;
 import meta.claw.core.llm.SpiMessage;
 import meta.claw.core.util.ProjectRootFinder;
+import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -30,16 +32,17 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.function.Supplier;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-import org.springframework.stereotype.Component;
 
 /**
  * 基于 JSONL 文件的短期记忆 backend。Spring 单例，按 vesselId 隔离数据。
  */
 @Slf4j
-@Component("jsonl")
-public class JsonlShortMemoryStore implements ShortMemoryStore {
+@Component
+public class ShortMemoryJsonlStore implements ShortMemory {
+
 
     private static final Pattern BASE64_PATTERN = Pattern.compile(
             "data:([^;]+);base64,[A-Za-z0-9+/=]{200,}"
@@ -49,7 +52,7 @@ public class JsonlShortMemoryStore implements ShortMemoryStore {
     private final ObjectMapper objectMapper;
     private final ConcurrentHashMap<String, ReentrantReadWriteLock> lockMap = new ConcurrentHashMap<>();
 
-    public JsonlShortMemoryStore() {
+    public ShortMemoryJsonlStore() {
         this.objectMapper = createObjectMapper();
     }
 
@@ -59,7 +62,33 @@ public class JsonlShortMemoryStore implements ShortMemoryStore {
     }
 
     @Override
-    public void initializeConversation(String vesselId, String sessionKey) {
+    public SessionSelection selectSession(String vesselId, String resumeSessionId, Supplier<String> newSessionIdSupplier){
+
+        String sessionId;
+        if (resumeSessionId != null && !resumeSessionId.isBlank()) {
+            if (!conversationExists(vesselId, resumeSessionId)) {
+                throw new IllegalArgumentException("Session not found for vessel '" +vesselId + "': " + resumeSessionId);
+            }
+            sessionId = resumeSessionId;
+        } else {
+            sessionId = newSessionIdSupplier.get();
+            initializeConversation(vesselId, sessionId);
+        }
+
+        Path historyFilePath = getHistoryFilePath(vesselId, sessionId)
+                .resolve("conversations")
+                .resolve(sessionId)
+                .resolve("history.jsonl");
+
+        return SessionSelection.builder()
+                .sessionId(sessionId)
+                .historyFilePath(historyFilePath)
+                .build();
+   }
+
+
+
+    private void initializeConversation(String vesselId, String sessionKey) {
         Path filePath = getHistoryFilePath(vesselId, sessionKey);
         ReentrantReadWriteLock lock = getLock(sessionKey);
         lock.writeLock().lock();
@@ -100,7 +129,7 @@ public class JsonlShortMemoryStore implements ShortMemoryStore {
     }
 
     @Override
-    public List<MemoryMessage> getHistory(String vesselId, String sessionKey, int limit) {
+    public List<MemoryMessage> loadMessages(String vesselId, String sessionKey, int limit) {
         Path filePath = getHistoryFilePath(vesselId, sessionKey);
         if (!Files.exists(filePath)) {
             return Collections.emptyList();
@@ -156,7 +185,7 @@ public class JsonlShortMemoryStore implements ShortMemoryStore {
     }
 
     @Override
-    public boolean clearHistory(String vesselId, String sessionKey) {
+    public boolean clearSession(String vesselId, String sessionKey) {
         Path filePath = getHistoryFilePath(vesselId, sessionKey);
         ReentrantReadWriteLock lock = getLock(sessionKey);
         lock.writeLock().lock();
@@ -178,24 +207,20 @@ public class JsonlShortMemoryStore implements ShortMemoryStore {
         return Files.exists(getHistoryFilePath(vesselId, sessionKey));
     }
 
-    @Override
-    public List<MemoryMessage> getHistoryByToken(String vesselId, String sessionKey, int maxTokens) {
-        return trimByToken(getHistory(vesselId, sessionKey,0), maxTokens);
-    }
 
     @Override
-    public SessionMemory loadSummary(String vesselId, String sessionKey) {
+    public SessionMemory loadSession(String vesselId, String sessionKey) {
         return loadSummaryForVessel(vesselId, sessionKey);
     }
 
     @Override
-    public void saveSummary(String vesselId, String sessionKey, SessionMemory summary) {
+    public void saveSession(String vesselId, String sessionKey, SessionMemory session) {
         Path filePath = getSummaryFilePath(vesselId, sessionKey);
         ReentrantReadWriteLock lock = getLock(sessionKey);
         lock.writeLock().lock();
         try {
             Files.createDirectories(filePath.getParent());
-            Files.writeString(filePath, objectMapper.writeValueAsString(summary),
+            Files.writeString(filePath, objectMapper.writeValueAsString(session),
                     StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
         } catch (IOException e) {
             throw new RuntimeException("Summary save failed", e);

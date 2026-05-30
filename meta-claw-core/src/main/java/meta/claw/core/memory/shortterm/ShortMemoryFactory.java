@@ -6,13 +6,15 @@ import meta.claw.core.config.VesselConfig;
 import meta.claw.core.memory.MemoryMessage;
 import meta.claw.core.memory.SessionMemory;
 
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
 
-import meta.claw.core.vessel.VesselConfigResolver;
+import meta.claw.core.prompt.PromptContext;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeansException;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
 import org.springframework.context.ApplicationListener;
@@ -24,11 +26,10 @@ import org.springframework.stereotype.Component;
  */
 @Slf4j
 @Component
-public class ShortMemoryManager implements ApplicationContextAware, ApplicationListener<ContextRefreshedEvent> {
-    @Autowired
-    private  VesselConfigResolver resolver;
+public class ShortMemoryFactory implements ApplicationContextAware, ApplicationListener<ContextRefreshedEvent> {
+
     private ApplicationContext applicationContext;
-    private Map<String, ShortMemoryStore> stores = new HashMap<>();
+    private Map<String, ShortMemory> stores = new HashMap<>();
     private boolean initialized = false;
 
     @Override
@@ -56,7 +57,7 @@ public class ShortMemoryManager implements ApplicationContextAware, ApplicationL
 
     private void initializeStores() {
         // 从 Spring 上下文中获取所有 ShortMemoryStore 实现
-        Map<String, ShortMemoryStore> allStores = applicationContext.getBeansOfType(ShortMemoryStore.class);
+        Map<String, ShortMemory> allStores = applicationContext.getBeansOfType(ShortMemory.class);
 
         log.info("Found {} ShortMemoryStore implementation(s): {}", allStores.size(), allStores.keySet());
 
@@ -64,9 +65,9 @@ public class ShortMemoryManager implements ApplicationContextAware, ApplicationL
         this.stores = new HashMap<>();
         Map<String, String> typeToBeanName = new HashMap<>(); // 用于检测 type 重名
 
-        for (Map.Entry<String, ShortMemoryStore> entry : allStores.entrySet()) {
+        for (Map.Entry<String, ShortMemory> entry : allStores.entrySet()) {
             String beanName = entry.getKey();
-            ShortMemoryStore store = entry.getValue();
+            ShortMemory store = entry.getValue();
             String type = store.type();
 
             log.debug("Registering ShortMemoryStore: beanName={}, type={}", beanName, type);
@@ -94,10 +95,9 @@ public class ShortMemoryManager implements ApplicationContextAware, ApplicationL
     /**
      * 按配置自动选择实现（默认 "jsonl"）。
      */
-    public ShortMemoryStore getStore(MemoryConfig config) {
-        String type = config != null && config.getShortTermStore() != null
-                ? config.getShortTermStore() : "jsonl";
-        ShortMemoryStore  store=   stores.get( type);
+    public ShortMemory get(String memoryType) {
+        String type = StringUtils.isBlank(memoryType) ?"jsonl":memoryType;
+        ShortMemory store=   stores.get( type);
         if (store == null) {
             throw new IllegalArgumentException(
                     "No ShortMemoryStore implementation found for type '" + type + "'! . Available: " + stores.keySet()
@@ -112,7 +112,7 @@ public class ShortMemoryManager implements ApplicationContextAware, ApplicationL
     /**
      * 运行时注册单个 Store（主要用于测试场景）。
      */
-    public void registerStore(String type, ShortMemoryStore store) {
+    public void register(String type, ShortMemory store) {
         if (this.stores == null) {
             this.stores = new HashMap<>();
         }
@@ -120,49 +120,5 @@ public class ShortMemoryManager implements ApplicationContextAware, ApplicationL
     }
 
 
-    public void appendMessage(String vesselId, String sessionKey, MemoryMessage message) {
 
-       getStore( resolver.loadMemoryConfig(vesselId)).appendMessage(vesselId, sessionKey, message);
-    }
-
-    public void initializeConversation( String vesselId, String sessionKey) {
-        getStore( resolver.loadMemoryConfig(vesselId)).initializeConversation(vesselId, sessionKey);
-    }
-
-    public List<MemoryMessage> getHistory( String vesselId, String sessionKey) {
-       VesselConfig vesselConfig = resolver.loadVesselConfig(vesselId);
-        int maxHistoryRounds =vesselConfig!=null&& vesselConfig.getMaxHistoryRounds() != null
-                ? vesselConfig.getMaxHistoryRounds() : 20;
-        return  getStore( resolver.loadMemoryConfig(vesselId)).getHistory(vesselId, sessionKey,maxHistoryRounds);
-    }
-
-
-
-    public List<SessionMemory> listSessions(String vesselId) {
-        return  getStore( resolver.loadMemoryConfig(vesselId)).listSessions(vesselId);
-    }
-
-    public boolean clearHistory( String vesselId, String sessionKey) {
-        return  getStore( resolver.loadMemoryConfig(vesselId)).clearHistory(vesselId, sessionKey);
-    }
-
-    public boolean conversationExists(String vesselId, String sessionKey) {
-        return  getStore( resolver.loadMemoryConfig(vesselId)).conversationExists(vesselId, sessionKey);
-    }
-
-    public List<MemoryMessage> getHistoryByToken(String vesselId, String sessionKey, int maxTokens) {
-        return  getStore( resolver.loadMemoryConfig(vesselId)).getHistoryByToken(vesselId, sessionKey, maxTokens);
-    }
-
-    public SessionMemory loadSummary( String vesselId, String sessionKey) {
-        return getStore( resolver.loadMemoryConfig(vesselId)).loadSummary(vesselId, sessionKey);
-    }
-
-    public void saveSummary( String vesselId, String sessionKey, SessionMemory summary) {
-        getStore( resolver.loadMemoryConfig(vesselId)).saveSummary(vesselId, sessionKey, summary);
-    }
-
-    public String summarizeConversation( String vesselId, List<MemoryMessage> history) {
-        return  getStore( resolver.loadMemoryConfig(vesselId)).summarizeConversation(vesselId, history);
-    }
 }

@@ -5,14 +5,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import lombok.extern.slf4j.Slf4j;
 import meta.claw.core.memory.PreferenceMemory;
-import meta.claw.core.memory.longterm.LongMemoryStore;
+import meta.claw.core.memory.longterm.LongMemory;
 import meta.claw.core.util.ProjectRootFinder;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
@@ -24,7 +23,7 @@ import org.springframework.stereotype.Component;
  */
 @Slf4j
 @Component("file")
-public class FileLongMemoryStore implements LongMemoryStore {
+public class FileLongMemoryStore implements LongMemory {
 
     private final ObjectMapper objectMapper;
 

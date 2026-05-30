@@ -15,14 +15,20 @@ public final class MemoryMessageConverter {
     public static MemoryMessage fromSpiMessage(SpiMessage message) {
         return MemoryMessage.builder()
                 .timestamp(LocalDateTime.now())
-                .role(message.role())
-                .content(message.content())
-                .toolCalls(message.toolCalls())
+                .role(message.getRole())
+                .content(message.getContent())
+                .reasoningContent(message.getReasoningContent())
+                .toolCalls(message.getToolCalls())
                 .build();
     }
 
     public static SpiMessage toSpiMessage(MemoryMessage message) {
-        return new SpiMessage(message.getRole(), message.getContent(), message.getToolCalls());
+        return SpiMessage.builder()
+                .role(message.getRole())
+                .content(message.getContent())
+                .reasoningContent(message.getReasoningContent())
+                .toolCalls(message.getToolCalls())
+                .build();
     }
 
     public static List<SpiMessage> toSpiMessages(List<MemoryMessage> messages) {

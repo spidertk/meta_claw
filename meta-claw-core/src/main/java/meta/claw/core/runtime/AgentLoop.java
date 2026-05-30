@@ -9,6 +9,8 @@ import meta.claw.core.message.Context;
 import meta.claw.core.message.Reply;
 import meta.claw.core.message.ReplyType;
 import meta.claw.core.config.VesselConfig;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
 
 import java.util.List;
 
@@ -25,12 +27,12 @@ public class AgentLoop {
     /**
      * 事件总线封装实例，用于发布和订阅领域事件
      */
-    private final EventBusWrapper eventBus;
+    private  final EventBusWrapper eventBus;
 
     /**
      * Vessel 管理器，负责提供可用 Vessel 的配置和运行时实例
      */
-    private final VesselManager vesselManager;
+    private  final VesselManager vesselManager;
 
     /**
      * 构造方法：初始化 AgentLoop 并注册为 EventBus 订阅者
@@ -96,7 +98,7 @@ public class AgentLoop {
             }
 
             // 步骤 3：调用 Vessel 进行对话处理
-            Reply reply = runtime.chat(targetVesselId,sessionId,context.getContent());
+            Reply reply = runtime.chat(sessionId,context.getContent());
             log.info("Vessel 处理完成: vesselId={}, replyType={}, sessionId={}",
                     targetVesselId, reply.getType(), sessionId);
 

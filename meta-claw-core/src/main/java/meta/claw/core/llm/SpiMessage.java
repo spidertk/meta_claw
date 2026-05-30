@@ -1,25 +1,51 @@
 package meta.claw.core.llm;
 
+import lombok.AllArgsConstructor;
 import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 import meta.claw.core.tool.SpiToolCall;
 
 import java.util.List;
 
 @Builder
-public record SpiMessage(String role, String content, List<SpiToolCall> toolCalls) {
+@NoArgsConstructor
+@AllArgsConstructor
+@Getter
+@Setter
+public class SpiMessage {
+    private String role;
+    private String content;
+    private String reasoningContent;
+    private List<SpiToolCall> toolCalls;
+
     public static SpiMessage system(String content) {
-        return new SpiMessage("system", content, null);
+        return SpiMessage.builder().role("system").content(content).build();
     }
+
     public static SpiMessage user(String content) {
-        return new SpiMessage("user", content, null);
+        return SpiMessage.builder().role("user").content(content).build();
     }
+
     public static SpiMessage assistant(String content) {
-        return new SpiMessage("assistant", content, null);
+        return SpiMessage.builder().role("assistant").content(content).build();
     }
+
     public static SpiMessage assistant(String content, List<SpiToolCall> toolCalls) {
-        return new SpiMessage("assistant", content, toolCalls);
+        return SpiMessage.builder().role("assistant").content(content).toolCalls(toolCalls).build();
     }
+
+    public static SpiMessage assistant(String content, String reasoningContent, List<SpiToolCall> toolCalls) {
+        return SpiMessage.builder()
+                .role("assistant")
+                .content(content)
+                .reasoningContent(reasoningContent)
+                .toolCalls(toolCalls)
+                .build();
+    }
+
     public static SpiMessage tool(String content) {
-        return new SpiMessage("tool", content, null);
+        return SpiMessage.builder().role("tool").content(content).build();
     }
 }

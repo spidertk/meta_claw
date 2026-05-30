@@ -27,7 +27,8 @@
 
 - 业务逻辑对象默认交给 Spring 容器管理。
   - 可复用的 service、manager、loader、converter、provider、factory 等，优先使用 `@Component`、`@Service`、`@Repository`、`@Configuration` 等方式纳入容器。
-  - **所有业务实现类禁止显式定义构造方法**；依赖一律通过 `@Autowired` 字段注入或 setter 注入完成，不得使用构造注入。
+
+[//]: # (  - **所有业务实现类禁止显式定义构造方法**；依赖一律通过 `@Autowired` 字段注入或 setter 注入完成，不得使用构造注入。)
   - 业务调用链中不得直接 `new` 业务服务或可复用组件；如果对象依赖运行时参数，优先使用 Spring 管理的 provider / prototype bean，而不是在调用方手工拼装依赖图。
 - DTO / 值对象统一使用 Lombok builder 风格。
   - 新增 DTO、事件对象、消息对象、配置快照对象等数据载体时，默认提供 `@Builder`。

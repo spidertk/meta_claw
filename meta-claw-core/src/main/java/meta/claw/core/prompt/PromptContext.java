@@ -5,9 +5,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import java.nio.file.Path;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
+
 
 import meta.claw.core.config.MemoryConfig;
 import meta.claw.core.config.ProviderConfig;
@@ -24,17 +22,13 @@ public class PromptContext {
     private String soul;
     private String capabilities;
     private String guidelines;
-    @Builder.Default
-    private List<SkillInfo> skills = Collections.emptyList();
+
     @Builder.Default
     private String knowledge = "";
-    @Builder.Default
-    private String preferences = "";
+
     private Path workspaceDir;
-    private String currentTime;
-    private String location;
-    @Builder.Default
-    private Map<String, String> runtimeInfo = Collections.emptyMap();
+
+
     private MemoryConfig memoryConfig;
     private ProviderConfig providerConfig;
     private VesselConfig vesselConfig;

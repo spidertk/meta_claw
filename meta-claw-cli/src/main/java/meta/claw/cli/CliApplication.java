@@ -1,8 +1,12 @@
 package meta.claw.cli;
 
 import meta.claw.core.config.GlobalConfigLoader;
+import meta.claw.core.runtime.VesselManager;
+import meta.claw.core.runtime.VesselRuntime;
 import meta.claw.core.vessel.ProjectRootFinder;
 import meta.claw.core.config.GlobalConfig;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -22,11 +26,31 @@ import java.util.Arrays;
                 org.springframework.ai.model.openai.autoconfigure.OpenAiChatAutoConfiguration.class
         }
 )
-public class CliApplication {
+public class CliApplication  implements CommandLineRunner  {
+
+
+    /**
+     * 核心配置类，提供 initializeRuntimes 等初始化方法
+     */
+    @Autowired
+    private AppConfig appConfig;
+
+    /**
+     * Vessel 管理器，维护所有 Vessel 配置及运行时实例
+     */
+    @Autowired
+    private VesselManager vesselManager;
+
+
+    @Autowired
+    private ObjectProvider<VesselRuntime> vesselRuntime;
 
     public static void main(String[] args) {
         SpringApplication app = new SpringApplication(CliApplication.class);
         app.setAdditionalProfiles("cli");
+
+
+
 
         app.addListeners((ApplicationListener<ApplicationEnvironmentPreparedEvent>) event -> {
             Path configDir = ProjectRootFinder.getMetaClawDir();
@@ -48,6 +72,7 @@ public class CliApplication {
 
     @Bean
     CommandLineRunner run(CommandLine.IFactory factory, MetaClawCommand command) {
+
         return args -> {
             // 防御：shell wrapper 或 IDE 可能把命令名也作为参数传入
             String[] effectiveArgs = args;
@@ -59,4 +84,10 @@ public class CliApplication {
         };
     }
 
+    @Override
+    public void run(String... args) throws Exception {
+        // 步骤 1：为所有已加载的 Vessel 创建运行时实例
+
+        appConfig.initializeRuntimes(vesselManager,  vesselRuntime);
+    }
 }

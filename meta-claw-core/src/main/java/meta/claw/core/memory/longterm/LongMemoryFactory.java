@@ -8,9 +8,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import meta.claw.core.vessel.VesselConfigResolver;
+import meta.claw.core.prompt.PromptContext;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeansException;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
 import org.springframework.context.ApplicationListener;
@@ -18,15 +18,14 @@ import org.springframework.context.event.ContextRefreshedEvent;
 import org.springframework.stereotype.Component;
 
 /**
- * 长期记忆编排器
+ * 长期记忆工厂注册类
  */
 @Slf4j
 @Component
-public class LongMemoryManager  implements ApplicationContextAware, ApplicationListener<ContextRefreshedEvent> {
-    @Autowired
-    private VesselConfigResolver resolver;
+public class LongMemoryFactory implements ApplicationContextAware, ApplicationListener<ContextRefreshedEvent> {
+
     private ApplicationContext applicationContext;
-    private Map<String, LongMemoryStore> stores = new HashMap<>();
+    private Map<String, LongMemory> stores = new HashMap<>();
     private boolean initialized = false;
 
     @Override
@@ -46,15 +45,15 @@ public class LongMemoryManager  implements ApplicationContextAware, ApplicationL
     }
 
     private void initializeStores() {
-        Map<String, LongMemoryStore> allStores = applicationContext.getBeansOfType(LongMemoryStore.class);
+        Map<String, LongMemory> allStores = applicationContext.getBeansOfType(LongMemory.class);
         log.info("Found {} LongMemoryStore implementation(s): {}", allStores.size(), allStores.keySet());
 
         this.stores = new HashMap<>();
         Map<String, String> typeToBeanName = new HashMap<>();
 
-        for (Map.Entry<String, LongMemoryStore> entry : allStores.entrySet()) {
+        for (Map.Entry<String, LongMemory> entry : allStores.entrySet()) {
             String beanName = entry.getKey();
-            LongMemoryStore store = entry.getValue();
+            LongMemory store = entry.getValue();
             String type = store.type();
 
             log.debug("Registering LongMemoryStore: beanName={}, type={}", beanName, type);
@@ -78,24 +77,20 @@ public class LongMemoryManager  implements ApplicationContextAware, ApplicationL
                 stores.size(), stores.keySet());
     }
 
-    public LongMemoryStore getStore(MemoryConfig config) {
-        String type = config != null && config.getLongTermStore() != null
-                ? config.getLongTermStore() : "file";
-        return getStore(type);
-    }
 
     /**
      * 运行时注册单个 Store（主要用于测试场景）。
      */
-    public void registerStore(String type, LongMemoryStore store) {
+    public void register(String type, LongMemory store) {
         if (this.stores == null) {
             this.stores = new HashMap<>();
         }
         this.stores.put(type, store);
     }
 
-    public LongMemoryStore getStore(String type) {
-        LongMemoryStore store = stores.get(type);
+    public LongMemory get(String memoryType) {
+        String type = StringUtils.isBlank(memoryType) ?"file":memoryType;
+        LongMemory store = stores.get(type);
         if (store == null) {
             throw new IllegalArgumentException(
                     "No LongMemoryStore for type: " + type + ". Available: " + stores.keySet());
@@ -104,23 +99,4 @@ public class LongMemoryManager  implements ApplicationContextAware, ApplicationL
     }
 
 
-    public void addPreference(MemoryConfig config, String vesselId, PreferenceMemory entry) {
-        getStore( resolver.loadMemoryConfig(vesselId)).addPreference(vesselId, entry);
-    }
-
-    public List<PreferenceMemory> lookupPreference(MemoryConfig config, String vesselId, String query) {
-        return  getStore( resolver.loadMemoryConfig(vesselId)).lookupPreference(vesselId, query);
-    }
-
-    public List<PreferenceMemory> listRecentPreferences(MemoryConfig config, String vesselId, int limit) {
-        return  getStore( resolver.loadMemoryConfig(vesselId)).listRecentPreferences(vesselId, limit);
-    }
-
-    public boolean deletePreference(MemoryConfig config, String vesselId, String preferenceId) {
-        return  getStore( resolver.loadMemoryConfig(vesselId)).deletePreference(vesselId, preferenceId);
-    }
-
-    public boolean clearPreferences(MemoryConfig config, String vesselId) {
-        return  getStore( resolver.loadMemoryConfig(vesselId)).clearPreferences(vesselId);
-    }
 }

@@ -22,5 +22,6 @@ public class MemoryMessage {
     private LocalDateTime timestamp;
     private String role;
     private String content;
+    private String reasoningContent;
     private List<SpiToolCall> toolCalls;
 }

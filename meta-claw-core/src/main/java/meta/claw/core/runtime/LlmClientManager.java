@@ -10,7 +10,6 @@ import meta.claw.core.llm.SpiStreamingCallback;
 import meta.claw.core.llm.provider.LlmClientProviderManager;
 import meta.claw.core.memory.MemoryMessage;
 import meta.claw.core.memory.MemoryMessageConverter;
-import meta.claw.core.memory.shortterm.ShortMemoryManager;
 import meta.claw.core.tool.registry.ToolRegistry;
 import meta.claw.core.vessel.VesselConfigResolver;
 import meta.claw.core.llm.SpiUsage;
@@ -47,8 +46,7 @@ public class LlmClientManager implements SpiLlmClient {
     private LlmClientProviderManager llmClientProviderManager;
     @Autowired
     private VesselConfigResolver vesselConfigResolver;
-    @Autowired
-    private ShortMemoryManager shortMemoryManager;
+
     @Autowired
     private ToolRegistry toolRegistry;
 
@@ -61,13 +59,14 @@ public class LlmClientManager implements SpiLlmClient {
         List<SpiMessage> restored = new ArrayList<>();
         for (MemoryMessage entry : entries) {
             SpiMessage message = MemoryMessageConverter.toSpiMessage(entry);
-            if (message.role() == null) {
+            if (message.getRole() == null) {
                 continue;
             }
-            switch (message.role().toLowerCase()) {
-                case "user" -> restored.add(SpiMessage.user(message.content()));
-                case "assistant" -> restored.add(SpiMessage.assistant(message.content()));
-                case "tool" -> restored.add(SpiMessage.tool(message.content()));
+            switch (message.getRole().toLowerCase()) {
+                case "user" -> restored.add(SpiMessage.user(message.getContent()));
+                case "assistant" -> restored.add(
+                        SpiMessage.assistant(message.getContent(), message.getReasoningContent(), message.getToolCalls()));
+                case "tool" -> restored.add(SpiMessage.tool(message.getContent()));
                 default -> {
                     // System prompts are rebuilt from current vessel config when resuming.
                 }
@@ -76,18 +75,11 @@ public class LlmClientManager implements SpiLlmClient {
         return restored;
     }
 
-    public List<SpiMessage> buildLlmRequest(String vesselId, String sessionKey, String systemPrompt) {
-        List<SpiMessage> messages = new ArrayList<>();
-        if (systemPrompt != null && !systemPrompt.isBlank()) {
-            messages.add(SpiMessage.system(systemPrompt));
-        }
-        messages.addAll(toSpiMessages(shortMemoryManager.getHistory(vesselId, sessionKey)));
-        return messages;
-    }
+
 
     @Override
     public SpiChatResponse chat(SpiChatRequest request) {
-        log.debug("LlmClientManager chat vessel={}, messages={}", request.getVesselName(), request.getMessages().size());
+        log.debug("LlmClientManager chat vessel={}, messages={}", request.getCtx().getVesselName(), request.getMessages().size());
 
         List<Message> messages = request.getMessages().stream()
                 .map(this::toSpringMessage)
@@ -96,7 +88,7 @@ public class LlmClientManager implements SpiLlmClient {
         List<Object> toolInstances = toolRegistry.getToolInstances();
         logRequestParams(messages, toolInstances);
 
-        ChatResponse chatResponse = buildChatClient(request.getVesselName())
+        ChatResponse chatResponse = buildChatClient(request.getCtx().getVesselName())
                 .prompt(new Prompt(messages))
                 .tools(toolInstances.toArray())
                 .call()
@@ -135,9 +127,13 @@ public class LlmClientManager implements SpiLlmClient {
         logRequestParams(messages, toolInstances);
 
         try {
-            buildChatClient(request.getVesselName())
+            buildChatClient(request.getCtx().getVesselName())
                     .prompt(new Prompt(messages))
                     .tools(toolInstances.toArray())
+                    .advisors(spec -> spec
+                            .param("vesselName", request.getCtx().getVesselName())
+                            .param("sessionId", request.getSessionId())
+                            .param("memoryConfig", request.getCtx().getMemoryConfig()))
                     .stream()
                     .chatResponse()
                     .doOnNext(response -> {
@@ -287,18 +283,18 @@ public class LlmClientManager implements SpiLlmClient {
     }
 
     private Message toSpringMessage(SpiMessage msg) {
-        return switch (msg.role()) {
-            case "system" -> new SystemMessage(msg.content());
-            case "user" -> new UserMessage(msg.content());
-            case "assistant" -> new AssistantMessage(msg.content());
+        return switch (msg.getRole()) {
+            case "system" -> new SystemMessage(msg.getContent());
+            case "user" -> new UserMessage(msg.getContent());
+            case "assistant" -> new AssistantMessage(msg.getContent());
             case "tool" -> ToolResponseMessage.builder()
                     .responses(List.of(
-                            new ToolResponseMessage.ToolResponse("tool", "tool", msg.content())
+                            new ToolResponseMessage.ToolResponse("tool", "tool", msg.getContent())
                     ))
                     .build();
             default -> {
-                log.warn("Unknown message role '{}', defaulting to user message", msg.role());
-                yield new UserMessage(msg.content());
+                log.warn("Unknown message role '{}', defaulting to user message", msg.getRole());
+                yield new UserMessage(msg.getContent());
             }
         };
     }

@@ -1,8 +1,21 @@
 package meta.claw.core.prompt;
 
 import lombok.RequiredArgsConstructor;
+import meta.claw.core.config.VesselConfig;
+import meta.claw.core.memory.PreferenceMemory;
+import meta.claw.core.memory.longterm.LongMemory;
+import meta.claw.core.memory.longterm.LongMemoryFactory;
+import meta.claw.core.memory.shortterm.ShortMemoryFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+import org.springframework.util.CollectionUtils;
 
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -11,9 +24,21 @@ import java.util.stream.Collectors;
  */
 @RequiredArgsConstructor
 @Component
-public class SystemPromptBuilder {
+public class PromptRuntimeBuilder {
 
+    @Autowired
+    private LongMemoryFactory longMemory;
     private final TemplateLoader templateLoader;
+    private static final DateTimeFormatter TIME_FORMATTER =
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss z");
+    private String formatCurrentTime() {
+        return ZonedDateTime.now(ZoneId.systemDefault()).format(TIME_FORMATTER);
+    }
+
+    private String detectLocation() {
+        ZoneId zone = ZoneId.systemDefault();
+        return zone.getId();
+    }
 
     /**
      * 构建完整的系统提示文本。
@@ -77,12 +102,13 @@ public class SystemPromptBuilder {
 //    }
 
     private String buildSkillsSection(PromptContext context) {
-        if (context.getSkills() == null || context.getSkills().isEmpty()) {
+       List<SkillInfo> skills= loadSkills(context);
+        if (CollectionUtils.isEmpty( skills)) {
             return "";
         }
         StringBuilder sb = new StringBuilder();
         sb.append("## Skills\n\n");
-        sb.append(context.getSkills().stream()
+        sb.append(skills.stream()
                 .map(s -> "- **" + s.getName() + "**: " + orDefault(s.getDescription(), ""))
                 .collect(Collectors.joining("\n")));
         return sb.toString();
@@ -96,11 +122,37 @@ public class SystemPromptBuilder {
     }
 
     private String buildPreferencesSection(PromptContext context) {
-        if (isBlank(context.getPreferences())) {
+        String preferences = loadPreferences(context);
+        if (isBlank(preferences)) {
             return "";
         }
-        return "## User Preferences\n\n" + context.getPreferences();
+        return "## User Preferences\n\n" + preferences;
     }
+    private  List<SkillInfo>  loadSkills(PromptContext context) {
+        return Collections.emptyList();
+    }
+    private Map<String, String> loadRuntimeInfo(PromptContext context) {
+
+        return Collections.emptyMap();
+    }
+    private String loadPreferences(PromptContext context) {
+         VesselConfig config=  context.getVesselConfig();
+        if (!config.isPreferencesEnabled() || config.getId() == null) {
+            return "";
+        }
+        LongMemory store = longMemory.get(context.getMemoryConfig().getShortTermStore());
+        List<PreferenceMemory> prefs = store.listRecentPreferences(config.getId(), 10);
+        if (prefs.isEmpty()) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder();
+        for (PreferenceMemory p : prefs) {
+            sb.append("- ").append(p.getContent()).append("\n");
+        }
+        return sb.toString().trim();
+    }
+
+
 
     private String buildWorkspaceSection(PromptContext context) {
         if (context.getWorkspaceDir() == null) {
@@ -112,10 +164,11 @@ public class SystemPromptBuilder {
     private String buildRuntimeSection(PromptContext context) {
         StringBuilder sb = new StringBuilder();
         sb.append("## Runtime\n\n");
-        sb.append("- **Current Time**: ").append(orDefault(context.getCurrentTime(), "unknown")).append("\n");
-        sb.append("- **Location**: ").append(orDefault(context.getLocation(), "unknown")).append("\n");
-        if (context.getRuntimeInfo() != null && !context.getRuntimeInfo().isEmpty()) {
-            context.getRuntimeInfo().forEach((k, v) ->
+        sb.append("- **Current Time**: ").append(orDefault(formatCurrentTime(), "unknown")).append("\n");
+        sb.append("- **Location**: ").append(orDefault( detectLocation(), "unknown")).append("\n");
+        Map<String,String> runtimeInfo= loadRuntimeInfo(context);
+        if (!CollectionUtils.isEmpty(runtimeInfo)) {
+            runtimeInfo.forEach((k, v) ->
                     sb.append("- **").append(k).append("**: ").append(v).append("\n"));
         }
         return sb.toString().trim();
@@ -135,4 +188,6 @@ public class SystemPromptBuilder {
     private static String orDefault(String value, String defaultValue) {
         return value != null ? value : defaultValue;
     }
+
+
 }
