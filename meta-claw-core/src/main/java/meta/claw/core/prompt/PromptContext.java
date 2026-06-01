@@ -7,9 +7,9 @@ import lombok.NoArgsConstructor;
 import java.nio.file.Path;
 
 
-import meta.claw.core.config.MemoryConfig;
-import meta.claw.core.config.ProviderConfig;
-import meta.claw.core.config.VesselConfig;
+import meta.claw.core.infra.config.MemoryConfig;
+import meta.claw.core.infra.config.ProviderConfig;
+import meta.claw.core.user.VesselMeta;
 @Getter
 @Builder(toBuilder = true)
 @NoArgsConstructor
@@ -31,5 +31,5 @@ public class PromptContext {
 
     private MemoryConfig memoryConfig;
     private ProviderConfig providerConfig;
-    private VesselConfig vesselConfig;
+    private VesselMeta vesselMeta;
 }

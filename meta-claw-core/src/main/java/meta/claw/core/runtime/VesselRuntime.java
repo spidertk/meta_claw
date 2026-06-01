@@ -13,7 +13,7 @@ import meta.claw.core.memory.shortterm.ShortMemory;
 import meta.claw.core.memory.shortterm.ShortMemoryFactory;
 import meta.claw.core.message.Reply;
 import meta.claw.core.message.ReplyType;
-import meta.claw.core.config.VesselConfig;
+import meta.claw.core.user.VesselMeta;
 import meta.claw.core.prompt.PromptContext;
 import meta.claw.core.prompt.PromptContextFactory;
 import meta.claw.core.prompt.PromptRuntimeBuilder;
@@ -84,8 +84,8 @@ public class VesselRuntime {
     /**
      * 获取 Vessel 配置
      */
-    public VesselConfig getConfig() {
-        return promptContext.getVesselConfig();
+    public VesselMeta getConfig() {
+        return promptContext.getVesselMeta();
     }
     /**
      * 将用户消息转换成 ChatClient 所需的格式。
@@ -99,7 +99,7 @@ public class VesselRuntime {
             messages.add(SpiMessage.system(systemPrompt));
         }
         if (StringUtils.isNotBlank(sessionId)){
-            messages.addAll(toSpiMessages(getShortMemory().loadMessages( vesselId, sessionId,promptContext.getVesselConfig().getMaxHistoryRounds())));
+            messages.addAll(toSpiMessages(getShortMemory().loadMessages( vesselId, sessionId,promptContext.getVesselMeta().getMaxHistoryRounds())));
         }
         messages.add(SpiMessage.user(userMessage));
         getShortMemory().appendMessage(  vesselId, sessionId,
