@@ -1,4 +1,4 @@
-package meta.claw.core.util;
+package meta.claw.core.infra.path;
 
 import lombok.extern.slf4j.Slf4j;
 

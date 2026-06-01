@@ -3,7 +3,6 @@ package meta.claw.cli;
 import lombok.extern.slf4j.Slf4j;
 import meta.claw.core.config.VesselConfig;
 import meta.claw.core.memory.shortterm.SessionSelection;
-import meta.claw.core.memory.shortterm.ShortMemoryFactory;
 
 import meta.claw.core.prompt.PromptContext;
 

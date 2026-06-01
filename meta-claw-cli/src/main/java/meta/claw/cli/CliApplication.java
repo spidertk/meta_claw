@@ -26,14 +26,10 @@ import java.util.Arrays;
                 org.springframework.ai.model.openai.autoconfigure.OpenAiChatAutoConfiguration.class
         }
 )
-public class CliApplication  implements CommandLineRunner  {
+public class CliApplication   {
 
 
-    /**
-     * 核心配置类，提供 initializeRuntimes 等初始化方法
-     */
-    @Autowired
-    private AppConfig appConfig;
+
 
     /**
      * Vessel 管理器，维护所有 Vessel 配置及运行时实例
@@ -84,10 +80,4 @@ public class CliApplication  implements CommandLineRunner  {
         };
     }
 
-    @Override
-    public void run(String... args) throws Exception {
-        // 步骤 1：为所有已加载的 Vessel 创建运行时实例
-
-        appConfig.initializeRuntimes(vesselManager,  vesselRuntime);
-    }
 }

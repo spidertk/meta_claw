@@ -3,6 +3,11 @@ package meta.claw.core.runtime;
 import lombok.extern.slf4j.Slf4j;
 import meta.claw.core.config.VesselConfigLoader;
 import meta.claw.core.config.VesselConfig;
+import meta.claw.core.infra.path.ProjectRootFinder;
+import org.springframework.beans.factory.InitializingBean;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
 
 import java.nio.file.Path;
 import java.util.Collections;
@@ -17,8 +22,14 @@ import java.util.concurrent.ConcurrentHashMap;
  * </p>
  */
 @Slf4j
-public class VesselManager {
+@Component
+public class VesselManager implements InitializingBean {
 
+    @Autowired
+    private ObjectProvider<VesselRuntime> vesselRuntime;
+
+    @Autowired
+    private VesselConfigLoader vesselConfigLoader;
 
     /**
      * 存储已加载的 Vessel 配置，key 为 vesselId
@@ -33,13 +44,9 @@ public class VesselManager {
     /**
      * vessels 目录的绝对路径
      */
-    private final Path vesselsDir;
-    private final VesselConfigLoader vesselConfigLoader;
+    private final Path vesselsDir = ProjectRootFinder.getMetaClawDir();
 
-    public VesselManager(Path vesselsDir, VesselConfigLoader vesselConfigLoader) {
-        this.vesselsDir = vesselsDir;
-        this.vesselConfigLoader = vesselConfigLoader;
-    }
+
 
     /**
      * 扫描 vessels/ 目录下的所有 vessel.md 文件并加载配置
@@ -82,9 +89,9 @@ public class VesselManager {
      * 注册 Vessel 运行时实例
      *
      * @param vesselId Vessel 唯一标识
-     * @param runtime  Vessel 运行时实例
      */
-    public void registerRuntime(String vesselId, VesselRuntime runtime) {
+    public void registerRuntime(String vesselId) {
+        VesselRuntime runtime = vesselRuntime.getObject(vesselId);
         runtimes.put(vesselId, runtime);
         log.info("成功注册 Vessel 运行时: {}", vesselId);
     }
@@ -108,4 +115,11 @@ public class VesselManager {
         return vessels.containsKey(vesselId);
     }
 
+    @Override
+    public void afterPropertiesSet() throws Exception {
+        loadVessels();
+        for (VesselConfig config : listAvailableVessels()) {
+           registerRuntime(config.getId());
+        }
+    }
 }

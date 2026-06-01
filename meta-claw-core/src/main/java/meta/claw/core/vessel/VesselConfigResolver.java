@@ -2,7 +2,7 @@ package meta.claw.core.vessel;
 
 import lombok.extern.slf4j.Slf4j;
 import meta.claw.core.config.*;
-import meta.claw.core.util.ProjectRootFinder;
+import meta.claw.core.infra.path.ProjectRootFinder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.apache.commons.lang3.StringUtils;

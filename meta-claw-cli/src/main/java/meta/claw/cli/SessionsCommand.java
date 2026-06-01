@@ -1,15 +1,15 @@
 package meta.claw.cli;
 
-import meta.claw.core.config.VesselConfig;
 import meta.claw.core.memory.SessionMemory;
-import meta.claw.core.memory.shortterm.ShortMemoryFactory;
-import meta.claw.core.util.ProjectRootFinder;
-import meta.claw.core.vessel.VesselConfigResolver;
+import meta.claw.core.memory.shortterm.ShortMemory;
+import meta.claw.core.runtime.VesselManager;
+import meta.claw.core.runtime.VesselRuntime;
+
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Parameters;
 
-import java.nio.file.Path;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
@@ -18,25 +18,21 @@ import java.util.List;
 public class SessionsCommand implements Runnable {
 
     private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+    @Autowired
+    private VesselManager vesselManager;
 
-    private final VesselConfigResolver resolver;
-    private final ShortMemoryFactory shortMemoryManager;
 
-    public SessionsCommand(VesselConfigResolver resolver, ShortMemoryFactory shortMemoryManager) {
-        this.resolver = resolver;
-        this.shortMemoryManager = shortMemoryManager;
-    }
+
 
     @Parameters(index = "0", defaultValue = "default", description = "Vessel name")
     private String vesselName;
 
     @Override
     public void run() {
-        Path configDir = ProjectRootFinder.getMetaClawDir();
         try {
-            var resolved = resolver.resolve(vesselName);
-            VesselConfig config = resolved.getVesselConfig();
-            printSessions(vesselName, shortMemoryManager.listSessions(vesselName));
+            VesselRuntime vesselRuntime = vesselManager.getRuntime(vesselName);
+            ShortMemory shortMemory = vesselRuntime.getShortMemory();
+            printSessions(vesselName, shortMemory.listSessions(vesselName));
             return;
         } catch (IllegalStateException | IllegalArgumentException e) {
             System.err.println(e.getMessage());

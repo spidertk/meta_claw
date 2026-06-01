@@ -2,6 +2,7 @@ package meta.claw.cli;
 
 import meta.claw.core.vessel.ProjectRootFinder;
 import meta.claw.core.vessel.VesselTemplate;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -19,11 +20,9 @@ import java.nio.file.Path;
 @Component
 @Command(name = "create", description = "Create a new vessel")
 public class CreateCommand implements Runnable {
-    private final VesselTemplate vesselTemplate;
+    @Autowired
+    private  VesselTemplate vesselTemplate;
 
-    public CreateCommand(VesselTemplate vesselTemplate) {
-        this.vesselTemplate = vesselTemplate;
-    }
 
     @Parameters(index = "0", description = "Vessel name")
     private String vesselName;

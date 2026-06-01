@@ -81,22 +81,7 @@ public class AppConfig {
         return new Gateway(registry, eventBus);
     }
 
-    /**
-     * Vessel 管理器 Bean
-     * <p>
-     * 负责扫描并加载 vessels/ 目录下的所有 Vessel 配置（vessel.md），
-     * 维护 Vessel 配置及运行时实例的注册与查询。
-     * Bean 创建时立即调用 loadVessels() 完成配置加载。
-     * </p>
-     *
-     * @return VesselManager 实例
-     */
-    @Bean
-    public VesselManager vesselManager(VesselConfigLoader vesselConfigLoader) {
-        VesselManager manager = new VesselManager(ProjectRootFinder.getMetaClawDir(), vesselConfigLoader);
-        manager.loadVessels();
-        return manager;
-    }
+
 
     /**
      * Agent 事件循环处理器 Bean
@@ -132,21 +117,5 @@ public class AppConfig {
         return new WeixinChannel(config, gateway, converter);
     }
 
-    /**
-     * 初始化所有 Vessel 的运行时实例
-     * <p>
-     * 遍历 VesselManager 中已加载的所有 Vessel 配置，为每个 Vessel 创建独立的 VesselRuntime。
-     * VesselRuntime 封装 Spring AI ChatClient，提供独立的 AI 对话能力。
-     * 创建完成后将运行时实例注册回 VesselManager，供 AgentLoop 调度使用。
-     * </p>
-     *
-     * @param vesselManager Vessel 管理器，包含已加载的 Vessel 配置
-     */
-    public void initializeRuntimes(VesselManager vesselManager,
-                                   ObjectProvider<VesselRuntime> runtimes) {
-        for (VesselConfig config : vesselManager.listAvailableVessels()) {
-            VesselRuntime runtime = runtimes.getObject(config.getName());
-            vesselManager.registerRuntime(config.getId(), runtime);
-        }
-    }
+
 }

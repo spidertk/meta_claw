@@ -2,7 +2,7 @@ package meta.claw.core.prompt;
 
 import meta.claw.core.config.VesselConfig;
 
-import meta.claw.core.util.ProjectRootFinder;
+import meta.claw.core.infra.path.ProjectRootFinder;
 import meta.claw.core.vessel.VesselConfigResolver;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;

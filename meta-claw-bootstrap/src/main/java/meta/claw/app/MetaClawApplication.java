@@ -107,9 +107,7 @@ public class MetaClawApplication implements CommandLineRunner {
      */
     @Override
     public void run(String... args) {
-        // 步骤 1：为所有已加载的 Vessel 创建运行时实例
 
-        appConfig.initializeRuntimes(vesselManager,  vesselRuntime);
 
         // 步骤 2：注册并启动微信渠道
         gateway.registerChannel(weixinChannel);
