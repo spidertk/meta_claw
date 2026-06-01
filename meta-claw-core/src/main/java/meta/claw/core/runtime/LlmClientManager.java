@@ -1,7 +1,7 @@
 package meta.claw.core.runtime;
 
 import lombok.extern.slf4j.Slf4j;
-import meta.claw.core.config.ProviderConfig;
+import meta.claw.core.infra.config.ProviderConfig;
 import meta.claw.core.llm.SpiChatRequest;
 import meta.claw.core.llm.SpiChatResponse;
 import meta.claw.core.llm.SpiLlmClient;
@@ -11,7 +11,7 @@ import meta.claw.core.llm.provider.LlmClientProviderManager;
 import meta.claw.core.memory.MemoryMessage;
 import meta.claw.core.memory.MemoryMessageConverter;
 import meta.claw.core.tool.registry.ToolRegistry;
-import meta.claw.core.vessel.VesselConfigResolver;
+import meta.claw.core.runtime.config.RuntimeConfigResolver;
 import meta.claw.core.llm.SpiUsage;
 import meta.claw.core.tool.SpiToolCall;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -45,13 +45,13 @@ public class LlmClientManager implements SpiLlmClient {
     @Autowired
     private LlmClientProviderManager llmClientProviderManager;
     @Autowired
-    private VesselConfigResolver vesselConfigResolver;
+    private RuntimeConfigResolver runtimeConfigResolver;
 
     @Autowired
     private ToolRegistry toolRegistry;
 
     private ChatClient buildChatClient(String vesselName) {
-        ProviderConfig providerConfig = vesselConfigResolver.loadProviderConfig(vesselName);
+        ProviderConfig providerConfig = runtimeConfigResolver.resolve(vesselName).getProviderConfig();
         return llmClientProviderManager.create(providerConfig);
     }
 

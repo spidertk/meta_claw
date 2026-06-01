@@ -1,8 +1,8 @@
 package meta.claw.core.runtime;
 
 import lombok.extern.slf4j.Slf4j;
-import meta.claw.core.config.VesselConfigLoader;
-import meta.claw.core.config.VesselConfig;
+import meta.claw.core.user.VesselMetaLoader;
+import meta.claw.core.user.VesselMeta;
 import meta.claw.core.infra.path.ProjectRootFinder;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.ObjectProvider;
@@ -29,12 +29,12 @@ public class VesselManager implements InitializingBean {
     private ObjectProvider<VesselRuntime> vesselRuntime;
 
     @Autowired
-    private VesselConfigLoader vesselConfigLoader;
+    private VesselMetaLoader vesselMetaLoader;
 
     /**
      * 存储已加载的 Vessel 配置，key 为 vesselId
      */
-    private final ConcurrentHashMap<String, VesselConfig> vessels = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, VesselMeta> vessels = new ConcurrentHashMap<>();
 
     /**
      * 存储已注册的 Vessel 运行时实例，key 为 vesselId
@@ -56,11 +56,11 @@ public class VesselManager implements InitializingBean {
      * </p>
      */
     public void loadVessels() {
-        List<VesselConfig> loaded = vesselConfigLoader.loadFromDirectory(vesselsDir);
-        for (VesselConfig config : loaded) {
-            if (config.getId() != null && !config.getId().isEmpty()) {
-                vessels.put(config.getId(), config);
-                log.info("成功加载 Vessel 配置: {} ({})", config.getId(), config.getName());
+        List<VesselMeta> loaded = vesselMetaLoader.loadFromDirectory(vesselsDir);
+        for (VesselMeta meta : loaded) {
+            if (meta.getMeta().getId() != null && !meta.getMeta().getId().isEmpty()) {
+                vessels.put(meta.getMeta().getId(), meta);
+                log.info("Loaded vessel config: {} ({})", meta.getMeta().getId(), meta.getMeta().getName());
             }
         }
     }
@@ -71,7 +71,7 @@ public class VesselManager implements InitializingBean {
      * @param vesselId Vessel 唯一标识
      * @return VesselConfig 实例，若不存在则返回 null
      */
-    public VesselConfig getConfig(String vesselId) {
+    public VesselMeta getConfig(String vesselId) {
         return vessels.get(vesselId);
     }
 
@@ -101,7 +101,7 @@ public class VesselManager implements InitializingBean {
      *
      * @return VesselConfig 列表
      */
-    public List<VesselConfig> listAvailableVessels() {
+    public List<VesselMeta> listAvailableVessels() {
         return Collections.unmodifiableList(List.copyOf(vessels.values()));
     }
 
@@ -118,8 +118,8 @@ public class VesselManager implements InitializingBean {
     @Override
     public void afterPropertiesSet() throws Exception {
         loadVessels();
-        for (VesselConfig config : listAvailableVessels()) {
-           registerRuntime(config.getId());
+        for (VesselMeta meta : listAvailableVessels()) {
+           registerRuntime(meta.getMeta().getId());
         }
     }
 }

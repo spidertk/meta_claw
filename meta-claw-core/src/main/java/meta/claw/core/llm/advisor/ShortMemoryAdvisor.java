@@ -3,7 +3,7 @@ package meta.claw.core.llm.advisor;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
-import meta.claw.core.config.MemoryConfig;
+import meta.claw.core.infra.config.MemoryConfig;
 import meta.claw.core.memory.MemoryMessage;
 import meta.claw.core.memory.shortterm.ShortMemoryFactory;
 import meta.claw.core.runtime.VesselManager;

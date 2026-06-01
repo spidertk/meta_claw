@@ -1,7 +1,7 @@
 package meta.claw.core.llm.provider;
 
 import lombok.extern.slf4j.Slf4j;
-import meta.claw.core.config.ProviderConfig;
+import meta.claw.core.infra.config.ProviderConfig;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.beans.BeansException;
 import org.springframework.context.ApplicationContext;

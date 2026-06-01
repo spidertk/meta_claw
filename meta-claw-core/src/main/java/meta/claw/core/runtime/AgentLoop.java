@@ -8,7 +8,7 @@ import meta.claw.core.events.UserMessageReceived;
 import meta.claw.core.message.Context;
 import meta.claw.core.message.Reply;
 import meta.claw.core.message.ReplyType;
-import meta.claw.core.config.VesselConfig;
+import meta.claw.core.user.VesselMeta;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -124,13 +124,13 @@ public class AgentLoop {
      */
     public String determineTargetVessel() {
         // 获取所有已加载的 Vessel 配置列表
-        List<VesselConfig> availableVessels = vesselManager.listAvailableVessels();
+        List<VesselMeta> availableVessels = vesselManager.listAvailableVessels();
         if (availableVessels == null || availableVessels.isEmpty()) {
             log.debug("当前系统中没有可用的 Vessel");
             return null;
         }
         // 返回列表中的第一个 Vessel 的 ID
-        String firstVesselId = availableVessels.get(0).getId();
+        String firstVesselId = availableVessels.get(0).getMeta().getId();
         log.debug("路由策略选择 Vessel: {}", firstVesselId);
         return firstVesselId;
     }
