@@ -11,6 +11,10 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Map;
 
+/**
+ * @deprecated Use {@link meta.claw.core.user.VesselInitializer} instead.
+ */
+@Deprecated
 @Slf4j
 @Component
 public class VesselTemplate {
