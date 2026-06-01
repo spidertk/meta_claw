@@ -1,15 +1,10 @@
-package meta.claw.core.config;
+package meta.claw.core.infra.config;
 
 import lombok.Getter;
 import lombok.Setter;
 
 import java.util.Map;
 
-/**
- * 全局配置模型，映射 ~/.meta-claw/config.yaml。
- * @deprecated Use {@link meta.claw.core.infra.config.GlobalConfig} instead.
- */
-@Deprecated
 @Getter
 @Setter
 public class GlobalConfig {

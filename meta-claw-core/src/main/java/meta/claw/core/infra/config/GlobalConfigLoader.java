@@ -1,10 +1,8 @@
-package meta.claw.core.config;
+package meta.claw.core.infra.config;
 
 import lombok.extern.slf4j.Slf4j;
-import meta.claw.core.config.GlobalConfig;
-import meta.claw.core.config.ProviderConfig;
-import org.yaml.snakeyaml.Yaml;
 import org.springframework.stereotype.Component;
+import org.yaml.snakeyaml.Yaml;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -12,10 +10,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
 
-/**
- * @deprecated Use {@link meta.claw.core.infra.config.GlobalConfigLoader} instead.
- */
-@Deprecated
 @Slf4j
 @Component
 public class GlobalConfigLoader {
@@ -26,18 +20,18 @@ public class GlobalConfigLoader {
     public GlobalConfig load(Path baseDir) {
         Path file = baseDir.resolve(CONFIG_FILE);
         if (!Files.exists(file)) {
-            log.warn("全局配置文件不存在: {}", file);
+            log.warn("Global config file not found: {}", file);
             return null;
         }
         try (InputStream input = Files.newInputStream(file)) {
             Map<String, Object> map = yaml.load(input);
             if (map == null) {
-                log.warn("配置文件为空: {}", file);
+                log.warn("Config file is empty: {}", file);
                 return null;
             }
             return mapToConfig(map);
         } catch (IOException e) {
-            log.error("加载全局配置失败: {}", file, e);
+            log.error("Failed to load global config: {}", file, e);
             return null;
         }
     }
