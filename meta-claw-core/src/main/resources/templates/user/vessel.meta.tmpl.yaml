@@ -1,0 +1,30 @@
+# Meta-Claw Vessel v1.0
+
+meta:
+  id: {name}
+  name: {name}
+  description: {description}
+  created_at: {created_at}
+  display_name: ~
+  emoji: 🤖
+
+llm:
+  provider: openapi
+  model: ~
+  overrides:
+    api_key: ~
+    base_url: ~
+    temperature: ~
+    timeout: ~
+
+runtime:
+  role: member
+  auto_serve: false
+
+memory:
+  preferences_enabled: true
+  short_term_store: jsonl
+  long_term_store: file
+
+tools:
+  exclude: []

@@ -7,8 +7,8 @@ import java.nio.charset.StandardCharsets;
 
 @Component
 public class TemplateLoader {
-    private static final String SYSTEM_TEMPLATE = "templates/system.tmpl.md";
-    private static final String CONTEXT_TEMPLATE = "templates/context.tmpl.md";
+    private static final String SYSTEM_TEMPLATE = "templates/runtime/system.tmpl.md";
+    private static final String CONTEXT_TEMPLATE = "templates/runtime/context.tmpl.md";
 
     private String systemTemplate;
     private String contextTemplate;
