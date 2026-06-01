@@ -1,13 +1,8 @@
-package meta.claw.core.config;
+package meta.claw.core.infra.config;
 
 import lombok.Getter;
 import lombok.Setter;
 
-/**
- * Provider 配置模型，对应 config.yaml 中 providers.<name> 下的字段。
- * @deprecated Use {@link meta.claw.core.infra.config.ProviderConfig} instead.
- */
-@Deprecated
 @Getter
 @Setter
 public class ProviderConfig {

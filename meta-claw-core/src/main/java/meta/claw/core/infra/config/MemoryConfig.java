@@ -1,13 +1,8 @@
-package meta.claw.core.config;
+package meta.claw.core.infra.config;
 
 import lombok.Getter;
 import lombok.Setter;
 
-/**
- * Memory backend 配置。
- * @deprecated Use {@link meta.claw.core.infra.config.MemoryConfig} instead.
- */
-@Deprecated
 @Getter
 @Setter
 public class MemoryConfig {
