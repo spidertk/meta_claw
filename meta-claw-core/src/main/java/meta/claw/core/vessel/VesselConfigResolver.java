@@ -15,6 +15,10 @@ import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+/**
+ * @deprecated Use {@link meta.claw.core.runtime.config.RuntimeConfigResolver} instead.
+ */
+@Deprecated
 @Slf4j
 @Component
 public class VesselConfigResolver {
