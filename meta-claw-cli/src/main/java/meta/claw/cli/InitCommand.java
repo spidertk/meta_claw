@@ -1,7 +1,7 @@
 package meta.claw.cli;
 
-import meta.claw.core.vessel.ProjectRootFinder;
-import meta.claw.core.vessel.VesselTemplate;
+import meta.claw.core.infra.path.ProjectRootFinder;
+import meta.claw.core.user.VesselInitializer;
 import org.springframework.stereotype.Component;
 import picocli.CommandLine.Command;
 
@@ -16,10 +16,10 @@ import java.nio.file.Path;
 public class InitCommand implements Runnable {
 
     private static final String GLOBAL_CONFIG_TEMPLATE = "/templates/global-config.tmpl.yaml";
-    private final VesselTemplate vesselTemplate;
+    private final VesselInitializer vesselInitializer;
 
-    public InitCommand(VesselTemplate vesselTemplate) {
-        this.vesselTemplate = vesselTemplate;
+    public InitCommand(VesselInitializer vesselInitializer) {
+        this.vesselInitializer = vesselInitializer;
     }
 
     @Override
@@ -32,7 +32,7 @@ public class InitCommand implements Runnable {
             Files.createDirectories(baseDir.resolve("skills"));
 
             // Create default vessel
-            vesselTemplate.createDefaultVessel(baseDir.resolve("vessels"));
+            vesselInitializer.createDefaultVessel(baseDir.resolve("vessels"));
 
             // Create config.yaml from template if not exists
             Path configFile = baseDir.resolve("config.yaml");

@@ -1,6 +1,6 @@
 {
   "project": "meta-claw",
-  "last_updated": "2026-05-27",
+  "last_updated": "2026-05-30",
   "rules": {
     "single_active_feature": true,
     "passing_requires_evidence": true,

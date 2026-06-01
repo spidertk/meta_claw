@@ -1,0 +1,18 @@
+# Meta-Claw Global Config v1.0
+# 此文件为全局配置，所有 Vessel 默认继承此文件中的 provider 设置。
+# Vessel 级覆盖请编辑 vessels/<name>/vessel.meta.yaml 的 llm.overrides 部分。
+
+# 默认使用的 provider 名称（对应 providers 下的某个 key）
+default_provider: openai
+
+# Provider 配置列表
+providers:
+  openai:
+    api_key: "your-api-key"
+    base_url: "https://api.openai.com/v1"
+    model: "gpt-4o"
+    temperature: 0.7
+    timeout: 30.0
+
+# 是否开启 DEBUG 级别日志（仅 meta.claw 包）
+log.debug: false

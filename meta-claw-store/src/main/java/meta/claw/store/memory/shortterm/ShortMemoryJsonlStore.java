@@ -14,7 +14,7 @@ import meta.claw.core.memory.SessionMemory;
 import meta.claw.core.memory.shortterm.SessionSelection;
 import meta.claw.core.memory.shortterm.ShortMemory;
 import meta.claw.core.llm.SpiMessage;
-import meta.claw.core.util.ProjectRootFinder;
+import meta.claw.core.infra.path.ProjectRootFinder;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;

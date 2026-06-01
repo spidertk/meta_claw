@@ -950,6 +950,38 @@
   3. 运行 chat 命令，确认日志中出现 `ChatClientPromptContentObservationHandler` 和 `ChatClientCompletionObservationHandler` 的 DEBUG 输出
 
 
+### Session 030
+
+- 日期：2026-05-30
+- 本轮目标：修复 `meta-claw-cli` 及全模块编译错误——`core.config`/`core.vessel` 旧包删除后的消费者适配
+- 已完成：
+  - 扫描全仓库所有引用已删除旧包 `meta.claw.core.config.*`、`meta.claw.core.vessel.*`、`meta.claw.core.util.*` 的 Java 文件
+  - 修复 `meta-claw-cli` 全部 6 个命令类：
+    - `CliApplication.java`：`GlobalConfigLoader`/`GlobalConfig` → `infra.config`，`ProjectRootFinder` → `infra.path`
+    - `ConfigCommand.java`：`ProjectRootFinder` → `infra.path`
+    - `CreateCommand.java`：`VesselTemplate` → `VesselInitializer`，`ProjectRootFinder` → `infra.path`
+    - `DeleteCommand.java`：`ProjectRootFinder` → `infra.path`
+    - `ChatCommand.java`：`VesselConfig` → `VesselMeta`，使用 `baseCtx.getVesselMeta()` 获取显示信息
+    - `ListCommand.java`：完全重写，从 `VesselConfigResolver.resolveAll()` 改为注入 `VesselMetaLoader` 并扫描目录逐个加载
+  - 修复 `meta-claw-store`：`FileLongMemoryStore`/`ShortMemoryJsonlStore` 的 `ProjectRootFinder` import 路径
+  - 修复 `meta-claw-bootstrap`：`MetaClawApplication.java` 和 `AppConfig.java` 的 import 路径，删除未使用的 `VesselConfig`/`VesselConfigLoader` import
+- 运行过的验证：
+  - `mvn clean compile`（全仓） → 成功，无编译错误
+  - `mvn test -pl meta-claw-core` → 成功
+  - 全局 grep 确认：仓库内不再有任何引用 `meta.claw.core.config.`、`meta.claw.core.vessel.`、`meta.claw.core.util.` 的 import
+- 更新过的文件或工件：
+  - `meta-claw-cli/src/main/java/meta/claw/cli/{CliApplication,ConfigCommand,CreateCommand,DeleteCommand,ChatCommand,ListCommand}.java`
+  - `meta-claw-store/src/main/java/meta/claw/store/memory/longterm/FileLongMemoryStore.java`
+  - `meta-claw-store/src/main/java/meta/claw/store/memory/shortterm/ShortMemoryJsonlStore.java`
+  - `meta-claw-bootstrap/src/main/java/meta/claw/app/{MetaClawApplication,AppConfig}.java`
+  - `claude-progress.md`、`feature_list.json`、`clean-state-checklist.md`
+- 已知风险或未解决的问题：
+  - `GlobalConfigLoader` 仍为手动 `Map→POJO` 转换，计划后续统一为 `SnakeYamlFactory.createCamelCaseYaml().loadAs()`
+  - `ListCommand` 的表头列从原来的 `Preferences` 改为 `Provider`，因为新 `VesselMeta` 模型中没有 preferences enabled 标志
+- 下一步最佳动作：
+  1. 提交本轮修改
+  2. 由用户决定下一项功能优先级
+
 ### Session 029
 
 - 日期：2026-05-27

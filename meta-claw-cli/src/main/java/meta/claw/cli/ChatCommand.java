@@ -1,7 +1,6 @@
 package meta.claw.cli;
 
 import lombok.extern.slf4j.Slf4j;
-import meta.claw.core.config.VesselConfig;
 import meta.claw.core.memory.shortterm.SessionSelection;
 
 import meta.claw.core.prompt.PromptContext;
@@ -80,11 +79,15 @@ public class ChatCommand implements Runnable {
             System.err.println(e.getMessage());
             return;
         }
-        VesselConfig vesselConfig = baseCtx.getVesselConfig();
-
-        String displayName = vesselConfig.getName() != null ? vesselConfig.getName() : vesselName;
-        String emoji = vesselConfig.getEmoji() != null ? vesselConfig.getEmoji() : "🤖";
-        String description = vesselConfig.getDescription() != null ? vesselConfig.getDescription() : "A general-purpose AI assistant.";
+        meta.claw.core.user.VesselMeta vesselMeta = baseCtx.getVesselMeta();
+        String displayName = vesselMeta != null && vesselMeta.getMeta() != null && vesselMeta.getMeta().getDisplayName() != null
+                ? vesselMeta.getMeta().getDisplayName()
+                : (vesselMeta != null && vesselMeta.getMeta() != null && vesselMeta.getMeta().getName() != null
+                        ? vesselMeta.getMeta().getName() : vesselName);
+        String emoji = vesselMeta != null && vesselMeta.getMeta() != null && vesselMeta.getMeta().getEmoji() != null
+                ? vesselMeta.getMeta().getEmoji() : "🤖";
+        String description = vesselMeta != null && vesselMeta.getMeta() != null && vesselMeta.getMeta().getDescription() != null
+                ? vesselMeta.getMeta().getDescription() : "A general-purpose AI assistant.";
 
         terminal.writer().println();
         terminal.writer().println("╔══════════════════════════════════════════════════════════════════╗");

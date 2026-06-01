@@ -1,9 +1,9 @@
 package meta.claw.app;
 
-import meta.claw.core.config.GlobalConfigLoader;
+import meta.claw.core.infra.config.GlobalConfigLoader;
 import meta.claw.core.runtime.VesselRuntime;
-import meta.claw.core.vessel.ProjectRootFinder;
-import meta.claw.core.config.GlobalConfig;
+import meta.claw.core.infra.path.ProjectRootFinder;
+import meta.claw.core.infra.config.GlobalConfig;
 import meta.claw.gateway.Gateway;
 import meta.claw.gateway.weixin.WeixinChannel;
 import meta.claw.core.runtime.AgentLoop;

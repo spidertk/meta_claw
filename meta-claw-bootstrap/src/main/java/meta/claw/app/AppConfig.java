@@ -1,7 +1,7 @@
 package meta.claw.app;
 
 import meta.claw.core.eventbus.EventBusWrapper;
-import meta.claw.core.util.ProjectRootFinder;
+import meta.claw.core.infra.path.ProjectRootFinder;
 import meta.claw.gateway.Gateway;
 import meta.claw.gateway.channel.ChannelRegistry;
 import meta.claw.gateway.weixin.WeixinChannel;
@@ -9,8 +9,6 @@ import meta.claw.gateway.weixin.WeixinConfig;
 import meta.claw.core.runtime.AgentLoop;
 import meta.claw.core.runtime.VesselManager;
 import meta.claw.core.runtime.VesselRuntime;
-import meta.claw.core.config.VesselConfig;
-import meta.claw.core.config.VesselConfigLoader;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;

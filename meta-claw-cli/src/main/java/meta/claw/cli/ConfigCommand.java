@@ -10,7 +10,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import meta.claw.core.vessel.ProjectRootFinder;
+import meta.claw.core.infra.path.ProjectRootFinder;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.regex.Matcher;

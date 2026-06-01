@@ -1,7 +1,7 @@
 package meta.claw.cli;
 
-import meta.claw.core.vessel.ProjectRootFinder;
-import meta.claw.core.vessel.VesselTemplate;
+import meta.claw.core.infra.path.ProjectRootFinder;
+import meta.claw.core.user.VesselInitializer;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import picocli.CommandLine.Command;
@@ -21,7 +21,7 @@ import java.nio.file.Path;
 @Command(name = "create", description = "Create a new vessel")
 public class CreateCommand implements Runnable {
     @Autowired
-    private  VesselTemplate vesselTemplate;
+    private  VesselInitializer vesselInitializer;
 
 
     @Parameters(index = "0", description = "Vessel name")
@@ -40,7 +40,7 @@ public class CreateCommand implements Runnable {
         }
 
         try {
-            vesselTemplate.createVessel(vesselsDir, vesselName,
+            vesselInitializer.createVessel(vesselsDir, vesselName,
                     description != null ? description : "A customized AI vessel for specific tasks.");
             System.out.println("Created vessel: " + vesselName);
             System.out.println("Edit .meta-claw/vessels/" + vesselName + "/vessel.md to customize.");
