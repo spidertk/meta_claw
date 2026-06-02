@@ -1017,6 +1017,41 @@
   1. 提交本轮修改
   2. 由用户决定下一项功能优先级
 
+### Session 032
+
+- 日期：2026-05-30
+- 本轮目标：按设计方案实施 Prompt 架构重构（配置即 Prompt）
+- 已完成：
+  - **Phase 1**：新增 `VesselConfigBundle` 统一配置视图，接入 `PromptContextFactory`
+    - 合并 `VesselMeta` + `VesselProfile` + `RuntimeConfig` 为一个只读访问入口
+    - `PromptContext` 新增 `bundle` 字段，保留旧字段兼容期
+    - `PromptContextFactory` 注入 `VesselProfileLoader`，同时加载 profile
+  - **Phase 2**：新增 `PromptRenderer` 替换 `PromptAssembler` + `PromptRuntimeBuilder`
+    - 模板语法从 `<SECTION id="xxx"/>` 统一为 `{xxx}` 占位符
+    - `VesselRuntime` 改为注入 `PromptRenderer`
+    - `PromptContextFactory` 直接生成 `currentTime` + `location` 运行时数据
+  - **Phase 3**：删除废弃类，清理死字段
+    - 删除 `SectionRegistry` 枚举、`SectionResolver` 接口及 4 个实现
+    - 删除 `ResolutionContext`、`PromptAssembler`、`PromptRuntimeBuilder`
+    - 删除 `PromptAssemblerTest`
+    - 清理 `PromptContext` 死字段（identity/soul/capabilities/guidelines/knowledge 等）
+    - `ChatCommand`、`LlmClientManager`、`VesselRuntime` 全部改为通过 `bundle` 访问配置
+- 运行过的验证：
+  - `mvn clean compile`（全仓） → 成功，零编译错误
+  - `mvn test`（全仓） → 全部通过
+- 更新过的文件或工件：
+  - 新增：`VesselConfigBundle.java`、`PromptRenderer.java`
+  - 修改：`PromptContext.java`、`PromptContextFactory.java`、`VesselRuntime.java`、`ChatCommand.java`、`LlmClientManager.java`、模板文件
+  - 删除：`SectionRegistry.java`、`SectionResolver.java` + 4 实现、`ResolutionContext.java`、`PromptAssembler.java`、`PromptRuntimeBuilder.java`、`PromptAssemblerTest.java`
+  - 设计文档：`docs/superpowers/specs/2026-05-30-prompt-architecture-redesign.md`
+  - 状态文件：`claude-progress.md`、`clean-state-checklist.md`
+- 已知风险或未解决的问题：
+  - 当前无新增 blocker
+  - `Loader` = 文件 → POJO；`Resolver` = 多源配置合并 → 运行时对象。两者分别位于 `config.loader` 和 `config.resolver` 子包，关系已澄清。
+- 下一步最佳动作：
+  1. 提交本轮修改
+  2. 由用户决定下一项功能优先级
+
 ### Session 029
 
 - 日期：2026-05-27

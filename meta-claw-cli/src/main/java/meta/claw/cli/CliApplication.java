@@ -1,6 +1,6 @@
 package meta.claw.cli;
 
-import meta.claw.core.config.GlobalConfigLoader;
+import meta.claw.core.config.loader.GlobalConfigLoader;
 import meta.claw.core.runtime.VesselManager;
 import meta.claw.core.runtime.VesselRuntime;
 import meta.claw.core.infra.ProjectRootFinder;

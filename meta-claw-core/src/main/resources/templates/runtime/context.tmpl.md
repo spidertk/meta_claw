@@ -1,9 +1,8 @@
-<!-- Meta-Claw Context Prompt Template v1.0 -->
+{workspace}
 
 ## Runtime Context
 
-<SECTION id="workspace"/>
+- Current Time: {current_time}
+- Location: {location}
 
-<SECTION id="runtime"/>
-
-<SECTION id="preferences"/>
+{preferences}

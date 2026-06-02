@@ -2,7 +2,7 @@ package meta.claw.cli;
 
 import meta.claw.core.infra.ProjectRootFinder;
 import meta.claw.core.config.VesselMeta;
-import meta.claw.core.config.VesselMetaLoader;
+import meta.claw.core.config.loader.VesselMetaLoader;
 import org.springframework.stereotype.Component;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;

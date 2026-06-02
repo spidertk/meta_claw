@@ -1,6 +1,8 @@
-package meta.claw.core.config;
+package meta.claw.core.config.loader;
 
 import lombok.extern.slf4j.Slf4j;
+import meta.claw.core.config.GlobalConfig;
+import meta.claw.core.infra.SnakeYamlFactory;
 import org.springframework.stereotype.Component;
 import org.yaml.snakeyaml.Yaml;
 

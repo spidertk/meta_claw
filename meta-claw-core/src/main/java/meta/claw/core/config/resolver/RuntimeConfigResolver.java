@@ -1,12 +1,15 @@
-package meta.claw.core.config;
+package meta.claw.core.config.resolver;
 
 import lombok.extern.slf4j.Slf4j;
+import meta.claw.core.config.GlobalConfig;
+import meta.claw.core.config.ProviderConfig;
+import meta.claw.core.config.RuntimeConfig;
+import meta.claw.core.config.VesselMeta;
+import meta.claw.core.config.loader.GlobalConfigLoader;
 import meta.claw.core.exception.ErrorCode;
 import meta.claw.core.exception.VesselException;
-import meta.claw.core.config.*;
 import meta.claw.core.infra.ProjectRootFinder;
-import meta.claw.core.config.VesselMeta;
-import meta.claw.core.config.VesselMetaLoader;
+import meta.claw.core.config.loader.VesselMetaLoader;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;

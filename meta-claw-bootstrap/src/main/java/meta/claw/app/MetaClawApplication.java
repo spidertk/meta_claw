@@ -1,6 +1,6 @@
 package meta.claw.app;
 
-import meta.claw.core.config.GlobalConfigLoader;
+import meta.claw.core.config.loader.GlobalConfigLoader;
 import meta.claw.core.runtime.VesselRuntime;
 import meta.claw.core.infra.ProjectRootFinder;
 import meta.claw.core.config.GlobalConfig;
@@ -8,7 +8,6 @@ import meta.claw.gateway.Gateway;
 import meta.claw.gateway.weixin.WeixinChannel;
 import meta.claw.core.runtime.AgentLoop;
 import meta.claw.core.runtime.VesselManager;
-import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;

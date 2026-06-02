@@ -4,32 +4,26 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import java.nio.file.Path;
+import meta.claw.core.config.VesselConfigBundle;
 
-
-import meta.claw.core.config.MemoryConfig;
-import meta.claw.core.config.ProviderConfig;
-import meta.claw.core.config.VesselMeta;
 @Getter
 @Builder(toBuilder = true)
 @NoArgsConstructor
 @AllArgsConstructor
 public class PromptContext {
-    private Path vesselsDir;
-    private String vesselName;
-    private String vesselDescription;
-    private String identity;
-    private String soul;
-    private String capabilities;
-    private String guidelines;
 
-    @Builder.Default
-    private String knowledge = "";
+    /**
+     * 统一配置视图。所有配置访问都委托给 bundle。
+     */
+    private VesselConfigBundle bundle;
 
-    private Path workspaceDir;
+    /**
+     * 运行时动态数据：当前时间（渲染时刻生成）
+     */
+    private String currentTime;
 
-
-    private MemoryConfig memoryConfig;
-    private ProviderConfig providerConfig;
-    private VesselMeta vesselMeta;
+    /**
+     * 运行时动态数据：当前时区位置
+     */
+    private String location;
 }

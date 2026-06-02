@@ -1,5 +1,6 @@
 package meta.claw.core.config;
 
+import meta.claw.core.config.loader.VesselMetaLoader;
 import meta.claw.core.exception.VesselException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;

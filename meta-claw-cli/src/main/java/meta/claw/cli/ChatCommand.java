@@ -67,10 +67,10 @@ public class ChatCommand implements Runnable {
         }
 
 
-        log.info("Using provider: {}", baseCtx.getProviderConfig());
+        log.info("Using provider: {}", baseCtx.getBundle().getProviderConfig());
         log.info("Provider config - baseUrl: {}, model: {}",
-                baseCtx.getProviderConfig().getBaseUrl(),
-                baseCtx.getProviderConfig().getModel());
+                baseCtx.getBundle().getProviderConfig().getBaseUrl(),
+                baseCtx.getBundle().getProviderConfig().getModel());
 
         SessionSelection  sessionSelection;
         try {
@@ -79,7 +79,7 @@ public class ChatCommand implements Runnable {
             System.err.println(e.getMessage());
             return;
         }
-        meta.claw.core.config.VesselMeta vesselMeta = baseCtx.getVesselMeta();
+        meta.claw.core.config.VesselMeta vesselMeta = baseCtx.getBundle().getRuntimeVesselMeta();
         String displayName = vesselMeta != null && vesselMeta.getMeta() != null && vesselMeta.getMeta().getDisplayName() != null
                 ? vesselMeta.getMeta().getDisplayName()
                 : (vesselMeta != null && vesselMeta.getMeta() != null && vesselMeta.getMeta().getName() != null
@@ -96,8 +96,8 @@ public class ChatCommand implements Runnable {
         terminal.writer().println("║                                                                  ║");
         terminal.writer().println(String.format("║   %-60s ║", description));
         terminal.writer().println("║                                                                  ║");
-        terminal.writer().println(String.format("║   Model: %-54s ║", baseCtx.getProviderConfig().getModel()));
-        terminal.writer().println(String.format("║   Provider: %-51s ║", baseCtx.getProviderConfig().getProvider()));
+        terminal.writer().println(String.format("║   Model: %-54s ║", baseCtx.getBundle().getProviderConfig().getModel()));
+        terminal.writer().println(String.format("║   Provider: %-51s ║", baseCtx.getBundle().getProviderConfig().getProvider()));
         terminal.writer().println("║                                                                  ║");
         terminal.writer().println("╚══════════════════════════════════════════════════════════════════╝");
         terminal.writer().println();

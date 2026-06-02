@@ -16,7 +16,7 @@ import meta.claw.core.message.ReplyType;
 import meta.claw.core.config.VesselMeta;
 import meta.claw.core.prompt.PromptContext;
 import meta.claw.core.prompt.PromptContextFactory;
-import meta.claw.core.prompt.PromptRuntimeBuilder;
+import meta.claw.core.prompt.PromptRenderer;
 import org.apache.commons.lang3.StringUtils;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -42,7 +42,7 @@ public class VesselRuntime {
     @Autowired
     private PromptContextFactory promptContextManager;
     @Autowired
-    private PromptRuntimeBuilder systemPromptBuilder;
+    private PromptRenderer promptRenderer;
     @Autowired
     private LlmClientManager llmClient;
     @Autowired
@@ -71,21 +71,21 @@ public class VesselRuntime {
      * 便捷方法：获取当前 Vessel 的短期记忆
      */
     public ShortMemory getShortMemory() {
-        return shortMemory.get(promptContext.getMemoryConfig().getShortTermStore());
+        return shortMemory.get(promptContext.getBundle().getMemoryConfig().getShortTermStore());
     }
 
     /**
      * 便捷方法：获取当前 Vessel 的长期记忆
      */
     public LongMemory getLongMemory() {
-        return longMemory.get(promptContext.getMemoryConfig().getLongTermStore());
+        return longMemory.get(promptContext.getBundle().getMemoryConfig().getLongTermStore());
     }
 
     /**
      * 获取 Vessel 配置
      */
     public VesselMeta getConfig() {
-        return promptContext.getVesselMeta();
+        return promptContext.getBundle().getRuntimeVesselMeta();
     }
     /**
      * 将用户消息转换成 ChatClient 所需的格式。
@@ -99,7 +99,7 @@ public class VesselRuntime {
             messages.add(SpiMessage.system(systemPrompt));
         }
         if (StringUtils.isNotBlank(sessionId)){
-            messages.addAll(toSpiMessages(getShortMemory().loadMessages( vesselId, sessionId,promptContext.getVesselMeta().getMaxHistoryRounds())));
+            messages.addAll(toSpiMessages(getShortMemory().loadMessages( vesselId, sessionId,promptContext.getBundle().getMaxHistoryRounds())));
         }
         messages.add(SpiMessage.user(userMessage));
         getShortMemory().appendMessage(  vesselId, sessionId,
@@ -112,7 +112,7 @@ public class VesselRuntime {
 
         try {
             PromptContext ctx = promptContextManager.create(vesselId);
-            return systemPromptBuilder.build(ctx);
+            return promptRenderer.renderSystem(ctx);
         } catch (Exception e) {
             log.warn("Failed to build system prompt for vessel {}: {}", vesselId, e.getMessage());
             return null;

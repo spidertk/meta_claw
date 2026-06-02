@@ -1,18 +1,18 @@
 # 干净状态检查清单
 
 > 最后核对：2026-05-30
-> 结论：全仓编译通过，包结构已按域重新划分，仓库可按约定重新开始工作。
+> 结论：全仓编译通过，Prompt 架构已重构为"配置即 Prompt"，仓库可按约定重新开始工作。
 
 - [x] 标准启动路径仍然可用
   证据：2026-05-30 执行 `mvn clean compile`（全仓）成功，无编译错误
 - [x] 标准验证路径仍然可运行
   证据：`mvn test`（全仓）全部通过
 - [x] 当前进度已经记录到进度日志
-  证据：`claude-progress.md` 已新增 Session 031，记录包结构重构
+  证据：`claude-progress.md` 已新增 Session 032，记录 Prompt 架构重构
 - [x] 功能状态真实反映了 passing 和未验证的边界
   证据：`feature_list.json` last_updated 已更新至 2026-05-30
 - [x] 没有任何半成品步骤处于未记录状态
-  证据：配置域/用户域/Prompt域/基础设施域已清晰划分，空包已删除
+  证据：Phase 1/2/3 全部完成，VesselConfigBundle/PromptRenderer 已落地，废弃类已删除
 - [x] 下一轮会话无需人工修复即可继续
   证据：下一轮可直接运行 `./init.sh`（或 `mvn clean compile`），再进入下一个已记录功能
 

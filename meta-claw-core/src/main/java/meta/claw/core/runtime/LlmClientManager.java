@@ -11,7 +11,7 @@ import meta.claw.core.llm.provider.LlmClientProviderManager;
 import meta.claw.core.memory.MemoryMessage;
 import meta.claw.core.memory.MemoryMessageConverter;
 import meta.claw.core.tool.registry.ToolRegistry;
-import meta.claw.core.config.RuntimeConfigResolver;
+import meta.claw.core.config.resolver.RuntimeConfigResolver;
 import meta.claw.core.llm.SpiUsage;
 import meta.claw.core.tool.SpiToolCall;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -79,7 +79,7 @@ public class LlmClientManager implements SpiLlmClient {
 
     @Override
     public SpiChatResponse chat(SpiChatRequest request) {
-        log.debug("LlmClientManager chat vessel={}, messages={}", request.getCtx().getVesselName(), request.getMessages().size());
+        log.debug("LlmClientManager chat vessel={}, messages={}", request.getCtx().getBundle().getVesselName(), request.getMessages().size());
 
         List<Message> messages = request.getMessages().stream()
                 .map(this::toSpringMessage)
@@ -88,7 +88,7 @@ public class LlmClientManager implements SpiLlmClient {
         List<Object> toolInstances = toolRegistry.getToolInstances();
         logRequestParams(messages, toolInstances);
 
-        ChatResponse chatResponse = buildChatClient(request.getCtx().getVesselName())
+        ChatResponse chatResponse = buildChatClient(request.getCtx().getBundle().getVesselName())
                 .prompt(new Prompt(messages))
                 .tools(toolInstances.toArray())
                 .call()
@@ -127,13 +127,13 @@ public class LlmClientManager implements SpiLlmClient {
         logRequestParams(messages, toolInstances);
 
         try {
-            buildChatClient(request.getCtx().getVesselName())
+            buildChatClient(request.getCtx().getBundle().getVesselName())
                     .prompt(new Prompt(messages))
                     .tools(toolInstances.toArray())
                     .advisors(spec -> spec
-                            .param("vesselName", request.getCtx().getVesselName())
+                            .param("vesselName", request.getCtx().getBundle().getVesselName())
                             .param("sessionId", request.getSessionId())
-                            .param("memoryConfig", request.getCtx().getMemoryConfig()))
+                            .param("memoryConfig", request.getCtx().getBundle().getMemoryConfig()))
                     .stream()
                     .chatResponse()
                     .doOnNext(response -> {
