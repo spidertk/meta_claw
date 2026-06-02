@@ -1,7 +1,7 @@
 package meta.claw.core.prompt;
 
-import meta.claw.core.runtime.prompt.PromptAssembler;
-import meta.claw.core.runtime.prompt.resolver.ResolutionContext;
+import meta.claw.core.prompt.PromptAssembler;
+import meta.claw.core.prompt.resolver.ResolutionContext;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 

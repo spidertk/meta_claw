@@ -1,9 +1,9 @@
-package meta.claw.core.user;
+package meta.claw.core.config;
 
 import lombok.extern.slf4j.Slf4j;
 import meta.claw.core.exception.ErrorCode;
 import meta.claw.core.exception.VesselException;
-import meta.claw.core.infra.config.SnakeYamlFactory;
+import meta.claw.core.config.SnakeYamlFactory;
 import org.springframework.stereotype.Component;
 import org.yaml.snakeyaml.Yaml;
 

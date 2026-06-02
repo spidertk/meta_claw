@@ -6,7 +6,7 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import lombok.extern.slf4j.Slf4j;
 import meta.claw.core.memory.PreferenceMemory;
 import meta.claw.core.memory.longterm.LongMemory;
-import meta.claw.core.infra.path.ProjectRootFinder;
+import meta.claw.core.infra.ProjectRootFinder;
 
 import java.io.IOException;
 import java.nio.file.Files;

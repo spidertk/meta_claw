@@ -8,7 +8,7 @@ import meta.claw.core.events.UserMessageReceived;
 import meta.claw.core.message.Context;
 import meta.claw.core.message.Reply;
 import meta.claw.core.message.ReplyType;
-import meta.claw.core.user.VesselMeta;
+import meta.claw.core.config.VesselMeta;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 

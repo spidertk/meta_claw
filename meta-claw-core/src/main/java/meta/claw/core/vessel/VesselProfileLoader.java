@@ -1,4 +1,4 @@
-package meta.claw.core.user;
+package meta.claw.core.vessel;
 
 import lombok.extern.slf4j.Slf4j;
 import meta.claw.core.exception.ErrorCode;

@@ -1,9 +1,9 @@
 package meta.claw.core.prompt;
 
-import meta.claw.core.infra.path.ProjectRootFinder;
-import meta.claw.core.runtime.config.RuntimeConfig;
-import meta.claw.core.runtime.config.RuntimeConfigResolver;
-import meta.claw.core.user.VesselMeta;
+import meta.claw.core.infra.ProjectRootFinder;
+import meta.claw.core.config.RuntimeConfig;
+import meta.claw.core.config.RuntimeConfigResolver;
+import meta.claw.core.config.VesselMeta;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 

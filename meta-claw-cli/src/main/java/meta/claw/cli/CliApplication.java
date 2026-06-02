@@ -1,10 +1,10 @@
 package meta.claw.cli;
 
-import meta.claw.core.infra.config.GlobalConfigLoader;
+import meta.claw.core.config.GlobalConfigLoader;
 import meta.claw.core.runtime.VesselManager;
 import meta.claw.core.runtime.VesselRuntime;
-import meta.claw.core.infra.path.ProjectRootFinder;
-import meta.claw.core.infra.config.GlobalConfig;
+import meta.claw.core.infra.ProjectRootFinder;
+import meta.claw.core.config.GlobalConfig;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;

@@ -1,7 +1,7 @@
-package meta.claw.core.runtime.prompt.resolver;
+package meta.claw.core.prompt.resolver;
 
-import meta.claw.core.runtime.prompt.SectionRegistry;
-import meta.claw.core.user.VesselProfile;
+import meta.claw.core.prompt.SectionRegistry;
+import meta.claw.core.vessel.VesselProfile;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;

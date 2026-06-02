@@ -1,4 +1,4 @@
-package meta.claw.core.user;
+package meta.claw.core.vessel;
 
 import lombok.Builder;
 import lombok.Getter;

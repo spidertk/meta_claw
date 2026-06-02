@@ -1,7 +1,7 @@
 package meta.claw.core.memory.shortterm;
 
 import lombok.extern.slf4j.Slf4j;
-import meta.claw.core.infra.config.MemoryConfig;
+import meta.claw.core.config.MemoryConfig;
 import meta.claw.core.memory.MemoryMessage;
 import meta.claw.core.memory.SessionMemory;
 

@@ -13,7 +13,7 @@ import meta.claw.core.memory.shortterm.ShortMemory;
 import meta.claw.core.memory.shortterm.ShortMemoryFactory;
 import meta.claw.core.message.Reply;
 import meta.claw.core.message.ReplyType;
-import meta.claw.core.user.VesselMeta;
+import meta.claw.core.config.VesselMeta;
 import meta.claw.core.prompt.PromptContext;
 import meta.claw.core.prompt.PromptContextFactory;
 import meta.claw.core.prompt.PromptRuntimeBuilder;

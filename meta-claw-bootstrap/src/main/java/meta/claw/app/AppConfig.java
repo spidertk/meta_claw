@@ -1,7 +1,7 @@
 package meta.claw.app;
 
 import meta.claw.core.eventbus.EventBusWrapper;
-import meta.claw.core.infra.path.ProjectRootFinder;
+import meta.claw.core.infra.ProjectRootFinder;
 import meta.claw.gateway.Gateway;
 import meta.claw.gateway.channel.ChannelRegistry;
 import meta.claw.gateway.weixin.WeixinChannel;

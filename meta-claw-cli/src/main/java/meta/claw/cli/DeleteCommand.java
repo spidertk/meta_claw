@@ -8,7 +8,7 @@ import picocli.CommandLine.Parameters;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import meta.claw.core.infra.path.ProjectRootFinder;
+import meta.claw.core.infra.ProjectRootFinder;
 import java.util.Comparator;
 import java.util.Scanner;
 import java.util.stream.Stream;

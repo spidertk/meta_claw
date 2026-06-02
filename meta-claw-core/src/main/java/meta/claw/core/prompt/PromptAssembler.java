@@ -1,8 +1,8 @@
-package meta.claw.core.runtime.prompt;
+package meta.claw.core.prompt;
 
 import lombok.extern.slf4j.Slf4j;
-import meta.claw.core.runtime.prompt.resolver.ResolutionContext;
-import meta.claw.core.runtime.prompt.resolver.SectionResolver;
+import meta.claw.core.prompt.resolver.ResolutionContext;
+import meta.claw.core.prompt.resolver.SectionResolver;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 

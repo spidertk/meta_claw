@@ -1,9 +1,9 @@
-package meta.claw.core.runtime.prompt.resolver;
+package meta.claw.core.prompt.resolver;
 
 import lombok.Builder;
 import lombok.Getter;
-import meta.claw.core.user.VesselMeta;
-import meta.claw.core.user.VesselProfile;
+import meta.claw.core.config.VesselMeta;
+import meta.claw.core.vessel.VesselProfile;
 
 import java.nio.file.Path;
 

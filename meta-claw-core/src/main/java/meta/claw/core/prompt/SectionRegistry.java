@@ -1,4 +1,4 @@
-package meta.claw.core.runtime.prompt;
+package meta.claw.core.prompt;
 
 import lombok.Getter;
 

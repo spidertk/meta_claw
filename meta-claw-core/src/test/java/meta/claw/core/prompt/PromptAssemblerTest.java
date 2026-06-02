@@ -1,8 +1,8 @@
-package meta.claw.core.runtime.prompt;
+package meta.claw.core.prompt;
 
-import meta.claw.core.runtime.prompt.resolver.MetaSectionResolver;
-import meta.claw.core.runtime.prompt.resolver.ResolutionContext;
-import meta.claw.core.user.VesselMeta;
+import meta.claw.core.prompt.resolver.MetaSectionResolver;
+import meta.claw.core.prompt.resolver.ResolutionContext;
+import meta.claw.core.config.VesselMeta;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;

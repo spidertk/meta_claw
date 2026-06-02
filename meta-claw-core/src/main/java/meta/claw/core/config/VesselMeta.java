@@ -1,8 +1,8 @@
-package meta.claw.core.user;
+package meta.claw.core.config;
 
 import lombok.Getter;
 import lombok.Setter;
-import meta.claw.core.infra.config.MemoryConfig;
+import meta.claw.core.config.MemoryConfig;
 
 import java.util.List;
 

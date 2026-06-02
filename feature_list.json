@@ -1,6 +1,12 @@
 {
   "project": "meta-claw",
   "last_updated": "2026-05-30",
+  "package_structure": {
+    "config": "meta.claw.core.config — 所有配置模型 + 加载器 + 解析器",
+    "vessel": "meta.claw.core.vessel — Vessel 用户域（Profile + Initializer）",
+    "prompt": "meta.claw.core.prompt — 所有 Prompt 渲染",
+    "infra": "meta.claw.core.infra — 基础设施（ProjectRootFinder）"
+  },
   "rules": {
     "single_active_feature": true,
     "passing_requires_evidence": true,

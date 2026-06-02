@@ -1,7 +1,7 @@
 package meta.claw.cli;
 
-import meta.claw.core.infra.path.ProjectRootFinder;
-import meta.claw.core.user.VesselInitializer;
+import meta.claw.core.infra.ProjectRootFinder;
+import meta.claw.core.vessel.VesselInitializer;
 import org.springframework.stereotype.Component;
 import picocli.CommandLine.Command;
 

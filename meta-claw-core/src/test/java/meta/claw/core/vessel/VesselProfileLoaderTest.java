@@ -1,4 +1,4 @@
-package meta.claw.core.user;
+package meta.claw.core.vessel;
 
 import meta.claw.core.exception.VesselException;
 import org.junit.jupiter.api.Test;

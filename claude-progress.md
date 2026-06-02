@@ -982,6 +982,41 @@
   1. 提交本轮修改
   2. 由用户决定下一项功能优先级
 
+### Session 031
+
+- 日期：2026-05-30
+- 本轮目标：重新规划 meta-claw-core 配置相关类的包结构，按域聚合并澄清 Loader/Resolver 关系
+- 已完成：
+  - 按域重新划分包结构：
+    - `meta.claw.core.config` — 所有配置模型 + 加载 + 解析（合并自 `infra.config` + `runtime.config` + `user` 中的配置类）
+      - 模型：`GlobalConfig`, `ProviderConfig`, `MemoryConfig`, `VesselMeta`, `RuntimeConfig`
+      - 加载器：`GlobalConfigLoader`, `VesselMetaLoader`（负责文件 → POJO）
+      - 解析器：`RuntimeConfigResolver`（负责多源配置合并 → 运行时对象）
+      - 基础设施：`SnakeYamlFactory`
+    - `meta.claw.core.vessel` — Vessel 用户域（保留自旧 `user` 包中的非配置类）
+      - `VesselProfile`, `VesselProfileLoader`, `VesselInitializer`
+    - `meta.claw.core.prompt` — 所有 Prompt 渲染（合并自 `runtime.prompt` + 原有 `prompt`）
+      - `PromptAssembler`, `SectionRegistry`, `SectionResolver`+实现
+      - `PromptContext`, `PromptContextFactory`, `PromptRuntimeBuilder`, `SkillInfo`
+    - `meta.claw.core.infra` — 基础设施（扁平化自 `infra.path`）
+      - `ProjectRootFinder`
+  - 删除空包：`infra.config`, `infra.path`, `runtime.config`, `runtime.prompt`, `user`
+  - 更新全仓库 consumer import 路径（core/cli/store/bootstrap）
+  - 同步移动测试文件到对应包
+- 运行过的验证：
+  - `mvn clean compile`（全仓） → 成功，零编译错误
+  - `mvn test`（全仓） → 全部通过
+- 更新过的文件或工件：
+  - 移动 22 个 Java 源文件 + 3 个测试文件
+  - 修改 20+ 个 consumer 文件的 import 路径
+  - `claude-progress.md`, `clean-state-checklist.md`
+- 已知风险或未解决的问题：
+  - 当前无新增 blocker
+  - `Loader` = 文件 → POJO（反序列化）；`Resolver` = 多源配置 → 合并后的运行时对象。两者都在 `config` 包下，关系已澄清。
+- 下一步最佳动作：
+  1. 提交本轮修改
+  2. 由用户决定下一项功能优先级
+
 ### Session 029
 
 - 日期：2026-05-27

@@ -79,7 +79,7 @@ public class ChatCommand implements Runnable {
             System.err.println(e.getMessage());
             return;
         }
-        meta.claw.core.user.VesselMeta vesselMeta = baseCtx.getVesselMeta();
+        meta.claw.core.config.VesselMeta vesselMeta = baseCtx.getVesselMeta();
         String displayName = vesselMeta != null && vesselMeta.getMeta() != null && vesselMeta.getMeta().getDisplayName() != null
                 ? vesselMeta.getMeta().getDisplayName()
                 : (vesselMeta != null && vesselMeta.getMeta() != null && vesselMeta.getMeta().getName() != null

@@ -1,6 +1,6 @@
 package meta.claw.core.llm.provider;
 
-import meta.claw.core.infra.config.ProviderConfig;
+import meta.claw.core.config.ProviderConfig;
 import org.springframework.ai.chat.client.ChatClient;
 
 /**

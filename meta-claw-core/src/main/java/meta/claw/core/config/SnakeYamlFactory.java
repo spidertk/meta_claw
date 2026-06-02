@@ -1,4 +1,4 @@
-package meta.claw.core.infra.config;
+package meta.claw.core.config;
 
 import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
