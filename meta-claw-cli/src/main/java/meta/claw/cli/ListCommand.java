@@ -77,7 +77,7 @@ public class ListCommand implements Runnable {
                 continue;
             }
 
-            VesselConfig.Identity m = meta != null ? meta.getMeta() : null;
+            VesselConfig.Identity m = meta != null ? meta.getIdentity() : null;
             String name = m != null && m.getName() != null ? m.getName()
                     : (m != null && m.getDisplayName() != null ? m.getDisplayName() : id);
             String desc = m != null && m.getDescription() != null ? m.getDescription() : "";
@@ -87,7 +87,7 @@ public class ListCommand implements Runnable {
             String model = llm != null && llm.getModel() != null ? llm.getModel() : "";
             String provider = llm != null && llm.getProvider() != null ? llm.getProvider() : "";
 
-            VesselConfig.Behavior rt = meta != null ? meta.getRuntime() : null;
+            VesselConfig.Behavior rt = meta != null ? meta.getBehavior() : null;
             String role = rt != null && rt.getRole() != null ? rt.getRole() : "";
             String autoServe = rt != null && rt.isAutoServe() ? "true" : "false";
 

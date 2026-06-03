@@ -50,8 +50,8 @@ class VesselConfigLoaderTest {
 
         VesselConfig meta = loader.load(vesselDir);
 
-        assertEquals("test-bot", meta.getMeta().getId());
-        assertEquals("Test Bot", meta.getMeta().getName());
+        assertEquals("test-bot", meta.getIdentity().getId());
+        assertEquals("Test Bot", meta.getIdentity().getName());
         assertEquals("ollama", meta.getLlm().getProvider());
         assertEquals(0.7, meta.getLlm().getOverrides().getTemperature());
         assertEquals("jsonl", meta.getMemory().getShortTermStore());

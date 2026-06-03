@@ -5,23 +5,22 @@
 # 替换为用户输入的实际值，生成 vessels/<name>/vessel.meta.yaml。
 #
 # YAML ↔ Java 映射关系（通过 SnakeYAML + CamelCasePropertyUtils 反序列化）：
-#   meta      → VesselConfig.Identity    — 基本身份标识（名称、图标、描述等）
+#   identity  → VesselConfig.Identity    — 基本身份标识（名称、图标、描述等）
 #   llm       → VesselConfig.LlmConfig   — 大模型连接配置
-#   runtime   → VesselConfig.Behavior    — 运行时行为模式（角色、自动服务等）
+#   behavior  → VesselConfig.Behavior    — 运行时行为模式（角色、自动服务等）
 #   memory    → VesselConfig.MemoryConfig — 记忆存储后端配置
 #   tools     → VesselConfig.ToolConfig  — 工具系统配置
 #
-# 为什么 YAML key 叫 runtime 而 Java 类叫 Behavior？
-#   历史兼容性：早期版本此段落就叫 runtime，已有 Vessel 的 vessel.meta.yaml
-#   文件不能随意改名。Java 侧通过字段名 runtime 保持反序列化兼容，
-#   内部类名 Behavior 更准确地描述其职责（行为模式）。
+# 旧版 key 兼容：
+#   旧版 YAML 使用 meta: 和 runtime:，加载时通过 VesselConfigLoader
+#   自动迁移为 identity: 和 behavior:。已有文件无需手动修改。
 #
 # 覆盖规则：
 #   llm.overrides 中的非空字段会覆盖全局 config.yaml 中对应 provider 的值。
 #   例如全局 openai 模型为 gpt-4o，此处 overrides.model = gpt-4o-mini
 #   则该 Vessel 实际使用 gpt-4o-mini。
 
-meta:
+identity:
   # Vessel 的唯一标识（通常与目录名一致）
   # → 映射到 VesselConfig.Identity.id
   id: {name}
@@ -56,7 +55,7 @@ llm:
     temperature: ~    # 采样温度（留空则使用全局配置，默认 0.7）
     timeout: ~        # 请求超时秒数（留空则使用全局配置，默认 30）
 
-runtime:
+behavior:
   # Vessel 在系统中的角色（member / admin / guest）
   # → 映射到 VesselConfig.Behavior.role
   role: member

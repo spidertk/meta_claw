@@ -30,32 +30,32 @@ public class VesselConfigBundle {
     // ── Meta 便捷访问 ──
 
     public String getVesselName() {
-        return vesselConfig != null && vesselConfig.getMeta() != null
-                ? vesselConfig.getMeta().getName()
+        return vesselConfig != null && vesselConfig.getIdentity() != null
+                ? vesselConfig.getIdentity().getName()
                 : "Vessel";
     }
 
     public String getVesselDescription() {
-        return vesselConfig != null && vesselConfig.getMeta() != null
-                ? vesselConfig.getMeta().getDescription()
+        return vesselConfig != null && vesselConfig.getIdentity() != null
+                ? vesselConfig.getIdentity().getDescription()
                 : "";
     }
 
     public String getDisplayName() {
-        return vesselConfig != null && vesselConfig.getMeta() != null
-                ? vesselConfig.getMeta().getDisplayName()
+        return vesselConfig != null && vesselConfig.getIdentity() != null
+                ? vesselConfig.getIdentity().getDisplayName()
                 : getVesselName();
     }
 
     public String getEmoji() {
-        return vesselConfig != null && vesselConfig.getMeta() != null
-                ? vesselConfig.getMeta().getEmoji()
+        return vesselConfig != null && vesselConfig.getIdentity() != null
+                ? vesselConfig.getIdentity().getEmoji()
                 : "\uD83E\uDD16";
     }
 
     public String getVesselId() {
-        return vesselConfig != null && vesselConfig.getMeta() != null
-                ? vesselConfig.getMeta().getId()
+        return vesselConfig != null && vesselConfig.getIdentity() != null
+                ? vesselConfig.getIdentity().getId()
                 : null;
     }
 

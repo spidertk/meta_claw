@@ -80,14 +80,14 @@ public class ChatCommand implements Runnable {
             return;
         }
         meta.claw.core.config.VesselConfig vesselConfig = baseCtx.getBundle().getRuntimeVesselConfig();
-        String displayName = vesselConfig != null && vesselConfig.getMeta() != null && vesselConfig.getMeta().getDisplayName() != null
-                ? vesselConfig.getMeta().getDisplayName()
-                : (vesselConfig != null && vesselConfig.getMeta() != null && vesselConfig.getMeta().getName() != null
-                        ? vesselConfig.getMeta().getName() : vesselName);
-        String emoji = vesselConfig != null && vesselConfig.getMeta() != null && vesselConfig.getMeta().getEmoji() != null
-                ? vesselConfig.getMeta().getEmoji() : "🤖";
-        String description = vesselConfig != null && vesselConfig.getMeta() != null && vesselConfig.getMeta().getDescription() != null
-                ? vesselConfig.getMeta().getDescription() : "A general-purpose AI assistant.";
+        String displayName = vesselConfig != null && vesselConfig.getIdentity() != null && vesselConfig.getIdentity().getDisplayName() != null
+                ? vesselConfig.getIdentity().getDisplayName()
+                : (vesselConfig != null && vesselConfig.getIdentity() != null && vesselConfig.getIdentity().getName() != null
+                        ? vesselConfig.getIdentity().getName() : vesselName);
+        String emoji = vesselConfig != null && vesselConfig.getIdentity() != null && vesselConfig.getIdentity().getEmoji() != null
+                ? vesselConfig.getIdentity().getEmoji() : "🤖";
+        String description = vesselConfig != null && vesselConfig.getIdentity() != null && vesselConfig.getIdentity().getDescription() != null
+                ? vesselConfig.getIdentity().getDescription() : "A general-purpose AI assistant.";
 
         terminal.writer().println();
         terminal.writer().println("╔══════════════════════════════════════════════════════════════════╗");

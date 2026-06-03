@@ -15,9 +15,9 @@ import java.util.List;
  * <p>
  * YAML ↔ Java 字段映射（通过 SnakeYAML + CamelCasePropertyUtils）：
  * <ul>
- *   <li>YAML {@code meta}      → Java 字段 {@code meta}（类型 {@link Identity}）</li>
+ *   <li>YAML {@code identity}  → Java 字段 {@code identity}（类型 {@link Identity}）</li>
  *   <li>YAML {@code llm}       → Java 字段 {@code llm}（类型 {@link LlmConfig}）</li>
- *   <li>YAML {@code runtime}   → Java 字段 {@code runtime}（类型 {@link Behavior}）</li>
+ *   <li>YAML {@code behavior}  → Java 字段 {@code behavior}（类型 {@link Behavior}）</li>
  *   <li>YAML {@code memory}    → Java 字段 {@code memory}（类型 {@link MemoryConfig}）</li>
  *   <li>YAML {@code tools}     → Java 字段 {@code tools}（类型 {@link ToolConfig}）</li>
  * </ul>
@@ -41,13 +41,13 @@ import java.util.List;
 public class VesselConfig {
 
     /** 基本身份标识（名称、描述、图标等） */
-    private Identity meta = new Identity();
+    private Identity identity = new Identity();
 
     /** 大模型连接配置（provider、模型、覆盖项） */
     private LlmConfig llm = new LlmConfig();
 
     /** 运行时行为配置（角色、自动服务等） */
-    private Behavior runtime = new Behavior();
+    private Behavior behavior = new Behavior();
 
     /** 记忆系统配置（短期/长期存储后端） */
     private MemoryConfig memory = new MemoryConfig();

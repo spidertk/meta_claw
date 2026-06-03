@@ -58,9 +58,9 @@ public class VesselManager implements InitializingBean {
     public void loadVessels() {
         List<VesselConfig> loaded = vesselConfigLoader.loadFromDirectory(vesselsDir);
         for (VesselConfig meta : loaded) {
-            if (meta.getMeta().getId() != null && !meta.getMeta().getId().isEmpty()) {
-                vessels.put(meta.getMeta().getId(), meta);
-                log.info("Loaded vessel config: {} ({})", meta.getMeta().getId(), meta.getMeta().getName());
+            if (meta.getIdentity().getId() != null && !meta.getIdentity().getId().isEmpty()) {
+                vessels.put(meta.getIdentity().getId(), meta);
+                log.info("Loaded vessel config: {} ({})", meta.getIdentity().getId(), meta.getIdentity().getName());
             }
         }
     }
@@ -119,7 +119,7 @@ public class VesselManager implements InitializingBean {
     public void afterPropertiesSet() throws Exception {
         loadVessels();
         for (VesselConfig meta : listAvailableVessels()) {
-           registerRuntime(meta.getMeta().getId());
+           registerRuntime(meta.getIdentity().getId());
         }
     }
 }

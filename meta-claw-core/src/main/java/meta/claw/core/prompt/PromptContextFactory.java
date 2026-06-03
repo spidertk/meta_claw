@@ -33,8 +33,8 @@ public class PromptContextFactory {
         Path baseDir = ProjectRootFinder.getMetaClawDir();
         Path vesselsDir = baseDir.resolve("vessels");
         Path vesselDir = vesselsDir.resolve(vesselId);
-        Path workspaceDir = meta != null && meta.getMeta() != null && meta.getMeta().getId() != null
-                ? vesselsDir.resolve(meta.getMeta().getId()).resolve("workspace")
+        Path workspaceDir = meta != null && meta.getIdentity() != null && meta.getIdentity().getId() != null
+                ? vesselsDir.resolve(meta.getIdentity().getId()).resolve("workspace")
                 : Path.of(".");
 
         // 加载 VesselProfile（Markdown 段落）

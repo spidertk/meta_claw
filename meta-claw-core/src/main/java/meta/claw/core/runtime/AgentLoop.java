@@ -130,7 +130,7 @@ public class AgentLoop {
             return null;
         }
         // 返回列表中的第一个 Vessel 的 ID
-        String firstVesselId = availableVessels.get(0).getMeta().getId();
+        String firstVesselId = availableVessels.get(0).getIdentity().getId();
         log.debug("路由策略选择 Vessel: {}", firstVesselId);
         return firstVesselId;
     }
