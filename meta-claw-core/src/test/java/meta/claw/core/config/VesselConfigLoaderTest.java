@@ -32,7 +32,7 @@ class VesselConfigLoaderTest {
     @Test
     void load_parsesNestedYaml() throws Exception {
         String yaml = """
-            meta:
+            identity:
               id: test-bot
               name: Test Bot
               description: A test vessel

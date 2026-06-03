@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 import org.yaml.snakeyaml.Yaml;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collections;
@@ -18,14 +19,6 @@ import java.util.stream.Stream;
 
 /**
  * 加载 Vessel 结构化配置（vessel.meta.yaml）。
- * <p>
- * 支持旧版 YAML key 自动迁移：
- * <ul>
- *   <li>{@code meta:}     → {@code identity:}</li>
- *   <li>{@code runtime:}  → {@code behavior:}</li>
- * </ul>
- * 已有 Vessel 的 vessel.meta.yaml 无需手动修改，加载时会自动转换。
- * </p>
  */
 @Slf4j
 @Component
@@ -56,24 +49,11 @@ public class VesselConfigLoader {
             log.warn("Vessel config file not found: {}", metaPath);
             throw new VesselException(ErrorCode.VESSEL_META_NOT_FOUND, metaPath);
         }
-        try {
-            String content = Files.readString(metaPath);
-            String migrated = migrateLegacyKeys(content);
-            return yaml.loadAs(migrated, VesselConfig.class);
+        try (InputStream is = Files.newInputStream(metaPath)) {
+            return yaml.loadAs(is, VesselConfig.class);
         } catch (IOException e) {
             log.error("Failed to load vessel config: {}", metaPath, e);
             throw new VesselException(ErrorCode.VESSEL_META_PARSE_ERROR, e, metaPath);
         }
-    }
-
-    /**
-     * 将旧版 YAML key 迁移为新版 key，保持已有文件兼容。
-     */
-    private String migrateLegacyKeys(String yaml) {
-        // (?m) 启用多行模式，^ 匹配每行行首
-        // 仅替换作为独立 key 出现的行首 meta:/runtime:，不影响注释或值中的文本
-        String result = yaml.replaceAll("(?m)^meta:", "identity:");
-        result = result.replaceAll("(?m)^runtime:", "behavior:");
-        return result;
     }
 }
