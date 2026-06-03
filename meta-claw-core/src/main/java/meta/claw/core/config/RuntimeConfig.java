@@ -2,6 +2,7 @@ package meta.claw.core.config;
 
 import lombok.Getter;
 import lombok.Setter;
+import meta.claw.core.config.bundle.VesselConfigBundle;
 
 /**
  * 运行时配置（合并后的生效配置）。
@@ -23,8 +24,8 @@ import lombok.Setter;
 @Setter
 public class RuntimeConfig {
 
-    /** Vessel 原始元数据（未合并的原始配置，保留用于调试和回显） */
-    private VesselMeta vesselMeta;
+    /** Vessel 原始配置（未合并的 vessel.meta.yaml，保留用于调试和回显） */
+    private VesselConfig vesselConfig;
 
     /** 合并后的 Provider 配置（含 API 密钥、模型、温度等） */
     private ProviderConfig providerConfig;

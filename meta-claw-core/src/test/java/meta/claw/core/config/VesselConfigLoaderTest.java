@@ -1,6 +1,6 @@
 package meta.claw.core.config;
 
-import meta.claw.core.config.loader.VesselMetaLoader;
+import meta.claw.core.config.loader.VesselConfigLoader;
 import meta.claw.core.exception.VesselException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -11,16 +11,16 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class VesselMetaLoaderTest {
+class VesselConfigLoaderTest {
 
     @TempDir
     Path tempDir;
 
-    private final VesselMetaLoader loader = new VesselMetaLoader();
+    private final VesselConfigLoader loader = new VesselConfigLoader();
 
     @Test
     void loadFromDirectory_returnsEmptyForMissingDir() {
-        List<VesselMeta> result = loader.loadFromDirectory(tempDir.resolve("nonexistent"));
+        List<VesselConfig> result = loader.loadFromDirectory(tempDir.resolve("nonexistent"));
         assertTrue(result.isEmpty());
     }
 
@@ -48,7 +48,7 @@ class VesselMetaLoaderTest {
         Files.createDirectories(vesselDir);
         Files.writeString(vesselDir.resolve("vessel.meta.yaml"), yaml);
 
-        VesselMeta meta = loader.load(vesselDir);
+        VesselConfig meta = loader.load(vesselDir);
 
         assertEquals("test-bot", meta.getMeta().getId());
         assertEquals("Test Bot", meta.getMeta().getName());

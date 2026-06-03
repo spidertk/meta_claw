@@ -1052,6 +1052,32 @@
   1. 提交本轮修改
   2. 由用户决定下一项功能优先级
 
+### Session 033
+
+- 日期：2026-05-30
+- 本轮目标：消除 `VesselMeta` 与 `RuntimeConfig` 命名冲突，统一 Config 类命名风格
+- 已完成：
+  - `VesselMeta` → `VesselConfig`（与其他 *Config 类命名一致：GlobalConfig、ProviderConfig、MemoryConfig）
+  - `VesselMeta.MetaInfo` → `VesselConfig.Identity`（Vessel 的身份标识信息）
+  - `VesselMeta.RuntimeConfig` → `VesselConfig.Behavior`（消除与独立 `RuntimeConfig` 类的命名冲突）
+  - `VesselMetaLoader` → `VesselConfigLoader`
+  - `RuntimeConfig.vesselMeta` → `RuntimeConfig.vesselConfig`
+  - `VesselConfigBundle.getRuntimeVesselMeta()` → `getRuntimeVesselConfig()`
+  - 全仓库 consumer 同步适配（RuntimeConfigResolver、VesselManager、VesselRuntime、ChatCommand、ListCommand、LlmClientManager、AgentLoop）
+  - 测试类 `VesselMetaLoaderTest` → `VesselConfigLoaderTest`
+- 运行过的验证：
+  - `mvn clean compile`（全仓） → 成功，零编译错误
+  - `mvn test`（全仓） → 全部通过
+- 更新过的文件或工件：
+  - 重命名：VesselMeta.java → VesselConfig.java，VesselMetaLoader.java → VesselConfigLoader.java
+  - 修改 15+ 个 consumer 文件的 import、变量名、方法调用
+  - 状态文件：claude-progress.md、clean-state-checklist.md
+- 已知风险或未解决的问题：
+  - 当前无新增 blocker
+- 下一步最佳动作：
+  1. 提交本轮修改
+  2. 由用户决定下一项功能优先级
+
 ### Session 029
 
 - 日期：2026-05-27

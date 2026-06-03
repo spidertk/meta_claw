@@ -1,8 +1,8 @@
 package meta.claw.cli;
 
 import meta.claw.core.infra.ProjectRootFinder;
-import meta.claw.core.config.VesselMeta;
-import meta.claw.core.config.loader.VesselMetaLoader;
+import meta.claw.core.config.VesselConfig;
+import meta.claw.core.config.loader.VesselConfigLoader;
 import org.springframework.stereotype.Component;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -24,9 +24,9 @@ import java.util.stream.Stream;
 @Command(name = "list", description = "List all vessels")
 public class ListCommand implements Runnable {
 
-    private final VesselMetaLoader metaLoader;
+    private final VesselConfigLoader metaLoader;
 
-    public ListCommand(VesselMetaLoader metaLoader) {
+    public ListCommand(VesselConfigLoader metaLoader) {
         this.metaLoader = metaLoader;
     }
 
@@ -67,7 +67,7 @@ public class ListCommand implements Runnable {
                 continue;
             }
 
-            VesselMeta meta;
+            VesselConfig meta;
             try {
                 meta = metaLoader.load(dir);
             } catch (Exception e) {
@@ -77,17 +77,17 @@ public class ListCommand implements Runnable {
                 continue;
             }
 
-            VesselMeta.MetaInfo m = meta != null ? meta.getMeta() : null;
+            VesselConfig.Identity m = meta != null ? meta.getMeta() : null;
             String name = m != null && m.getName() != null ? m.getName()
                     : (m != null && m.getDisplayName() != null ? m.getDisplayName() : id);
             String desc = m != null && m.getDescription() != null ? m.getDescription() : "";
             String emoji = m != null && m.getEmoji() != null ? m.getEmoji() : "";
 
-            VesselMeta.LlmConfig llm = meta != null ? meta.getLlm() : null;
+            VesselConfig.LlmConfig llm = meta != null ? meta.getLlm() : null;
             String model = llm != null && llm.getModel() != null ? llm.getModel() : "";
             String provider = llm != null && llm.getProvider() != null ? llm.getProvider() : "";
 
-            VesselMeta.RuntimeConfig rt = meta != null ? meta.getRuntime() : null;
+            VesselConfig.Behavior rt = meta != null ? meta.getRuntime() : null;
             String role = rt != null && rt.getRole() != null ? rt.getRole() : "";
             String autoServe = rt != null && rt.isAutoServe() ? "true" : "false";
 

@@ -2,6 +2,7 @@ package meta.claw.core.config;
 
 import lombok.Getter;
 import lombok.Setter;
+import meta.claw.core.config.bundle.VesselConfigBundle;
 
 import java.util.List;
 
@@ -14,7 +15,7 @@ import java.util.List;
  * <p>
  * 与 {@link meta.claw.core.vessel.VesselProfile} 的关系：
  * <ul>
- *   <li>VesselMeta（本类）= 机器可读的"硬件配置"：模型、密钥、存储后端、行为开关</li>
+ *   <li>VesselConfig（本类）= 机器可读的"硬件配置"：模型、密钥、存储后端、行为开关</li>
  *   <li>VesselProfile = 人可读的"人格说明书"：Identity、Soul、Capabilities 等</li>
  * </ul>
  * 两者共同构成一个 Vessel 的完整定义，由 {@link VesselConfigBundle} 统一聚合。
@@ -25,16 +26,16 @@ import java.util.List;
  */
 @Getter
 @Setter
-public class VesselMeta {
+public class VesselConfig {
 
     /** 基本身份标识（名称、描述、图标等） */
-    private MetaInfo meta = new MetaInfo();
+    private Identity meta = new Identity();
 
     /** 大模型连接配置（provider、模型、覆盖项） */
     private LlmConfig llm = new LlmConfig();
 
     /** 运行时行为配置（角色、自动服务等） */
-    private RuntimeConfig runtime = new RuntimeConfig();
+    private Behavior runtime = new Behavior();
 
     /** 记忆系统配置（短期/长期存储后端） */
     private MemoryConfig memory = new MemoryConfig();
@@ -54,7 +55,7 @@ public class VesselMeta {
      */
     @Getter
     @Setter
-    public static class MetaInfo {
+    public static class Identity {
         /** Vessel 唯一标识（通常与目录名一致） */
         private String id;
         /** Vessel 短名称 */
@@ -110,7 +111,7 @@ public class VesselMeta {
      */
     @Getter
     @Setter
-    public static class RuntimeConfig {
+    public static class Behavior {
         /** 角色：member（普通成员）/ admin（管理员）/ guest（访客） */
         private String role = "member";
         /** 是否自动响应（无需用户触发即主动执行） */

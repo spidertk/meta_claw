@@ -7,11 +7,11 @@ import lombok.Setter;
  * 单个 LLM Provider 的连接配置。
  * <p>
  * 作为 {@link GlobalConfig#providers} 的 value 使用，
- * 也可被 {@link VesselMeta.ProviderOverride} 部分覆盖。
+ * 也可被 {@link VesselConfig.ProviderOverride} 部分覆盖。
  * </p>
  *
  * @see GlobalConfig
- * @see VesselMeta.ProviderOverride
+ * @see VesselConfig.ProviderOverride
  */
 @Getter
 @Setter

@@ -1,7 +1,11 @@
-package meta.claw.core.config;
+package meta.claw.core.config.bundle;
 
 import lombok.Builder;
 import lombok.Getter;
+import meta.claw.core.config.MemoryConfig;
+import meta.claw.core.config.ProviderConfig;
+import meta.claw.core.config.RuntimeConfig;
+import meta.claw.core.config.VesselConfig;
 import meta.claw.core.vessel.VesselProfile;
 
 import java.nio.file.Path;
@@ -18,7 +22,7 @@ import java.nio.file.Path;
 @Builder
 public class VesselConfigBundle {
 
-    private final VesselMeta vesselMeta;
+    private final VesselConfig vesselConfig;
     private final VesselProfile vesselProfile;
     private final RuntimeConfig runtimeConfig;
     private final Path workspaceDir;
@@ -26,41 +30,41 @@ public class VesselConfigBundle {
     // ── Meta 便捷访问 ──
 
     public String getVesselName() {
-        return vesselMeta != null && vesselMeta.getMeta() != null
-                ? vesselMeta.getMeta().getName()
+        return vesselConfig != null && vesselConfig.getMeta() != null
+                ? vesselConfig.getMeta().getName()
                 : "Vessel";
     }
 
     public String getVesselDescription() {
-        return vesselMeta != null && vesselMeta.getMeta() != null
-                ? vesselMeta.getMeta().getDescription()
+        return vesselConfig != null && vesselConfig.getMeta() != null
+                ? vesselConfig.getMeta().getDescription()
                 : "";
     }
 
     public String getDisplayName() {
-        return vesselMeta != null && vesselMeta.getMeta() != null
-                ? vesselMeta.getMeta().getDisplayName()
+        return vesselConfig != null && vesselConfig.getMeta() != null
+                ? vesselConfig.getMeta().getDisplayName()
                 : getVesselName();
     }
 
     public String getEmoji() {
-        return vesselMeta != null && vesselMeta.getMeta() != null
-                ? vesselMeta.getMeta().getEmoji()
+        return vesselConfig != null && vesselConfig.getMeta() != null
+                ? vesselConfig.getMeta().getEmoji()
                 : "\uD83E\uDD16";
     }
 
     public String getVesselId() {
-        return vesselMeta != null && vesselMeta.getMeta() != null
-                ? vesselMeta.getMeta().getId()
+        return vesselConfig != null && vesselConfig.getMeta() != null
+                ? vesselConfig.getMeta().getId()
                 : null;
     }
 
     public Integer getMaxHistoryRounds() {
-        return vesselMeta != null ? vesselMeta.getMaxHistoryRounds() : 20;
+        return vesselConfig != null ? vesselConfig.getMaxHistoryRounds() : 20;
     }
 
     public Integer getMaxTokens() {
-        return vesselMeta != null ? vesselMeta.getMaxTokens() : 4096;
+        return vesselConfig != null ? vesselConfig.getMaxTokens() : 4096;
     }
 
     // ── Profile 便捷访问 ──
@@ -99,7 +103,7 @@ public class VesselConfigBundle {
         return runtimeConfig != null ? runtimeConfig.getMemoryConfig() : null;
     }
 
-    public VesselMeta getRuntimeVesselMeta() {
-        return runtimeConfig != null ? runtimeConfig.getVesselMeta() : vesselMeta;
+    public VesselConfig getRuntimeVesselConfig() {
+        return runtimeConfig != null ? runtimeConfig.getVesselConfig() : vesselConfig;
     }
 }

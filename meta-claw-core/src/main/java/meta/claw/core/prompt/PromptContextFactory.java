@@ -1,8 +1,8 @@
 package meta.claw.core.prompt;
 
 import meta.claw.core.config.RuntimeConfig;
-import meta.claw.core.config.VesselConfigBundle;
-import meta.claw.core.config.VesselMeta;
+import meta.claw.core.config.bundle.VesselConfigBundle;
+import meta.claw.core.config.VesselConfig;
 import meta.claw.core.config.resolver.RuntimeConfigResolver;
 import meta.claw.core.infra.ProjectRootFinder;
 import meta.claw.core.vessel.VesselProfile;
@@ -28,7 +28,7 @@ public class PromptContextFactory {
 
     public PromptContext create(String vesselId) {
         RuntimeConfig runtime = resolver.resolve(vesselId);
-        VesselMeta meta = runtime.getVesselMeta();
+        VesselConfig meta = runtime.getVesselConfig();
 
         Path baseDir = ProjectRootFinder.getMetaClawDir();
         Path vesselsDir = baseDir.resolve("vessels");
@@ -41,7 +41,7 @@ public class PromptContextFactory {
         VesselProfile profile = loadProfileSafe(vesselDir);
 
         VesselConfigBundle bundle = VesselConfigBundle.builder()
-                .vesselMeta(meta)
+                .vesselConfig(meta)
                 .vesselProfile(profile)
                 .runtimeConfig(runtime)
                 .workspaceDir(workspaceDir)

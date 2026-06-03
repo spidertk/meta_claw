@@ -4,12 +4,12 @@ import lombok.extern.slf4j.Slf4j;
 import meta.claw.core.config.GlobalConfig;
 import meta.claw.core.config.ProviderConfig;
 import meta.claw.core.config.RuntimeConfig;
-import meta.claw.core.config.VesselMeta;
+import meta.claw.core.config.VesselConfig;
 import meta.claw.core.config.loader.GlobalConfigLoader;
 import meta.claw.core.exception.ErrorCode;
 import meta.claw.core.exception.VesselException;
 import meta.claw.core.infra.ProjectRootFinder;
-import meta.claw.core.config.loader.VesselMetaLoader;
+import meta.claw.core.config.loader.VesselConfigLoader;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -24,7 +24,7 @@ public class RuntimeConfigResolver {
     @Autowired
     private GlobalConfigLoader globalConfigLoader;
     @Autowired
-    private VesselMetaLoader vesselMetaLoader;
+    private VesselConfigLoader vesselConfigLoader;
 
     public RuntimeConfig resolve(String vesselName) {
         Path baseDir = ProjectRootFinder.getMetaClawDir();
@@ -35,28 +35,28 @@ public class RuntimeConfigResolver {
         }
 
         Path vesselDir = baseDir.resolve("vessels").resolve(vesselName);
-        VesselMeta vesselMeta = vesselMetaLoader.load(vesselDir);
+        VesselConfig vesselConfig = vesselConfigLoader.load(vesselDir);
 
-        String providerName = resolveProviderName(vesselMeta, globalConfig);
+        String providerName = resolveProviderName(vesselConfig, globalConfig);
         ProviderConfig baseProvider = globalConfig.getProviders().get(providerName);
         if (baseProvider == null) {
             throw new VesselException(ErrorCode.VESSEL_PROVIDER_NOT_FOUND, providerName, globalConfig.getProviders().keySet());
         }
 
-        ProviderConfig merged = mergeProviderConfig(baseProvider, vesselMeta);
+        ProviderConfig merged = mergeProviderConfig(baseProvider, vesselConfig);
         validateProviderConfig(merged, providerName);
 
         RuntimeConfig result = new RuntimeConfig();
-        result.setVesselMeta(vesselMeta);
+        result.setVesselConfig(vesselConfig);
         result.setProviderConfig(merged);
-        result.setMemoryConfig(vesselMeta.getMemory());
+        result.setMemoryConfig(vesselConfig.getMemory());
         return result;
     }
 
-    private String resolveProviderName(VesselMeta vesselMeta, GlobalConfig globalConfig) {
-        String name = (vesselMeta != null && vesselMeta.getLlm() != null
-                && StringUtils.isNotBlank(vesselMeta.getLlm().getProvider()))
-                ? vesselMeta.getLlm().getProvider()
+    private String resolveProviderName(VesselConfig vesselConfig, GlobalConfig globalConfig) {
+        String name = (vesselConfig != null && vesselConfig.getLlm() != null
+                && StringUtils.isNotBlank(vesselConfig.getLlm().getProvider()))
+                ? vesselConfig.getLlm().getProvider()
                 : globalConfig.getDefaultProvider();
         if (StringUtils.isBlank(name)) {
             name = globalConfig.getProviders().keySet().iterator().next();
@@ -64,15 +64,15 @@ public class RuntimeConfigResolver {
         return name;
     }
 
-    private ProviderConfig mergeProviderConfig(ProviderConfig base, VesselMeta vesselMeta) {
-        if (vesselMeta == null || vesselMeta.getLlm() == null || vesselMeta.getLlm().getOverrides() == null) {
+    private ProviderConfig mergeProviderConfig(ProviderConfig base, VesselConfig vesselConfig) {
+        if (vesselConfig == null || vesselConfig.getLlm() == null || vesselConfig.getLlm().getOverrides() == null) {
             return copy(base);
         }
-        VesselMeta.ProviderOverride ov = vesselMeta.getLlm().getOverrides();
+        VesselConfig.ProviderOverride ov = vesselConfig.getLlm().getOverrides();
         ProviderConfig merged = copy(base);
         mergeField(merged::setApiKey, merged.getApiKey(), ov.getApiKey());
         mergeField(merged::setBaseUrl, merged.getBaseUrl(), ov.getBaseUrl());
-        mergeField(merged::setModel, merged.getModel(), vesselMeta.getLlm().getModel());
+        mergeField(merged::setModel, merged.getModel(), vesselConfig.getLlm().getModel());
         mergeField(merged::setTemperature, merged.getTemperature(), ov.getTemperature());
         mergeField(merged::setTimeout, merged.getTimeout(), ov.getTimeout());
         return merged;

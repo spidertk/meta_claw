@@ -10,11 +10,11 @@ import java.util.Map;
  * <p>
  * 映射 ~/.meta-claw/config.yaml 的结构。
  * 所有 Vessel 的默认配置来源；Vessel 可通过 vessel.meta.yaml 中的
- * {@link VesselMeta.LlmConfig#overrides} 覆盖其中任意字段。
+ * {@link VesselConfig.LlmConfig#overrides} 覆盖其中任意字段。
  * </p>
  *
  * @see ProviderConfig
- * @see VesselMeta.LlmConfig
+ * @see VesselConfig.LlmConfig
  * @see meta.claw.core.config.loader.GlobalConfigLoader
  */
 @Getter

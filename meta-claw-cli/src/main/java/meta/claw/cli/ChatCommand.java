@@ -79,15 +79,15 @@ public class ChatCommand implements Runnable {
             System.err.println(e.getMessage());
             return;
         }
-        meta.claw.core.config.VesselMeta vesselMeta = baseCtx.getBundle().getRuntimeVesselMeta();
-        String displayName = vesselMeta != null && vesselMeta.getMeta() != null && vesselMeta.getMeta().getDisplayName() != null
-                ? vesselMeta.getMeta().getDisplayName()
-                : (vesselMeta != null && vesselMeta.getMeta() != null && vesselMeta.getMeta().getName() != null
-                        ? vesselMeta.getMeta().getName() : vesselName);
-        String emoji = vesselMeta != null && vesselMeta.getMeta() != null && vesselMeta.getMeta().getEmoji() != null
-                ? vesselMeta.getMeta().getEmoji() : "🤖";
-        String description = vesselMeta != null && vesselMeta.getMeta() != null && vesselMeta.getMeta().getDescription() != null
-                ? vesselMeta.getMeta().getDescription() : "A general-purpose AI assistant.";
+        meta.claw.core.config.VesselConfig vesselConfig = baseCtx.getBundle().getRuntimeVesselConfig();
+        String displayName = vesselConfig != null && vesselConfig.getMeta() != null && vesselConfig.getMeta().getDisplayName() != null
+                ? vesselConfig.getMeta().getDisplayName()
+                : (vesselConfig != null && vesselConfig.getMeta() != null && vesselConfig.getMeta().getName() != null
+                        ? vesselConfig.getMeta().getName() : vesselName);
+        String emoji = vesselConfig != null && vesselConfig.getMeta() != null && vesselConfig.getMeta().getEmoji() != null
+                ? vesselConfig.getMeta().getEmoji() : "🤖";
+        String description = vesselConfig != null && vesselConfig.getMeta() != null && vesselConfig.getMeta().getDescription() != null
+                ? vesselConfig.getMeta().getDescription() : "A general-purpose AI assistant.";
 
         terminal.writer().println();
         terminal.writer().println("╔══════════════════════════════════════════════════════════════════╗");

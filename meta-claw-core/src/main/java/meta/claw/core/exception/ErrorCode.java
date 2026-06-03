@@ -6,13 +6,13 @@ import lombok.Getter;
 public enum ErrorCode {
 
     // Vessel domain (Vxxx)
-    VESSEL_META_NOT_FOUND("V001", "Vessel meta file not found: {0}"),
+    VESSEL_META_NOT_FOUND("V001", "Vessel config file not found: {0}"),
     VESSEL_PROFILE_NOT_FOUND("V002", "Vessel profile not found: {0}"),
     VESSEL_GLOBAL_CONFIG_EMPTY("V003", "Global config not found or providers empty: {0}"),
     VESSEL_PROVIDER_NOT_FOUND("V004", "Provider '{0}' not found in global config. Available: {1}"),
     VESSEL_API_KEY_MISSING("V005", "API key not set for provider '{0}'"),
     VESSEL_MODEL_MISSING("V006", "Model not set for provider '{0}'"),
-    VESSEL_META_PARSE_ERROR("V007", "Failed to parse vessel meta: {0}"),
+    VESSEL_META_PARSE_ERROR("V007", "Failed to parse vessel config: {0}"),
     VESSEL_PROFILE_PARSE_ERROR("V008", "Failed to parse vessel profile: {0}");
 
     private final String code;

@@ -13,7 +13,7 @@ import meta.claw.core.memory.shortterm.ShortMemory;
 import meta.claw.core.memory.shortterm.ShortMemoryFactory;
 import meta.claw.core.message.Reply;
 import meta.claw.core.message.ReplyType;
-import meta.claw.core.config.VesselMeta;
+import meta.claw.core.config.VesselConfig;
 import meta.claw.core.prompt.PromptContext;
 import meta.claw.core.prompt.PromptContextFactory;
 import meta.claw.core.prompt.PromptRenderer;
@@ -84,8 +84,8 @@ public class VesselRuntime {
     /**
      * 获取 Vessel 配置
      */
-    public VesselMeta getConfig() {
-        return promptContext.getBundle().getRuntimeVesselMeta();
+    public VesselConfig getConfig() {
+        return promptContext.getBundle().getRuntimeVesselConfig();
     }
     /**
      * 将用户消息转换成 ChatClient 所需的格式。

@@ -1,7 +1,7 @@
 package meta.claw.core.config.loader;
 
 import lombok.extern.slf4j.Slf4j;
-import meta.claw.core.config.VesselMeta;
+import meta.claw.core.config.VesselConfig;
 import meta.claw.core.exception.ErrorCode;
 import meta.claw.core.exception.VesselException;
 import meta.claw.core.infra.SnakeYamlFactory;
@@ -19,12 +19,12 @@ import java.util.stream.Stream;
 
 @Slf4j
 @Component
-public class VesselMetaLoader {
+public class VesselConfigLoader {
 
     private static final String META_FILE = "vessel.meta.yaml";
     private final Yaml yaml = SnakeYamlFactory.createCamelCaseYaml();
 
-    public List<VesselMeta> loadFromDirectory(Path dir) {
+    public List<VesselConfig> loadFromDirectory(Path dir) {
         if (!Files.exists(dir) || !Files.isDirectory(dir)) {
             log.warn("Vessel directory not found: {}", dir);
             return Collections.emptyList();
@@ -40,16 +40,16 @@ public class VesselMetaLoader {
         }
     }
 
-    public VesselMeta load(Path vesselDir) {
+    public VesselConfig load(Path vesselDir) {
         Path metaPath = vesselDir.resolve(META_FILE);
         if (!Files.exists(metaPath)) {
-            log.warn("Vessel meta file not found: {}", metaPath);
+            log.warn("Vessel config file not found: {}", metaPath);
             throw new VesselException(ErrorCode.VESSEL_META_NOT_FOUND, metaPath);
         }
         try (InputStream is = Files.newInputStream(metaPath)) {
-            return yaml.loadAs(is, VesselMeta.class);
+            return yaml.loadAs(is, VesselConfig.class);
         } catch (IOException e) {
-            log.error("Failed to load vessel meta: {}", metaPath, e);
+            log.error("Failed to load vessel config: {}", metaPath, e);
             throw new VesselException(ErrorCode.VESSEL_META_PARSE_ERROR, e, metaPath);
         }
     }

@@ -4,7 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import meta.claw.core.config.VesselConfigBundle;
+import meta.claw.core.config.bundle.VesselConfigBundle;
 
 @Getter
 @Builder(toBuilder = true)
