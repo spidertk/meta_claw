@@ -7,10 +7,22 @@ import meta.claw.core.config.bundle.VesselConfigBundle;
 import java.util.List;
 
 /**
- * Vessel 元数据配置模型。
+ * Vessel 结构化配置模型。
  * <p>
  * 映射 vessels/&lt;name&gt;/vessel.meta.yaml 的完整结构。
- * 这是 Vessel 的"结构化配置"——决定它用什么模型、什么记忆后端、什么行为模式。
+ * 决定 Vessel 用什么模型、什么记忆后端、什么行为模式。
+ * </p>
+ * <p>
+ * YAML ↔ Java 字段映射（通过 SnakeYAML + CamelCasePropertyUtils）：
+ * <ul>
+ *   <li>YAML {@code meta}      → Java 字段 {@code meta}（类型 {@link Identity}）</li>
+ *   <li>YAML {@code llm}       → Java 字段 {@code llm}（类型 {@link LlmConfig}）</li>
+ *   <li>YAML {@code runtime}   → Java 字段 {@code runtime}（类型 {@link Behavior}）</li>
+ *   <li>YAML {@code memory}    → Java 字段 {@code memory}（类型 {@link MemoryConfig}）</li>
+ *   <li>YAML {@code tools}     → Java 字段 {@code tools}（类型 {@link ToolConfig}）</li>
+ * </ul>
+ * 注：YAML key {@code runtime} 保持历史名称以确保已有文件兼容；
+ * Java 内部类命名为 {@link Behavior} 以更准确描述其职责（行为模式）。
  * </p>
  * <p>
  * 与 {@link meta.claw.core.vessel.VesselProfile} 的关系：

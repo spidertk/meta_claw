@@ -1,15 +1,20 @@
-# Meta-Claw Vessel Meta Template v1.0
-# ==================================
-# 此文件是新建 Vessel 时的 YAML 配置模板。
+# Meta-Claw Vessel Config Template v1.0
+# ====================================
+# 此文件是新建 Vessel 时的结构化配置模板。
 # 初始化时，VesselInitializer 会将 {name} / {created_at} / {description}
 # 替换为用户输入的实际值，生成 vessels/<name>/vessel.meta.yaml。
 #
-# 字段说明：
-#   meta          — Vessel 的基本身份标识（显示名、图标、描述等）
-#   llm           — 大模型连接配置（可覆盖全局 config.yaml 中的默认值）
-#   runtime       — Vessel 的运行时行为（角色、自动服务等）
-#   memory        — 记忆存储后端配置
-#   tools         — 工具系统配置
+# YAML ↔ Java 映射关系（通过 SnakeYAML + CamelCasePropertyUtils 反序列化）：
+#   meta      → VesselConfig.Identity    — 基本身份标识（名称、图标、描述等）
+#   llm       → VesselConfig.LlmConfig   — 大模型连接配置
+#   runtime   → VesselConfig.Behavior    — 运行时行为模式（角色、自动服务等）
+#   memory    → VesselConfig.MemoryConfig — 记忆存储后端配置
+#   tools     → VesselConfig.ToolConfig  — 工具系统配置
+#
+# 为什么 YAML key 叫 runtime 而 Java 类叫 Behavior？
+#   历史兼容性：早期版本此段落就叫 runtime，已有 Vessel 的 vessel.meta.yaml
+#   文件不能随意改名。Java 侧通过字段名 runtime 保持反序列化兼容，
+#   内部类名 Behavior 更准确地描述其职责（行为模式）。
 #
 # 覆盖规则：
 #   llm.overrides 中的非空字段会覆盖全局 config.yaml 中对应 provider 的值。
@@ -18,24 +23,33 @@
 
 meta:
   # Vessel 的唯一标识（通常与目录名一致）
+  # → 映射到 VesselConfig.Identity.id
   id: {name}
   # Vessel 的短名称
+  # → 映射到 VesselConfig.Identity.name
   name: {name}
   # 一句话描述该 Vessel 的用途
+  # → 映射到 VesselConfig.Identity.description
   description: {description}
   # 创建日期（ISO 格式）
+  # → 映射到 VesselConfig.Identity.createdAt
   created_at: {created_at}
   # 显示名称（CLI 列表、欢迎语中展示，~ 表示使用 name）
+  # → 映射到 VesselConfig.Identity.displayName
   display_name: ~
   # 表情符号（默认 🤖）
+  # → 映射到 VesselConfig.Identity.emoji
   emoji: 🤖
 
 llm:
   # 使用的 provider 名称，必须对应全局 config.yaml 中 providers 下的某个 key
+  # → 映射到 VesselConfig.LlmConfig.provider
   provider: openapi
   # 模型名称（~ 表示使用全局配置的默认模型）
+  # → 映射到 VesselConfig.LlmConfig.model
   model: ~
   # Vessel 级覆盖：非空字段会覆盖全局 provider 配置
+  # → 映射到 VesselConfig.LlmConfig.overrides
   overrides:
     api_key: ~        # API 密钥（留空则使用全局配置）
     base_url: ~       # 接口基地址（留空则使用全局配置）
@@ -44,16 +58,21 @@ llm:
 
 runtime:
   # Vessel 在系统中的角色（member / admin / guest）
+  # → 映射到 VesselConfig.Behavior.role
   role: member
   # 是否自动响应（无需用户触发即主动执行）
+  # → 映射到 VesselConfig.Behavior.autoServe
   auto_serve: false
 
 memory:
   # 短期记忆存储后端（jsonl / memory / ...）
+  # → 映射到 VesselConfig.MemoryConfig.shortTermStore
   short_term_store: jsonl
   # 长期记忆存储后端（file / redis / ...）
+  # → 映射到 VesselConfig.MemoryConfig.longTermStore
   long_term_store: file
 
 tools:
   # 要排除的工具列表（按名称排除，空列表表示不排除任何工具）
+  # → 映射到 VesselConfig.ToolConfig.exclude
   exclude: []
