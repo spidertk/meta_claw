@@ -1,22 +1,18 @@
 package meta.claw.cli;
 
-import meta.claw.core.infra.ProjectRootFinder;
 import meta.claw.core.config.VesselConfig;
-import meta.claw.core.config.loader.VesselConfigLoader;
+import meta.claw.core.runtime.VesselManager;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.List;
-import java.util.stream.Stream;
 
 /**
- * 列出所有已创建的 Vessel。
+ * 列出所有已加载的 Vessel。
  * <p>
- * 扫描 .meta-claw/vessels/ 目录，读取每个子目录下的 vessel.meta.yaml，
+ * 直接从 {@link VesselManager} 内存中获取已缓存的 Vessel 配置列表，
  * 以表格形式展示 Vessel 的完整信息。
  * </p>
  */
@@ -24,33 +20,17 @@ import java.util.stream.Stream;
 @Command(name = "list", description = "List all vessels")
 public class ListCommand implements Runnable {
 
-    private final VesselConfigLoader metaLoader;
-
-    public ListCommand(VesselConfigLoader metaLoader) {
-        this.metaLoader = metaLoader;
-    }
+    @Autowired
+    private VesselManager vesselManager;
 
     @Option(names = {"--all", "-a"}, description = "Include hidden vessels")
     private boolean includeHidden;
 
     @Override
     public void run() {
-        Path vesselsDir = ProjectRootFinder.getMetaClawDir().resolve("vessels");
+        List<VesselConfig> vessels = vesselManager.listAvailableVessels();
 
-        if (!Files.exists(vesselsDir) || !Files.isDirectory(vesselsDir)) {
-            System.err.println("Vessels directory not found. Run 'meta-claw init' first.");
-            return;
-        }
-
-        List<Path> vesselDirs;
-        try (Stream<Path> paths = Files.list(vesselsDir)) {
-            vesselDirs = paths.filter(Files::isDirectory).toList();
-        } catch (IOException e) {
-            System.err.println("Failed to scan vessels directory: " + e.getMessage());
-            return;
-        }
-
-        if (vesselDirs.isEmpty()) {
+        if (vessels.isEmpty()) {
             System.out.println("No vessels found. Run 'meta-claw init' to create the default vessel.");
             return;
         }
@@ -61,33 +41,23 @@ public class ListCommand implements Runnable {
                 "ID", "Name", "Description", "Emoji", "Model", "Role", "AutoServe", "Provider"));
         System.out.println("├──────────────┼──────────────┼──────────────────────────────┼──────┼────────────────────┼────────┼───────────┼──────────┤");
 
-        for (Path dir : vesselDirs) {
-            String id = dir.getFileName().toString();
-            if (id.startsWith(".") && !includeHidden) {
+        for (VesselConfig meta : vessels) {
+            String id = meta.getIdentity().getId();
+            if (id != null && id.startsWith(".") && !includeHidden) {
                 continue;
             }
 
-            VesselConfig meta;
-            try {
-                meta = metaLoader.load(dir);
-            } catch (Exception e) {
-                // 加载失败时显示基本信息
-                System.out.println(String.format("│ %-12s │ %-12s │ %-28s │ %-4s │ %-18s │ %-6s │ %-9s │ %-8s │",
-                        truncate(id, 12), "(error)", truncate(e.getMessage(), 28), "", "", "", "", ""));
-                continue;
-            }
-
-            VesselConfig.Identity m = meta != null ? meta.getIdentity() : null;
+            VesselConfig.Identity m = meta.getIdentity();
             String name = m != null && m.getName() != null ? m.getName()
                     : (m != null && m.getDisplayName() != null ? m.getDisplayName() : id);
             String desc = m != null && m.getDescription() != null ? m.getDescription() : "";
             String emoji = m != null && m.getEmoji() != null ? m.getEmoji() : "";
 
-            VesselConfig.LlmConfig llm = meta != null ? meta.getLlm() : null;
+            VesselConfig.LlmConfig llm = meta.getLlm();
             String model = llm != null && llm.getModel() != null ? llm.getModel() : "";
             String provider = llm != null && llm.getProvider() != null ? llm.getProvider() : "";
 
-            VesselConfig.Behavior rt = meta != null ? meta.getBehavior() : null;
+            VesselConfig.Behavior rt = meta.getBehavior();
             String role = rt != null && rt.getRole() != null ? rt.getRole() : "";
             String autoServe = rt != null && rt.isAutoServe() ? "true" : "false";
 

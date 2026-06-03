@@ -1,28 +1,27 @@
 package meta.claw.cli;
 
+import meta.claw.core.runtime.VesselManager;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import meta.claw.core.infra.ProjectRootFinder;
-import java.util.Comparator;
 import java.util.Scanner;
-import java.util.stream.Stream;
 
 /**
  * 删除指定的 Vessel。
  * <p>
- * 删除 .meta-claw/vessels/&lt;name&gt;/ 目录及其所有内容。
+ * 通过 {@link VesselManager} 统一删除：销毁 Runtime、清内存、删目录。
  * 默认会要求用户确认，可使用 --yes 跳过确认。
  * </p>
  */
 @Component
 @Command(name = "delete", description = "Delete a vessel")
 public class DeleteCommand implements Runnable {
+
+    @Autowired
+    private VesselManager vesselManager;
 
     @Parameters(index = "0", description = "Vessel name to delete")
     private String vesselName;
@@ -32,9 +31,7 @@ public class DeleteCommand implements Runnable {
 
     @Override
     public void run() {
-        Path vesselDir = ProjectRootFinder.getMetaClawDir().resolve("vessels").resolve(vesselName);
-
-        if (!Files.exists(vesselDir)) {
+        if (!vesselManager.hasVessel(vesselName)) {
             System.err.println("Vessel not found: " + vesselName);
             return;
         }
@@ -50,23 +47,10 @@ public class DeleteCommand implements Runnable {
         }
 
         try {
-            deleteDirectory(vesselDir);
+            vesselManager.deleteVessel(vesselName);
             System.out.println("Deleted vessel: " + vesselName);
-        } catch (IOException e) {
+        } catch (Exception e) {
             System.err.println("Failed to delete vessel: " + e.getMessage());
-        }
-    }
-
-    private void deleteDirectory(Path dir) throws IOException {
-        try (Stream<Path> walk = Files.walk(dir)) {
-            walk.sorted(Comparator.reverseOrder())
-                    .forEach(path -> {
-                        try {
-                            Files.delete(path);
-                        } catch (IOException e) {
-                            throw new RuntimeException("Failed to delete: " + path, e);
-                        }
-                    });
         }
     }
 }

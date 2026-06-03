@@ -4,15 +4,20 @@ import lombok.extern.slf4j.Slf4j;
 import meta.claw.core.config.loader.VesselConfigLoader;
 import meta.claw.core.config.VesselConfig;
 import meta.claw.core.infra.ProjectRootFinder;
+import meta.claw.core.vessel.VesselInitializer;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Stream;
 
 /**
  * Vessel 管理器
@@ -30,6 +35,9 @@ public class VesselManager implements InitializingBean {
 
     @Autowired
     private VesselConfigLoader vesselConfigLoader;
+
+    @Autowired
+    private VesselInitializer vesselInitializer;
 
     /**
      * 存储已加载的 Vessel 配置，key 为 vesselId
@@ -113,6 +121,99 @@ public class VesselManager implements InitializingBean {
      */
     public boolean hasVessel(String vesselId) {
         return vessels.containsKey(vesselId);
+    }
+
+    /**
+     * 创建 Vessel：写盘 → 加载配置 → 注册内存 → 注册 Runtime。
+     * <p>整个操作加锁，保证原子性。</p>
+     *
+     * @param name        vessel 目录名（即 vesselId）
+     * @param description 描述
+     * @return 创建后的 VesselConfig
+     */
+    public synchronized VesselConfig createVessel(String name, String description) {
+        if (vessels.containsKey(name)) {
+            throw new IllegalStateException("Vessel already exists: " + name);
+        }
+        try {
+            vesselInitializer.createVessel(vesselsDir, name,
+                    description != null ? description : "A customized AI vessel for specific tasks.");
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to create vessel directory: " + name, e);
+        }
+
+        VesselConfig config = vesselConfigLoader.load(vesselsDir.resolve(name));
+        vessels.put(name, config);
+        log.info("Loaded vessel config into memory: {}", name);
+
+        registerRuntime(name);
+        return config;
+    }
+
+    /**
+     * 删除 Vessel：销毁 Runtime → 清内存 → 删目录。
+     * <p>整个操作加锁，保证原子性。若 runtime 不存在则静默跳过。</p>
+     *
+     * @param vesselId Vessel 唯一标识
+     */
+    public synchronized void deleteVessel(String vesselId) {
+        VesselRuntime runtime = runtimes.remove(vesselId);
+        if (runtime != null) {
+            try {
+                runtime.shutdown();
+            } catch (Exception e) {
+                log.warn("Error during runtime shutdown for vessel {}: {}", vesselId, e.getMessage());
+            }
+        }
+
+        vessels.remove(vesselId);
+        log.info("Removed vessel from memory: {}", vesselId);
+
+        Path vesselDir = vesselsDir.resolve(vesselId);
+        if (Files.exists(vesselDir)) {
+            try {
+                deleteDirectory(vesselDir);
+                log.info("Deleted vessel directory: {}", vesselDir);
+            } catch (IOException e) {
+                throw new RuntimeException("Failed to delete vessel directory: " + vesselDir, e);
+            }
+        }
+    }
+
+    /**
+     * 重新扫描 vessels/ 目录，同步内存与磁盘。
+     * <p>用于 init 完成后或外部手动修改目录后的兜底同步。</p>
+     */
+    public synchronized void refresh() {
+        // 1. 清理已不存在于磁盘的 vessel
+        List<String> toRemove = vessels.keySet().stream()
+                .filter(id -> !Files.exists(vesselsDir.resolve(id).resolve("vessel.meta.yaml")))
+                .toList();
+        for (String id : toRemove) {
+            deleteVessel(id);
+        }
+
+        // 2. 加载新出现的 vessel
+        loadVessels();
+        for (VesselConfig meta : listAvailableVessels()) {
+            String id = meta.getIdentity().getId();
+            if (!runtimes.containsKey(id)) {
+                registerRuntime(id);
+            }
+        }
+    }
+
+    private void deleteDirectory(Path dir) throws IOException {
+        try (Stream<Path> walk = Files.walk(dir)) {
+            walk.sorted(Comparator.reverseOrder())
+                    .forEach(path -> {
+                        try {
+                            Files.delete(path);
+                        } catch (IOException e) {
+                            throw new RuntimeException("Failed to delete: " + path, e);
+                        }
+                    });
+        }
     }
 
     @Override

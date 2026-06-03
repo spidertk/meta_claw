@@ -142,6 +142,14 @@ public class VesselRuntime implements InitializingBean {
         return new Reply(ReplyType.TEXT, content);
     }
 
+    /**
+     * 优雅关闭运行时，释放资源。
+     * <p>默认空实现，子类可按需覆盖。</p>
+     */
+    public void shutdown() {
+        log.info("VesselRuntime shutdown: {}", vesselId);
+    }
+
     public void chatStream(String sessionId,String userMessage, SpiStreamingCallback callback) {
 
         SpiChatRequest request = SpiChatRequest.builder()
