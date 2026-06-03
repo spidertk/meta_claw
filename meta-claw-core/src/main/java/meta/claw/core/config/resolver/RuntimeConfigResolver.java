@@ -42,7 +42,7 @@ public class RuntimeConfigResolver {
         if (baseProvider == null) {
             throw new VesselException(ErrorCode.VESSEL_PROVIDER_NOT_FOUND, providerName, globalConfig.getProviders().keySet());
         }
-
+        baseProvider.setProvider(providerName);
         ProviderConfig merged = mergeProviderConfig(baseProvider, vesselConfig);
         validateProviderConfig(merged, providerName);
 

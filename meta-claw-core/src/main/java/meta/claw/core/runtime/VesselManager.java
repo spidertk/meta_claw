@@ -44,7 +44,7 @@ public class VesselManager implements InitializingBean {
     /**
      * vessels 目录的绝对路径
      */
-    private final Path vesselsDir = ProjectRootFinder.getMetaClawDir();
+    private final Path vesselsDir = ProjectRootFinder.getMetaClawDir().resolve("vessels");
 
 
 

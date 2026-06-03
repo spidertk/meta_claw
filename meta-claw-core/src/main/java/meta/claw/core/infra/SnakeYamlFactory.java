@@ -34,7 +34,7 @@ public class SnakeYamlFactory {
             StringBuilder sb = new StringBuilder();
             boolean nextUpper = false;
             for (char c : snakeCase.toCharArray()) {
-                if (c == '_') {
+                if (c == '_' || c == '.' || c == '-') {
                     nextUpper = true;
                 } else if (nextUpper) {
                     sb.append(Character.toUpperCase(c));

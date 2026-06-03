@@ -19,6 +19,7 @@ import meta.claw.core.prompt.PromptContextFactory;
 import meta.claw.core.prompt.PromptRenderer;
 import org.apache.commons.lang3.StringUtils;
 
+import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
@@ -37,7 +38,7 @@ import java.util.List;
 @Slf4j
 @Component
 @Scope("prototype")
-public class VesselRuntime {
+public class VesselRuntime implements InitializingBean {
 
     @Autowired
     private PromptContextFactory promptContextManager;
@@ -50,14 +51,14 @@ public class VesselRuntime {
     @Autowired
     private LongMemoryFactory longMemory;
 
-    private final PromptContext  promptContext;
+    private  PromptContext  promptContext;
 
 
     private final String vesselId;
 
     public VesselRuntime(String vesselId) {
         this.vesselId = vesselId;
-        this.promptContext = promptContextManager.create(vesselId);;
+
     }
 
     /**
@@ -172,4 +173,8 @@ public class VesselRuntime {
     }
 
 
+    @Override
+    public void afterPropertiesSet() throws Exception {
+        this.promptContext = promptContextManager.create(vesselId);;
+    }
 }

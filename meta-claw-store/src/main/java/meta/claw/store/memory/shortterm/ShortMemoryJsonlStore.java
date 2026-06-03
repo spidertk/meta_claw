@@ -75,10 +75,7 @@ public class ShortMemoryJsonlStore implements ShortMemory {
             initializeConversation(vesselId, sessionId);
         }
 
-        Path historyFilePath = getHistoryFilePath(vesselId, sessionId)
-                .resolve("conversations")
-                .resolve(sessionId)
-                .resolve("history.jsonl");
+        Path historyFilePath = getHistoryFilePath(vesselId, sessionId);
 
         return SessionSelection.builder()
                 .sessionId(sessionId)
