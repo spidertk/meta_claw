@@ -1,18 +1,33 @@
 # Meta-Claw Global Config v1.0
-# 此文件为全局配置，所有 Vessel 默认继承此文件中的 provider 设置。
-# Vessel 级覆盖请编辑 vessels/<name>/vessel.meta.yaml 的 llm.overrides 部分。
+# ============================
+# 此文件是 Meta-Claw 的全局配置，位于 ~/.meta-claw/config.yaml。
+# 所有 Vessel 默认继承此文件中的 provider 设置。
+#
+# 覆盖规则：
+#   Vessel 级配置位于 vessels/<name>/vessel.meta.yaml 的 llm.overrides 部分。
+#   若 overrides 中某个字段非空，则覆盖全局配置中的对应值。
+#   例如：全局 model 为 gpt-4o，Vessel 级 overrides.model = gpt-4o-mini
+#   则该 Vessel 实际使用 gpt-4o-mini，其他 Vessel 仍使用 gpt-4o。
 
-# 默认使用的 provider 名称（对应 providers 下的某个 key）
+# 默认使用的 provider 名称（必须对应 providers 下的某个 key）
 default_provider: openai
 
 # Provider 配置列表
+# 可配置多个 provider，通过 default_provider 切换默认使用哪个。
 providers:
   openai:
+    # API 密钥（必须替换为真实密钥，不可使用默认值）
     api_key: "your-api-key"
+    # 接口基地址（OpenAI 官方地址，使用第三方中转时修改此处）
     base_url: "https://api.openai.com/v1"
+    # 默认使用的模型名称
     model: "gpt-4o"
+    # 采样温度（0.0 = 最确定，2.0 = 最随机，推荐 0.5~1.0）
     temperature: 0.7
+    # 请求超时秒数（连接异常时可适当增大）
     timeout: 30.0
 
-# 是否开启 DEBUG 级别日志（仅 meta.claw 包）
+# 是否开启 DEBUG 级别日志（仅作用于 meta.claw 包）
+# true  — 输出详细的内部调用链路、请求/响应内容（注意隐私泄露风险）
+# false — 仅输出 INFO 及以上级别（推荐生产环境使用）
 log.debug: false
