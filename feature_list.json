@@ -616,6 +616,32 @@
         }
       ],
       "notes": "Spring AI 1.1.7 将 reasoningContent 存入 AssistantMessage.metadata 而非 ChatGenerationMetadata；extractReasoningContent 已适配。streamUsage(true) 已启用以获取流式 usage。"
+    },
+    {
+      "id": "spi-001",
+      "priority": 20,
+      "area": "core-architecture",
+      "title": "VesselSubSystem SPI 骨架 + 现有能力迁移（Phase 1）",
+      "user_visible_behavior": "VesselRuntime 升级为子系统编排器，所有能力通过 VesselSubSystem SPI 接入，PromptVars 作为 prompt 组装协议。",
+      "status": "passing",
+      "verification": [
+        "确认 VesselSubSystem SPI 接口存在（configure + promptVars + onTaskStart/End + priority）",
+        "确认 SubSystemRegistry 按 priority 排序",
+        "确认 VesselProfile 作为内置子系统（priority=0）替代 PromptContext",
+        "确认 MemorySubSystem 包装现有 Memory 能力",
+        "确认 PromptRenderer 接收 Map<String,String> 纯函数渲染",
+        "确认 SpiChatRequest 删除 PromptContext 字段",
+        "运行 mvn test 全仓通过",
+        "运行 ./init.sh 通过"
+      ],
+      "evidence": [
+        {
+          "date": "2026-06-06",
+          "result": "passing",
+          "detail": "新增 PromptVars, MessageThread, StepRecord, StepLog, VesselTask, VesselSubSystem, SubSystemRegistry, TaskContext, MemorySubSystem, VesselProfile, PromptComposer 及对应测试；修改 PromptRenderer, SpiChatRequest, LlmClientManager, VesselRuntime, ChatCommand；删除 PromptContext/PromptContextFactory；mvn test 全仓通过（core 16/16）；./init.sh 9 个 reactor 模块全部 SUCCESS。"
+        }
+      ],
+      "notes": "Phase 1 完成，SPI 骨架已搭好。Phase 2 将引入 ToolSubSystem + ReActLoop。"
     }
   ]
 }

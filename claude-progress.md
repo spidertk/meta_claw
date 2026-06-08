@@ -1116,3 +1116,35 @@
 - 下一步最佳动作：
   1. 提交本轮修改
   2. 在需要工具调用的场景中验证 `🔧 Calling tool: ...` 的显示是否正常
+
+### Session 035
+
+- 日期：2026-06-06
+- 本轮目标：Phase 1 - VesselSubSystem SPI 骨架 + 现有能力迁移
+- 已完成：
+  - 新建 `PromptVars`：不可变 prompt 变量集合，支持 merge
+  - 新建 `MessageThread`、`StepRecord`、`StepLog`：封装消息线程和步骤日志
+  - 新建 `VesselTask` DTO 和 `VesselSubSystem` SPI 接口
+  - 新建 `SubSystemRegistry`：按 priority 排序的子系统注册表
+  - 新建 `TaskContext`：任务执行上下文
+  - 新建 `MemorySubSystem`：包装现有 Short/Long Memory 工厂
+  - 新建 `VesselProfile`（内置子系统，priority=0）：替代 PromptContext 配置画像
+  - 新建 `PromptComposer`：收集 merge 所有子系统的 promptVars
+  - 修改 `PromptRenderer`：接收 `Map<String,String>`，纯函数渲染
+  - 修改 `SpiChatRequest`：删除 PromptContext，添加 vesselId
+  - 修改 `LlmClientManager`：使用 request.getVesselId()
+  - 重构 `VesselRuntime`：升级为子系统编排器，registry 生命周期管理
+  - 删除 `PromptContext` 和 `PromptContextFactory`
+  - 适配 `ChatCommand`：使用新的 VesselProfile API
+- 运行过的验证：
+  - `mvn test`（全仓）→ 成功；core 16/16 测试通过
+  - `./init.sh` → 成功；9 个 reactor 模块全部 SUCCESS
+- 更新过的文件或工件：
+  - 新增 11 个源文件 + 6 个测试文件
+  - 修改 7 个现有文件
+  - 删除 2 个旧类
+  - `claude-progress.md`
+- 已知风险或未解决的问题：
+  - 当前无新增 blocker
+- 下一步最佳动作：
+  1. Phase 2: Tool 子系统 + Spring AI 1.1.7 + ReActLoop
