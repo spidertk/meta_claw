@@ -2,7 +2,6 @@ package meta.claw.core.memory.shortterm;
 
 import meta.claw.core.memory.MemoryMessage;
 import meta.claw.core.memory.SessionMemory;
-import meta.claw.core.prompt.PromptContext;
 
 import java.util.List;
 import java.util.function.Supplier;

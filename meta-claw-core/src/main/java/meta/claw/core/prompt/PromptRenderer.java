@@ -6,15 +6,11 @@ import org.springframework.stereotype.Component;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Path;
+import java.util.Map;
 
 /**
  * Prompt 统一渲染引擎。
- * <p>
- * 合并原 PromptAssembler + PromptRuntimeBuilder 的职责，
- * 直接从 PromptContext（通过 VesselConfigBundle）取值，
- * 用占位符替换生成最终 prompt，无需 SectionRegistry / SectionResolver 中间层。
- * </p>
+ * <p>纯函数渲染器：接收 Map&lt;String, String&gt; 模板变量，返回最终 prompt 文本。</p>
  */
 @Slf4j
 @Component
@@ -23,32 +19,39 @@ public class PromptRenderer {
     private static final String SYSTEM_TEMPLATE = "/templates/runtime/system.tmpl.md";
     private static final String CONTEXT_TEMPLATE = "/templates/runtime/context.tmpl.md";
 
-    public String renderSystem(PromptContext ctx) {
-        return render(loadTemplate(SYSTEM_TEMPLATE), ctx);
+    public String renderSystem(Map<String, String> vars) {
+        return render(stripHtmlComments(loadTemplate(SYSTEM_TEMPLATE)), vars);
     }
 
-    public String renderContext(PromptContext ctx) {
-        return render(loadTemplate(CONTEXT_TEMPLATE), ctx);
+    public String renderContext(Map<String, String> vars) {
+        return render(stripHtmlComments(loadTemplate(CONTEXT_TEMPLATE)), vars);
     }
 
-    String render(String template, PromptContext ctx) {
-        if (ctx.getBundle() == null) {
-            log.warn("PromptContext has no bundle, returning empty prompt");
+    private String stripHtmlComments(String template) {
+        if (template == null) {
+            return "";
+        }
+        return template.replaceAll("<!--[\\s\\S]*?-->", "").trim();
+    }
+
+    String render(String template, Map<String, String> vars) {
+        if (vars == null || vars.isEmpty()) {
+            log.warn("Empty prompt vars, returning empty prompt");
             return "";
         }
 
         String result = template
-                .replace("{vessel_name}",        ctx.getBundle().getVesselName())
-                .replace("{vessel_description}", ctx.getBundle().getVesselDescription())
-                .replace("{identity}",           sectionOrEmpty(ctx.getBundle().getIdentity(), "Identity"))
-                .replace("{soul}",               sectionOrEmpty(ctx.getBundle().getSoul(), "Soul"))
-                .replace("{capabilities}",       sectionOrEmpty(ctx.getBundle().getCapabilities(), "Capabilities"))
-                .replace("{guidelines}",         sectionOrEmpty(ctx.getBundle().getGuidelines(), "Guidelines"))
-                .replace("{domain_knowledge}",   sectionOrEmpty(ctx.getBundle().getDomainKnowledge(), "Domain Knowledge"))
-                .replace("{workspace}",          workspaceSection(ctx))
-                .replace("{current_time}",       orEmpty(ctx.getCurrentTime()))
-                .replace("{location}",           orEmpty(ctx.getLocation()))
-                .replace("{preferences}",        sectionOrEmpty(ctx.getBundle().getPreferences(), "Preferences"))
+                .replace("{vessel_name}",        orEmpty(vars.get("vessel_name")))
+                .replace("{vessel_description}", orEmpty(vars.get("vessel_description")))
+                .replace("{identity}",           sectionOrEmpty(vars.get("identity"), "Identity"))
+                .replace("{soul}",               sectionOrEmpty(vars.get("soul"), "Soul"))
+                .replace("{capabilities}",       sectionOrEmpty(vars.get("capabilities"), "Capabilities"))
+                .replace("{guidelines}",         sectionOrEmpty(vars.get("guidelines"), "Guidelines"))
+                .replace("{domain_knowledge}",   sectionOrEmpty(vars.get("domain_knowledge"), "Domain Knowledge"))
+                .replace("{workspace}",          workspaceSection(vars.get("workspace")))
+                .replace("{current_time}",       orEmpty(vars.get("current_time")))
+                .replace("{location}",           orEmpty(vars.get("location")))
+                .replace("{preferences}",        sectionOrEmpty(vars.get("preferences"), "Preferences"))
                 .trim();
 
         // 清理连续空行，提升可读性
@@ -62,12 +65,11 @@ public class PromptRenderer {
         return "## " + heading + "\n\n" + content;
     }
 
-    private String workspaceSection(PromptContext ctx) {
-        Path dir = ctx.getBundle() != null ? ctx.getBundle().getWorkspaceDir() : null;
-        if (dir == null) {
+    private String workspaceSection(String workspacePath) {
+        if (workspacePath == null || workspacePath.isBlank()) {
             return "";
         }
-        return "## Workspace\n\nCurrent working directory: `" + dir + "`";
+        return "## Workspace\n\nCurrent working directory: `" + workspacePath + "`";
     }
 
     private String orEmpty(String value) {

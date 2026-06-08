@@ -79,7 +79,7 @@ public class LlmClientManager implements SpiLlmClient {
 
     @Override
     public SpiChatResponse chat(SpiChatRequest request) {
-        log.debug("LlmClientManager chat vessel={}, messages={}", request.getCtx().getBundle().getVesselName(), request.getMessages().size());
+        log.debug("LlmClientManager chat vessel={}, messages={}", request.getVesselId(), request.getMessages().size());
 
         List<Message> messages = request.getMessages().stream()
                 .map(this::toSpringMessage)
@@ -88,7 +88,7 @@ public class LlmClientManager implements SpiLlmClient {
         List<Object> toolInstances = toolRegistry.getToolInstances();
         logRequestParams(messages, toolInstances);
 
-        ChatResponse chatResponse = buildChatClient(request.getCtx().getBundle().getVesselName())
+        ChatResponse chatResponse = buildChatClient(request.getVesselId())
                 .prompt(new Prompt(messages))
                 .tools(toolInstances.toArray())
                 .call()
@@ -127,13 +127,12 @@ public class LlmClientManager implements SpiLlmClient {
         logRequestParams(messages, toolInstances);
 
         try {
-            buildChatClient(request.getCtx().getBundle().getVesselName())
+            buildChatClient(request.getVesselId())
                     .prompt(new Prompt(messages))
                     .tools(toolInstances.toArray())
                     .advisors(spec -> spec
-                            .param("vesselName", request.getCtx().getBundle().getVesselName())
-                            .param("sessionId", request.getSessionId())
-                            .param("memoryConfig", request.getCtx().getBundle().getMemoryConfig()))
+                            .param("vesselName", request.getVesselId())
+                            .param("sessionId", request.getSessionId()))
                     .stream()
                     .chatResponse()
                     .doOnNext(response -> {

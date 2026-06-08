@@ -7,33 +7,33 @@ import meta.claw.core.llm.SpiMessage;
 import meta.claw.core.llm.SpiStreamingCallback;
 import meta.claw.core.memory.MemoryMessage;
 import meta.claw.core.memory.MemoryMessageConverter;
-import meta.claw.core.memory.longterm.LongMemory;
-import meta.claw.core.memory.longterm.LongMemoryFactory;
 import meta.claw.core.memory.shortterm.ShortMemory;
-import meta.claw.core.memory.shortterm.ShortMemoryFactory;
 import meta.claw.core.message.Reply;
 import meta.claw.core.message.ReplyType;
-import meta.claw.core.config.VesselConfig;
-import meta.claw.core.prompt.PromptContext;
-import meta.claw.core.prompt.PromptContextFactory;
+import meta.claw.core.prompt.PromptComposer;
 import meta.claw.core.prompt.PromptRenderer;
+import meta.claw.core.prompt.PromptVars;
+import meta.claw.core.runtime.subsystem.MemorySubSystem;
+import meta.claw.core.runtime.subsystem.SubSystemRegistry;
+import meta.claw.core.runtime.subsystem.VesselSubSystem;
 import org.apache.commons.lang3.StringUtils;
-
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.UUID;
 
 /**
- * Vessel 核心运行时类
- * <p>
- * 封装 Spring AI ChatClient，为每个 Vessel 提供独立的 AI 对话能力。
- * 通过 VesselConfig 中的系统提示词（systemPrompt）初始化 ChatClient，
- * 对外暴露统一的 chat 接口，负责将用户消息发送至 AI 模型并返回标准化的 Reply 对象。
- * </p>
+ * Vessel 核心运行时类 — 子系统编排器。
+ * <p>不再直接持有 memory/prompt 依赖，而是通过 SubSystemRegistry 统一编排子系统生命周期。</p>
  */
 @Slf4j
 @Component
@@ -41,123 +41,183 @@ import java.util.List;
 public class VesselRuntime implements InitializingBean {
 
     @Autowired
-    private PromptContextFactory promptContextManager;
+    private PromptComposer promptComposer;
     @Autowired
     private PromptRenderer promptRenderer;
     @Autowired
     private LlmClientManager llmClient;
-    @Autowired
-    private ShortMemoryFactory shortMemory;
-    @Autowired
-    private LongMemoryFactory longMemory;
 
-    private  PromptContext  promptContext;
+    /** 所有子系统，Spring 自动收集（含 VesselProfile） */
+    @Autowired(required = false)
+    private List<VesselSubSystem> subSystems = new ArrayList<>();
 
-
+    private final SubSystemRegistry registry = new SubSystemRegistry();
     private final String vesselId;
 
     public VesselRuntime(String vesselId) {
         this.vesselId = vesselId;
-
     }
 
-    /**
-     * 创建当前 Vessel 的 PromptContext（无参，自动使用 this.vesselId）
-     */
-    public PromptContext createPromptContext() {
-        return promptContext;
+    @Override
+    public void afterPropertiesSet() {
+        // ① 按 priority 排序并注册所有子系统（含 VesselProfile）
+        subSystems.stream()
+                .sorted(Comparator.comparingInt(VesselSubSystem::priority))
+                .forEach(sub -> {
+                    registry.register(sub);
+                    sub.configure(registry);
+                    if (sub instanceof VesselProfile) {
+                        ((VesselProfile) sub).loadForVessel(vesselId);
+                    }
+                });
     }
 
-    /**
-     * 便捷方法：获取当前 Vessel 的短期记忆
-     */
+    // ========== 子系统查询 ==========
+
+    public SubSystemRegistry getRegistry() {
+        return registry;
+    }
+
+    @SuppressWarnings("unchecked")
+    public <T extends VesselSubSystem> T getSubSystem(String name) {
+        return registry.get(name);
+    }
+
+    /** 便捷查询：获取 Vessel 配置画像 */
+    public VesselProfile getProfile() {
+        return registry.get("profile");
+    }
+
+    // ========== Prompt 组装与渲染 ==========
+
+    public String renderSystemPrompt() {
+        PromptVars allVars = buildPromptVars();
+        return promptRenderer.renderSystem(allVars.toMap());
+    }
+
+    public PromptVars buildPromptVars() {
+        // 静态变量：由 PromptComposer 从 registry 收集所有子系统贡献
+        PromptVars staticVars = promptComposer.compose(registry);
+
+        // 动态变量：每次任务实时计算
+        PromptVars dynamic = PromptVars.builder()
+                .vars(java.util.Map.of(
+                        "current_time", formatCurrentTime(),
+                        "location", detectLocation()
+                ))
+                .build();
+
+        return staticVars.merge(dynamic);
+    }
+
+    // ========== 对话入口 ==========
+
+    public Reply chat(String sessionId, String userMessage) {
+        return execute(newTask(sessionId, userMessage));
+    }
+
+    public Reply execute(VesselTask task) {
+        // ① 渲染 system prompt
+        String systemPrompt = renderSystemPrompt();
+
+        // ② 构造任务上下文
+        TaskContext ctx = new TaskContext(task, getProfile(), registry);
+
+        // ③ 任务开始生命周期
+        registry.listAll().forEach(sub -> sub.onTaskStart(ctx));
+
+        try {
+            // ④ 构建 LLM 请求并执行
+            List<SpiMessage> messages = buildLlmRequest(task, systemPrompt);
+            SpiChatRequest request = SpiChatRequest.builder()
+                    .vesselId(task.getVesselId())
+                    .messages(messages)
+                    .sessionId(task.getSessionId())
+                    .build();
+
+            SpiChatResponse response = llmClient.chat(request);
+
+            String content = response != null && response.content() != null
+                    ? response.content() : "";
+
+            // 保存 assistant 消息到短期记忆
+            saveAssistantMessage(task, content);
+
+            return new Reply(ReplyType.TEXT, content);
+        } finally {
+            // ⑤ 任务结束生命周期（finally 中保证调用）
+            registry.listAll().forEach(sub -> sub.onTaskEnd(ctx));
+        }
+    }
+
+    public void chatStream(String sessionId, String userMessage, SpiStreamingCallback callback) {
+        String systemPrompt = renderSystemPrompt();
+        VesselTask task = newTask(sessionId, userMessage);
+        List<SpiMessage> messages = buildLlmRequest(task, systemPrompt);
+        SpiChatRequest request = SpiChatRequest.builder()
+                .vesselId(task.getVesselId())
+                .messages(messages)
+                .sessionId(task.getSessionId())
+                .build();
+        llmClient.chatStream(request, callback);
+    }
+
+    // ========== 便捷方法（向后兼容）==========
+
     public ShortMemory getShortMemory() {
-        return shortMemory.get(promptContext.getBundle().getMemoryConfig().getShortTermStore());
+        MemorySubSystem mem = registry.get("memory");
+        if (mem != null) {
+            return mem.getShortMemory(getProfile().getBundle().getMemoryConfig());
+        }
+        log.warn("MemorySubSystem not registered, short memory unavailable");
+        return null;
     }
 
-    /**
-     * 便捷方法：获取当前 Vessel 的长期记忆
-     */
-    public LongMemory getLongMemory() {
-        return longMemory.get(promptContext.getBundle().getMemoryConfig().getLongTermStore());
+    public meta.claw.core.config.VesselConfig getConfig() {
+        return getProfile().getBundle().getRuntimeVesselConfig();
     }
 
-    /**
-     * 获取 Vessel 配置
-     */
-    public VesselConfig getConfig() {
-        return promptContext.getBundle().getRuntimeVesselConfig();
+    // ========== 内部 ==========
+
+    private VesselTask newTask(String sessionId, String userMessage) {
+        return VesselTask.builder()
+                .taskId(UUID.randomUUID().toString())
+                .vesselId(this.vesselId)
+                .sessionId(sessionId)
+                .userMessage(userMessage)
+                .createdAt(Instant.now())
+                .build();
     }
-    /**
-     * 将用户消息转换成 ChatClient 所需的格式。
-     * @param userMessage 用户输入消息
-     * @param sessionId 会话ID
-     * @return 转换后的 ChatClient 所需的格式
-     */
-    private List<SpiMessage> buildLlmRequest(String userMessage,String sessionId, String systemPrompt) {
+
+    private List<SpiMessage> buildLlmRequest(VesselTask task, String systemPrompt) {
         List<SpiMessage> messages = new ArrayList<>();
         if (systemPrompt != null && !systemPrompt.isBlank()) {
             messages.add(SpiMessage.system(systemPrompt));
         }
-        if (StringUtils.isNotBlank(sessionId)){
-            messages.addAll(toSpiMessages(getShortMemory().loadMessages( vesselId, sessionId,promptContext.getBundle().getMaxHistoryRounds())));
+
+        String sessionId = task.getSessionId();
+        ShortMemory shortMem = getShortMemory();
+        if (StringUtils.isNotBlank(sessionId) && shortMem != null) {
+            int maxRounds = getProfile().getBundle().getMaxHistoryRounds();
+            messages.addAll(toSpiMessages(shortMem.loadMessages(vesselId, sessionId, maxRounds)));
         }
-        messages.add(SpiMessage.user(userMessage));
-        getShortMemory().appendMessage(  vesselId, sessionId,
-                MemoryMessageConverter.fromSpiMessage(SpiMessage.user(userMessage)));
+
+        messages.add(SpiMessage.user(task.getUserMessage()));
+
+        if (shortMem != null) {
+            shortMem.appendMessage(vesselId, sessionId,
+                    MemoryMessageConverter.fromSpiMessage(SpiMessage.user(task.getUserMessage())));
+        }
+
         return messages;
     }
 
-
-    private String resolveSystemPrompt() {
-
-        try {
-            PromptContext ctx = promptContextManager.create(vesselId);
-            return promptRenderer.renderSystem(ctx);
-        } catch (Exception e) {
-            log.warn("Failed to build system prompt for vessel {}: {}", vesselId, e.getMessage());
-            return null;
+    private void saveAssistantMessage(VesselTask task, String content) {
+        ShortMemory shortMem = getShortMemory();
+        if (shortMem != null) {
+            shortMem.appendMessage(vesselId, task.getSessionId(),
+                    MemoryMessageConverter.fromSpiMessage(SpiMessage.assistant(content, null, null)));
         }
-    }
-
-    /**
-     * 向 AI 模型发送用户消息，并返回标准化的回复对象。
-     * @param userMessage 用户输入的文本消息
-     * @return 包含 AI 回复内容和元数据的标准化 Reply 对象
-     */
-    public Reply chat(String sessionId,String userMessage) {
-
-        String systemPrompt = resolveSystemPrompt();
-        SpiChatRequest request = SpiChatRequest.builder()
-                .messages(buildLlmRequest( userMessage,sessionId,systemPrompt))
-                .ctx( promptContext)
-                .sessionId(sessionId)
-                .build();
-        SpiChatResponse  response =llmClient.chat(request);
-
-        String content = response != null && response.content() != null
-                ? response.content()
-                : "";
-
-        return new Reply(ReplyType.TEXT, content);
-    }
-
-    /**
-     * 优雅关闭运行时，释放资源。
-     * <p>默认空实现，子类可按需覆盖。</p>
-     */
-    public void shutdown() {
-        log.info("VesselRuntime shutdown: {}", vesselId);
-    }
-
-    public void chatStream(String sessionId,String userMessage, SpiStreamingCallback callback) {
-
-        SpiChatRequest request = SpiChatRequest.builder()
-                .messages(buildLlmRequest( userMessage,sessionId, resolveSystemPrompt()))
-                .ctx( promptContext)
-                .sessionId(sessionId)
-                .build();
-        llmClient.chatStream(request,callback);
     }
 
     private List<SpiMessage> toSpiMessages(List<MemoryMessage> entries) {
@@ -180,9 +240,16 @@ public class VesselRuntime implements InitializingBean {
         return restored;
     }
 
+    private static String formatCurrentTime() {
+        return ZonedDateTime.now(ZoneId.systemDefault())
+                .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss z"));
+    }
 
-    @Override
-    public void afterPropertiesSet() throws Exception {
-        this.promptContext = promptContextManager.create(vesselId);;
+    private static String detectLocation() {
+        return ZoneId.systemDefault().getId();
+    }
+
+    public void shutdown() {
+        log.info("VesselRuntime shutdown: {}", vesselId);
     }
 }

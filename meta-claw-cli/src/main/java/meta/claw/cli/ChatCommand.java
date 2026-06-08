@@ -3,7 +3,6 @@ package meta.claw.cli;
 import lombok.extern.slf4j.Slf4j;
 import meta.claw.core.memory.shortterm.SessionSelection;
 
-import meta.claw.core.prompt.PromptContext;
 
 
 import meta.claw.core.llm.SpiChatResponse;
@@ -58,19 +57,16 @@ public class ChatCommand implements Runnable {
         }
 
         VesselRuntime  vesselRuntime = vesselManager.getRuntime(vesselName);
-        PromptContext baseCtx;
-        try {
-            baseCtx = vesselRuntime.createPromptContext();
-        } catch (IllegalStateException | IllegalArgumentException e) {
-            System.err.println(e.getMessage());
+        meta.claw.core.runtime.VesselProfile profile = vesselRuntime.getProfile();
+        if (profile == null || profile.getBundle() == null) {
+            System.err.println("Vessel profile not loaded");
             return;
         }
 
-
-        log.info("Using provider: {}", baseCtx.getBundle().getProviderConfig());
+        log.info("Using provider: {}", profile.getBundle().getProviderConfig());
         log.info("Provider config - baseUrl: {}, model: {}",
-                baseCtx.getBundle().getProviderConfig().getBaseUrl(),
-                baseCtx.getBundle().getProviderConfig().getModel());
+                profile.getBundle().getProviderConfig().getBaseUrl(),
+                profile.getBundle().getProviderConfig().getModel());
 
         SessionSelection  sessionSelection;
         try {
@@ -79,7 +75,7 @@ public class ChatCommand implements Runnable {
             System.err.println(e.getMessage());
             return;
         }
-        meta.claw.core.config.VesselConfig vesselConfig = baseCtx.getBundle().getRuntimeVesselConfig();
+        meta.claw.core.config.VesselConfig vesselConfig = profile.getBundle().getRuntimeVesselConfig();
         String displayName = vesselConfig != null && vesselConfig.getIdentity() != null && vesselConfig.getIdentity().getDisplayName() != null
                 ? vesselConfig.getIdentity().getDisplayName()
                 : (vesselConfig != null && vesselConfig.getIdentity() != null && vesselConfig.getIdentity().getName() != null
@@ -96,8 +92,8 @@ public class ChatCommand implements Runnable {
         terminal.writer().println("║                                                                  ║");
         terminal.writer().println(String.format("║   %-60s ║", description));
         terminal.writer().println("║                                                                  ║");
-        terminal.writer().println(String.format("║   Model: %-54s ║", baseCtx.getBundle().getProviderConfig().getModel()));
-        terminal.writer().println(String.format("║   Provider: %-51s ║", baseCtx.getBundle().getProviderConfig().getProvider()));
+        terminal.writer().println(String.format("║   Model: %-54s ║", profile.getBundle().getProviderConfig().getModel()));
+        terminal.writer().println(String.format("║   Provider: %-51s ║", profile.getBundle().getProviderConfig().getProvider()));
         terminal.writer().println("║                                                                  ║");
         terminal.writer().println("╚══════════════════════════════════════════════════════════════════╝");
         terminal.writer().println();
