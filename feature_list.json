@@ -1,6 +1,6 @@
 {
   "project": "meta-claw",
-  "last_updated": "2026-06-06",
+  "last_updated": "2026-06-12",
   "package_structure": {
     "config": "meta.claw.core.config — 所有配置模型 + 加载器 + 解析器",
     "vessel": "meta.claw.core.vessel — Vessel 用户域（Profile + Initializer）",
@@ -666,6 +666,29 @@
         }
       ],
       "notes": "Phase 2 完成。当前仅支持本地 @Tool 工具循环；Phase 3 将接入 HITL 子系统。"
+    },
+    {
+      "id": "hitl-001",
+      "priority": 22,
+      "area": "hitl",
+      "title": "HITL 子系统：异步票据挂起与恢复",
+      "user_visible_behavior": "当 LLM 返回的工具调用命中审批策略时，执行器抛出 HitlSuspendedException 并携带 ApprovalTicket；外部收集用户决议后可调用 VesselRuntime.resume(task, ticket, resolution) 继续完成 ReAct 循环。",
+      "status": "passing",
+      "verification": [
+        "确认 HitlSubSystem 作为 VesselSubSystem 实现存在（priority=15）。",
+        "确认 ConfigurableHitlPolicy 支持 default-require-approval 与 require/skip 名单。",
+        "确认 AgentExecutor.execute() 在需要审批时抛出 HitlSuspendedException。",
+        "确认 VesselRuntime.resume() 与 AgentExecutor.resume() 能从挂起状态恢复并继续循环。",
+        "运行 ./init.sh 通过"
+      ],
+      "evidence": [
+        {
+          "date": "2026-06-12",
+          "result": "passing",
+          "detail": "新增 HITL 值对象、策略、Gate、HitlSubSystem、HitlSuspendedException；AgentExecutor 与 VesselRuntime 支持 resume；新增 ConfigurableHitlPolicyTest、HitlSubSystemTest、AgentExecutorHitlTest；./init.sh 9 个 reactor 模块全部 SUCCESS。"
+        }
+      ],
+      "notes": "Phase 3 完成。当前仅支持非流式执行路径；chatStream 未集成 HITL。InMemoryHitlGate 为内存实现，不支持进程重启恢复。"
     }
   ]
 }

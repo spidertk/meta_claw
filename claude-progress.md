@@ -1179,3 +1179,33 @@
 - 下一步最佳动作：
   1. Phase 3: HITL 子系统
   2. 或由用户决定下一项功能优先级
+
+### Session 037
+
+- 日期：2026-06-12
+- 本轮目标：Phase 3 - HITL 子系统实现
+- 已完成：
+  - 新增 HITL 值对象与决策模型：HitlDecision、ApprovalStatus、ToolCallContext、ApprovalItem、ApprovalTicket、ApprovalResolution、HitlEvaluation
+  - 新增 HITL 策略与 Gate：HitlPolicy、ConfigurableHitlPolicy、HitlGate、InMemoryHitlGate、CliHitlGate（位于 cli 模块）
+  - 新增 HitlSubSystem（priority=15），作为 VesselSubSystem 接入
+  - 新增 HitlSuspendedException 与 ErrorCode.HITL_SUSPENDED
+  - 在 AgentExecutor 中集成 HITL 检查：需要审批时抛出 HitlSuspendedException
+  - 实现 VesselRuntime.resume(task, ticket, resolution) 与 AgentExecutor.resume(...)，支持从挂起状态恢复并继续 ReAct 循环
+  - 新增测试：ConfigurableHitlPolicyTest、HitlSubSystemTest、AgentExecutorHitlTest
+  - 更新 init.sh P0 测试列表，将新增 HITL 测试纳入标准验证
+- 运行过的验证：
+  - `./init.sh` → 成功；9 个 reactor 模块全部 SUCCESS，core 11 个测试全部通过
+- 更新过的文件或工件：
+  - 新增 core HITL 领域类 11 个
+  - 新增 `meta-claw-cli/src/main/java/meta/claw/cli/hitl/CliHitlGate.java`
+  - 修改 `AgentExecutor.java`、`VesselRuntime.java`、`ErrorCode.java`、`init.sh`
+  - 新增 HITL 测试 3 个
+  - `meta-claw-core/pom.xml` 增加 `spring-test` test 依赖
+  - `claude-progress.md`、`feature_list.json`、`clean-state-checklist.md`
+- 已知风险或未解决的问题：
+  - 当前 HITL 仅集成到非流式 `AgentExecutor.execute()` 路径；`chatStream()` 未集成
+  - `InMemoryHitlGate` 为内存实现，进程重启后 ticket 失效；持久化留给后续 Phase
+  - CLI 默认使用 streaming，如需在 CLI 中体验 HITL，需要新增非流式入口或 `--no-stream` 选项
+- 下一步最佳动作：
+  1. Phase 4: Skill 子系统
+  2. 或由用户决定下一项功能优先级
