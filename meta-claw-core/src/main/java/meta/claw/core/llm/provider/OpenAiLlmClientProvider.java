@@ -53,6 +53,11 @@ public class OpenAiLlmClientProvider implements LlmClientProvider {
         return clientCache.computeIfAbsent(cacheKey, k -> buildChatClient(providerConfig));
     }
 
+    @Override
+    public ChatClient createRaw(ProviderConfig providerConfig) {
+        return ChatClient.builder(buildChatModel(providerConfig)).build();
+    }
+
     /**
      * 构建缓存 key：baseUrl + model + temperature + timeout + apiKeyHash。
      * 任一配置项变化都会创建新的 ChatClient。
@@ -67,11 +72,25 @@ public class OpenAiLlmClientProvider implements LlmClientProvider {
     }
 
     private ChatClient buildChatClient(ProviderConfig providerConfig) {
+        ChatClient chatClient = ChatClient.builder(buildChatModel(providerConfig)).defaultAdvisors(
+                        ToolCallAdvisor.builder().build(),  // 外层：自动处理 tool calling 循环
+                        shortMemoryAdvisor                     // 内层：流式响应持久化到 ShortMemory
+                )
+                .build();
+
+        if (log.isDebugEnabled()) {
+            log.debug("ChatClient created successfully for model: {}", providerConfig.getModel());
+        }
+
+        return chatClient;
+    }
+
+    private org.springframework.ai.chat.model.ChatModel buildChatModel(ProviderConfig providerConfig) {
         String apiKey = providerConfig.getApiKey();
         String baseUrl = normalizeBaseUrl(providerConfig.getBaseUrl());
         String model = providerConfig.getModel();
 
-        log.info("Creating ChatClient - apiKey prefix: {}, baseUrl: {}, model: {}",
+        log.info("Creating ChatModel - apiKey prefix: {}, baseUrl: {}, model: {}",
                 apiKey != null && apiKey.length() > 8 ? apiKey.substring(0, 8) + "..." : "null",
                 baseUrl, model);
 
@@ -100,34 +119,12 @@ public class OpenAiLlmClientProvider implements LlmClientProvider {
         }
         OpenAiChatOptions chatOptions = optionsBuilder.build();
 
-        // 编程式创建 OpenAiChatModel，先不传入 ObservationRegistry 以激活可观测性
-        OpenAiChatModel chatModel = OpenAiChatModel.builder()
+        // 编程式创建 OpenAiChatModel
+        return OpenAiChatModel.builder()
                 .openAiApi(openAiApi)
                 .defaultOptions(chatOptions)
 //                .observationRegistry(observationRegistry)
                 .build();
-
-//        // 创建 ChatClient，传入 ObservationRegistry 以激活 ChatClient 层面的可观测性
-//        ChatClient chatClient = ChatClient.builder(chatModel, observationRegistry, null, null)
-//                .defaultAdvisors(
-//                        ToolCallAdvisor.builder().build()  // 外层：自动处理 tool calling 循环
-//                        toolCallTraceAdvisor                  // 内层：记录每次 ChatModel 调用的完整消息
-//                )
-//                .build();
-
-        ChatClient chatClient = ChatClient.builder(chatModel).defaultAdvisors(
-                        ToolCallAdvisor.builder().build(),  // 外层：自动处理 tool calling 循环
-                        shortMemoryAdvisor                     // 内层：流式响应持久化到 ShortMemory
-                )
-                .build();
-
-        // 异步预热连接（可选），在后台发起一个轻量级请求以建立连接池
-        // 注意：这会增加启动时间，但能消除首次请求的延迟
-        if (log.isDebugEnabled()) {
-            log.debug("ChatClient created successfully for model: {}", model);
-        }
-
-        return chatClient;
     }
 
     /**

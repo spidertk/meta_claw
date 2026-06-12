@@ -60,6 +60,11 @@
             <groupId>org.springframework.ai</groupId>
             <artifactId>spring-ai-starter-model-openai</artifactId>
         </dependency>
+        <!-- Spring AI MCP Client 启动器：集成 MCP 工具服务 -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-starter-mcp-client</artifactId>
+        </dependency>
         <!-- Spring Boot Actuator：健康检查、指标、可观测性端点 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

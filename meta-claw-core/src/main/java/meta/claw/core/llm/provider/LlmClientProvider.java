@@ -2,11 +2,12 @@ package meta.claw.core.llm.provider;
 
 import meta.claw.core.config.ProviderConfig;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.model.ChatModel;
 
 /**
  * LLM 客户端工厂接口。
  * <p>
- * 根据 ProviderConfig 创建对应的 Spring AI ChatClient。
+ * 根据 ProviderConfig 创建对应的 Spring AI ChatClient / ChatModel。
  * 支持 OpenAI 兼容协议、Anthropic、Ollama 等不同 provider。
  * </p>
  */
@@ -19,6 +20,16 @@ public interface LlmClientProvider {
      * @return Spring AI ChatClient 实例
      */
     ChatClient create(ProviderConfig providerConfig);
+
+    /**
+     * 创建不带自动 tool-call advisor 的 ChatClient，供 AgentExecutor 手动控制 tool-call 循环使用。
+     *
+     * @param providerConfig 全局 provider 配置
+     * @return Spring AI ChatClient 实例
+     */
+    default ChatClient createRaw(ProviderConfig providerConfig) {
+        return create(providerConfig);
+    }
 
     /**
      *  代理名称

@@ -22,6 +22,15 @@ spring:
         log-completion: true
         # 记录错误日志
         include-error-logging: true
+    mcp:
+      client:
+        # MCP 客户端总开关。启用后需要本地安装 npx 才能启动 stdio MCP server。
+        enabled: false
+        stdio:
+          connections:
+            filesystem:
+              command: npx
+              args: ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"]
 
 meta:
   claw:

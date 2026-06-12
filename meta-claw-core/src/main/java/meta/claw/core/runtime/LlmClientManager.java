@@ -18,6 +18,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.ToolResponseMessage;
@@ -25,6 +26,7 @@ import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.ai.tool.ToolCallback;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -98,10 +100,12 @@ public class LlmClientManager implements SpiLlmClient {
         String content = gen != null && gen.getOutput() != null ? gen.getOutput().getText() : "";
         String reasoningContent = extractReasoningContent(gen);
         SpiUsage usage = extractUsage(chatResponse);
+        List<SpiToolCall> toolCalls = extractToolCalls(gen);
 
         return SpiChatResponse.builder()
                 .content(content != null ? content : "")
                 .reasoningContent(reasoningContent)
+                .toolCalls(toolCalls)
                 .usage(usage)
                 .build();
     }
@@ -258,6 +262,59 @@ public class LlmClientManager implements SpiLlmClient {
                 .completionTokens(usage.getCompletionTokens())
                 .totalTokens(usage.getTotalTokens())
                 .build();
+    }
+
+    /**
+     * 单次 tool-aware 调用，返回的 SpiChatResponse 可能携带 toolCalls。
+     * 由 AgentExecutor 手动控制 tool-call 循环。
+     */
+    public SpiChatResponse chatWithTools(SpiChatRequest request, ToolCallback... toolCallbacks) {
+        log.debug("LlmClientManager chatWithTools vessel={}, messages={}", request.getVesselId(), request.getMessages().size());
+
+        List<Message> messages = request.getMessages().stream()
+                .map(this::toSpringMessage)
+                .collect(Collectors.toCollection(ArrayList::new));
+
+        ChatResponse chatResponse = buildRawChatClient(request.getVesselId())
+                .prompt(new Prompt(messages))
+                .tools(toolCallbacks)
+                .call()
+                .chatResponse();
+
+        Generation gen = chatResponse.getResult();
+        String content = gen != null && gen.getOutput() != null ? gen.getOutput().getText() : "";
+        String reasoningContent = extractReasoningContent(gen);
+        SpiUsage usage = extractUsage(chatResponse);
+        List<SpiToolCall> toolCalls = extractToolCalls(gen);
+
+        return SpiChatResponse.builder()
+                .content(content != null ? content : "")
+                .reasoningContent(reasoningContent)
+                .toolCalls(toolCalls)
+                .usage(usage)
+                .build();
+    }
+
+    private ChatClient buildRawChatClient(String vesselId) {
+        ProviderConfig providerConfig = runtimeConfigResolver.resolve(vesselId).getProviderConfig();
+        return llmClientProviderManager.createRaw(providerConfig);
+    }
+
+    private static List<SpiToolCall> extractToolCalls(Generation gen) {
+        List<SpiToolCall> result = new ArrayList<>();
+        if (gen == null || !(gen.getOutput() instanceof AssistantMessage am) || !am.hasToolCalls()) {
+            return result;
+        }
+        ObjectMapper mapper = new ObjectMapper();
+        for (AssistantMessage.ToolCall tc : am.getToolCalls()) {
+            try {
+                Map<String, Object> args = mapper.readValue(tc.arguments(), new TypeReference<>() {});
+                result.add(SpiToolCall.builder().id(tc.id()).name(tc.name()).arguments(args).build());
+            } catch (Exception e) {
+                log.warn("Failed to parse tool call arguments: {}", tc.arguments(), e);
+            }
+        }
+        return result;
     }
 
     private void logRequestParams(List<Message> messages, List<Object> toolInstances) {

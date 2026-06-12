@@ -46,6 +46,8 @@ public class VesselRuntime implements InitializingBean {
     private PromptRenderer promptRenderer;
     @Autowired
     private LlmClientManager llmClient;
+    @Autowired
+    private AgentExecutor agentExecutor;
 
     /** 所有子系统，Spring 自动收集（含 VesselProfile） */
     @Autowired(required = false)
@@ -135,15 +137,13 @@ public class VesselRuntime implements InitializingBean {
                     .sessionId(task.getSessionId())
                     .build();
 
-            SpiChatResponse response = llmClient.chat(request);
-
-            String content = response != null && response.content() != null
-                    ? response.content() : "";
+            // Phase 2: 使用 AgentExecutor 执行，支持多轮 tool-call
+            Reply reply = agentExecutor.execute(ctx, request);
 
             // 保存 assistant 消息到短期记忆
-            saveAssistantMessage(task, content);
+            saveAssistantMessage(task, reply.getContent());
 
-            return new Reply(ReplyType.TEXT, content);
+            return reply;
         } finally {
             // ⑤ 任务结束生命周期（finally 中保证调用）
             registry.listAll().forEach(sub -> sub.onTaskEnd(ctx));

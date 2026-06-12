@@ -125,6 +125,36 @@ public class LlmClientProviderManager implements ApplicationContextAware, Applic
         log.debug("Routing provider '{}' to factory: {}", provider.providerName(), provider.getClass().getSimpleName());
         return provider.create(providerConfig);
 
+    }
+
+    /**
+     * 根据 provider 名称创建不带自动 tool-call advisor 的 ChatClient
+     *
+     * @param providerConfig provider 配置
+     * @return ChatClient 实例
+     * @throws IllegalArgumentException 如果没有找到支持该 provider 的工厂
+     */
+    public ChatClient createRaw(ProviderConfig providerConfig) {
+        if (allProviders == null || allProviders.isEmpty()) {
+            String errorMsg = String.format(
+                    "No LlmClientFactory supports provider: '%s'. Available providers",
+                    providerConfig.getProvider()
+            );
+            log.error(errorMsg);
+            throw new IllegalArgumentException(errorMsg);
         }
+        LlmClientProvider provider = allProviders.get(providerConfig.getProvider());
+        if (provider == null) {
+            String errorMsg = String.format(
+                    "No LlmClientFactory supports provider: '%s'. Available providers:'%s' ",
+                    providerConfig.getProvider(), allProviders.values().stream().map(LlmClientProvider::providerName).toList()
+            );
+            log.error(errorMsg);
+            throw new IllegalArgumentException(errorMsg);
+        }
+        log.debug("Routing provider '{}' to raw ChatClient factory: {}", provider.providerName(), provider.getClass().getSimpleName());
+        return provider.createRaw(providerConfig);
+
+}
 
 }
