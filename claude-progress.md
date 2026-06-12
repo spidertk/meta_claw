@@ -1263,5 +1263,28 @@
   - `InMemoryHitlGate` 为内存实现，进程重启后 ticket 失效；持久化留给后续 Phase
   - 流式路径中 HITL 暂停时，回调会阻塞读取 `System.in`；Gateway 等渠道需要自定义 `onHitlSuspend` 行为
 - 下一步最佳动作：
-  1. Phase 4: Skill 子系统
+  1. Phase 5: Metrics 子系统
   2. 或由用户决定下一项功能优先级
+
+### Session 040
+
+- 日期：2026-06-12
+- 本轮目标：Phase 5 - Metrics 子系统实现
+- 已完成：
+  - 新增 `MetricSnapshot` 值对象：封装单次任务的 vesselId、taskId、stepCount、durationMs、tokenUsage
+  - 新增 `MetricsSubSystem`（priority=100）：作为 `VesselSubSystem` 接入，在 `onTaskEnd` 记录 `agent.task.completed` 与 `agent.steps` 计数器，标签带 `vessel`
+  - 新增 `MetricsSubSystemTest`：验证任务完成计数器与步数计数器正确累加
+  - 更新 `init.sh`：将 `MetricsSubSystemTest` 纳入 P0 测试列表
+- 运行过的验证：
+  - `./init.sh` → 成功；9 个 reactor 模块全部 SUCCESS，core 22 个测试全部通过（含新增 MetricsSubSystemTest 2/2）
+- 更新过的文件或工件：
+  - 新增 `meta-claw-core/src/main/java/meta/claw/core/runtime/metrics/MetricSnapshot.java`
+  - 新增 `meta-claw-core/src/main/java/meta/claw/core/runtime/subsystem/MetricsSubSystem.java`
+  - 新增 `meta-claw-core/src/test/java/meta/claw/core/runtime/subsystem/MetricsSubSystemTest.java`
+  - 修改 `init.sh`
+  - `claude-progress.md`、`feature_list.json`、`clean-state-checklist.md`
+- 已知风险或未解决的问题：
+  - Metrics 当前仅记录任务完成与步数；Token 消耗、LLM 延迟、工具调用次数等细化指标待后续补充
+- 下一步最佳动作：
+  1. 提交本轮修改
+  2. 由用户决定下一项功能优先级
