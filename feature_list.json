@@ -691,6 +691,29 @@
         }
       ],
       "notes": "Phase 3 完成。非流式与流式执行路径均已集成 HITL。InMemoryHitlGate 为内存实现，不支持进程重启恢复；Gateway 等渠道需自定义 onHitlSuspend 行为。"
+    },
+    {
+      "id": "skill-001",
+      "priority": 23,
+      "area": "skill",
+      "title": "Skill 子系统：SKILL.md 加载与 read_skill 工具",
+      "user_visible_behavior": "系统能从 .meta-claw/skills/ 与 vessels/{vessel}/skills/ 加载 SKILL.md，将可用技能列表注入系统提示；LLM 可通过 read_skill 工具按需读取技能完整内容。",
+      "status": "passing",
+      "verification": [
+        "确认 SkillSubSystem 作为 VesselSubSystem 实现存在（priority=30）。",
+        "确认 SkillRegistry 能加载系统级与 Vessel 私有 SKILL.md，且私有覆盖系统级同名技能。",
+        "确认 SkillSubSystem.promptVars() 注入 {skills} 变量。",
+        "确认 ReadSkillTool 能读取指定技能内容。",
+        "运行 ./init.sh 通过"
+      ],
+      "evidence": [
+        {
+          "date": "2026-06-12",
+          "result": "passing",
+          "detail": "新增 Skill 领域模型、SkillRegistry、SkillSubSystem、VesselAwareSubSystem、ReadSkillTool；VesselRuntime 统一调用 loadForVessel；新增 SkillRegistryTest、SkillSubSystemTest、ReadSkillToolTest；init.sh 纳入 meta-claw-tool 与 Skill 测试；./init.sh 9 个 reactor 模块全部 SUCCESS。"
+        }
+      ],
+      "notes": "Phase 4 完成。当前 Skill 内容通过 read_skill 工具按需读取；未来可扩展为自动触发或 RAG 检索。"
     }
   ]
 }

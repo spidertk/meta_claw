@@ -1208,6 +1208,34 @@
   1. Phase 4: Skill 子系统
   2. 或由用户决定下一项功能优先级
 
+### Session 039
+
+- 日期：2026-06-12
+- 本轮目标：Phase 4 - Skill 子系统实现
+- 已完成：
+  - 新增 `Skill` 领域模型与 `SkillRegistry`：扫描系统级 `.meta-claw/skills/` 与 Vessel 私有 `.meta-claw/vessels/{vessel}/skills/` 下的 `SKILL.md`
+  - 新增 `SkillSubSystem`（priority=30），通过 `promptVars()` 注入 `{skills}` 变量
+  - 新增 `VesselAwareSubSystem` 接口，统一 `VesselProfile` 与 `SkillSubSystem` 的 `loadForVessel(vesselId)` 调用
+  - 修改 `VesselRuntime` 对所有 `VesselAwareSubSystem` 调用 `loadForVessel`
+  - 新增 `ReadSkillTool`（`meta-claw-tool`）：供 LLM 按需读取技能完整内容
+  - 新增测试：`SkillRegistryTest`、`SkillSubSystemTest`、`ReadSkillToolTest`
+  - 更新 `init.sh`：将 `meta-claw-tool` 与 Skill 相关测试纳入 P0 验证
+- 运行过的验证：
+  - `./init.sh` → 成功；9 个 reactor 模块全部 SUCCESS，core 20 个测试、tool 2 个测试全部通过
+- 更新过的文件或工件：
+  - 新增 `Skill.java`、`SkillRegistry.java`、`SkillSubSystem.java`、`VesselAwareSubSystem.java`
+  - 新增 `ReadSkillTool.java`
+  - 修改 `VesselProfile.java`、`VesselRuntime.java`
+  - 新增 `SkillRegistryTest.java`、`SkillSubSystemTest.java`、`ReadSkillToolTest.java`
+  - 修改 `meta-claw-tool/pom.xml`（新增 spring-test、mockito-core test 依赖）
+  - 修改 `init.sh`
+  - `claude-progress.md`、`feature_list.json`、`clean-state-checklist.md`
+- 已知风险或未解决的问题：
+  - 当前无新增 blocker
+- 下一步最佳动作：
+  1. Phase 5: Metrics 子系统
+  2. 或由用户决定下一项功能优先级
+
 ### Session 038
 
 - 日期：2026-06-12
