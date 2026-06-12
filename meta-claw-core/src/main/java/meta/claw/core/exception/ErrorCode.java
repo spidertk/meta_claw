@@ -13,7 +13,10 @@ public enum ErrorCode {
     VESSEL_API_KEY_MISSING("V005", "API key not set for provider '{0}'"),
     VESSEL_MODEL_MISSING("V006", "Model not set for provider '{0}'"),
     VESSEL_META_PARSE_ERROR("V007", "Failed to parse vessel config: {0}"),
-    VESSEL_PROFILE_PARSE_ERROR("V008", "Failed to parse vessel profile: {0}");
+    VESSEL_PROFILE_PARSE_ERROR("V008", "Failed to parse vessel profile: {0}"),
+
+    // HITL domain (Hxxx)
+    HITL_SUSPENDED("H001", "Tool execution suspended awaiting approval: {0}");
 
     private final String code;
     private final String template;

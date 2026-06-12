@@ -10,6 +10,9 @@ import meta.claw.core.memory.MemoryMessageConverter;
 import meta.claw.core.memory.shortterm.ShortMemory;
 import meta.claw.core.message.Reply;
 import meta.claw.core.message.ReplyType;
+import meta.claw.core.runtime.hitl.ApprovalResolution;
+import meta.claw.core.runtime.hitl.ApprovalTicket;
+import meta.claw.core.tool.SpiToolCall;
 import meta.claw.core.prompt.PromptComposer;
 import meta.claw.core.prompt.PromptRenderer;
 import meta.claw.core.prompt.PromptVars;
@@ -29,6 +32,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -116,6 +120,31 @@ public class VesselRuntime implements InitializingBean {
 
     public Reply chat(String sessionId, String userMessage) {
         return execute(newTask(sessionId, userMessage));
+    }
+
+    /**
+     * 从 HITL 挂起状态恢复，继续完成 ReAct 循环。
+     */
+    public Reply resume(VesselTask task, ApprovalTicket ticket, ApprovalResolution resolution) {
+        String systemPrompt = renderSystemPrompt();
+        TaskContext ctx = new TaskContext(task, getProfile(), registry);
+        registry.listAll().forEach(sub -> sub.onTaskStart(ctx));
+        try {
+            List<SpiMessage> messages = buildLlmRequest(task, systemPrompt);
+            messages.add(SpiMessage.assistant(null, rebuildToolCalls(ticket)));
+
+            SpiChatRequest request = SpiChatRequest.builder()
+                    .vesselId(task.getVesselId())
+                    .messages(messages)
+                    .sessionId(task.getSessionId())
+                    .build();
+
+            Reply reply = agentExecutor.resume(ctx, request, ticket, resolution);
+            saveAssistantMessage(task, reply.getContent());
+            return reply;
+        } finally {
+            registry.listAll().forEach(sub -> sub.onTaskEnd(ctx));
+        }
     }
 
     public Reply execute(VesselTask task) {
@@ -247,6 +276,25 @@ public class VesselRuntime implements InitializingBean {
 
     private static String detectLocation() {
         return ZoneId.systemDefault().getId();
+    }
+
+    private List<SpiToolCall> rebuildToolCalls(ApprovalTicket ticket) {
+        com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        List<SpiToolCall> calls = new ArrayList<>();
+        for (meta.claw.core.runtime.hitl.ApprovalItem item : ticket.getItems()) {
+            Map<String, Object> args;
+            try {
+                args = mapper.readValue(item.getArgumentsJson(), new com.fasterxml.jackson.core.type.TypeReference<>() {});
+            } catch (Exception e) {
+                args = Map.of();
+            }
+            calls.add(SpiToolCall.builder()
+                    .id(item.getToolCallId())
+                    .name(item.getToolName())
+                    .arguments(args)
+                    .build());
+        }
+        return calls;
     }
 
     public void shutdown() {

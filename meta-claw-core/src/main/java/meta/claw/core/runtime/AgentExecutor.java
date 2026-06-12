@@ -7,6 +7,8 @@ import meta.claw.core.llm.SpiChatResponse;
 import meta.claw.core.llm.SpiMessage;
 import meta.claw.core.message.Reply;
 import meta.claw.core.message.ReplyType;
+import meta.claw.core.runtime.hitl.*;
+import meta.claw.core.runtime.subsystem.HitlSubSystem;
 import meta.claw.core.runtime.subsystem.ToolSubSystem;
 import meta.claw.core.tool.SpiToolCall;
 import org.springframework.ai.tool.ToolCallback;
@@ -41,16 +43,50 @@ public class AgentExecutor {
      */
     public Reply execute(TaskContext ctx, SpiChatRequest request) {
         ToolSubSystem toolSub = ctx.getSubSystem("tool");
+        HitlSubSystem hitlSub = ctx.getSubSystem("hitl");
         List<ToolCallback> tools = toolSub != null ? toolSub.getToolCallbacks() : List.of();
-        Map<String, ToolCallback> toolMap = tools.stream()
-                .collect(Collectors.toMap(
-                        tc -> tc.getToolDefinition().name(),
-                        Function.identity(),
-                        (a, b) -> a));
+        Map<String, ToolCallback> toolMap = buildToolMap(tools);
 
         List<SpiMessage> messages = new ArrayList<>(request.getMessages());
 
-        for (int step = 1; step <= maxSteps; step++) {
+        return reactLoop(ctx, request, messages, tools, toolMap, hitlSub, 1);
+    }
+
+    /**
+     * 从 HITL 挂起状态恢复，继续完成 ReAct 循环。
+     *
+     * @param request 已包含挂起前 assistant tool_calls 消息的完整请求
+     * @param ticket  挂起时生成的审批票证
+     * @param resolution 用户决议
+     */
+    public Reply resume(TaskContext ctx, SpiChatRequest request,
+                        ApprovalTicket ticket, ApprovalResolution resolution) {
+        ToolSubSystem toolSub = ctx.getSubSystem("tool");
+        List<ToolCallback> tools = toolSub != null ? toolSub.getToolCallbacks() : List.of();
+        Map<String, ToolCallback> toolMap = buildToolMap(tools);
+
+        List<SpiMessage> messages = new ArrayList<>(request.getMessages());
+
+        // 根据决议执行被挂起的 tool calls
+        for (ApprovalItem item : ticket.getItems()) {
+            ApprovalStatus status = resolution.getDecisions().get(item.getToolCallId());
+            String result = (status == ApprovalStatus.APPROVED)
+                    ? executeToolCall(toolMap.get(item.getToolName()), item)
+                    : "REJECTED by operator";
+
+            String toolResultJson = buildToolResultJson(item.getToolCallId(), item.getToolName(), result);
+            messages.add(SpiMessage.tool(toolResultJson));
+            ctx.getMessages().add(SpiMessage.tool(toolResultJson));
+        }
+
+        // 继续 ReAct 循环（从第 2 步开始，因为第 1 步已生成 tool_calls）
+        return reactLoop(ctx, request, messages, tools, toolMap, null, 2);
+    }
+
+    private Reply reactLoop(TaskContext ctx, SpiChatRequest request, List<SpiMessage> messages,
+                            List<ToolCallback> tools, Map<String, ToolCallback> toolMap,
+                            HitlSubSystem hitlSub, int startStep) {
+        for (int step = startStep; step <= maxSteps; step++) {
             ctx.getSteps().add(StepRecord.builder()
                     .stepNumber(step)
                     .action("llm-call")
@@ -71,43 +107,79 @@ public class AgentExecutor {
                 return new Reply(ReplyType.TEXT, content);
             }
 
+            // HITL 检查：需要审批时挂起执行
+            if (hitlSub != null) {
+                HitlEvaluation evaluation = hitlSub.evaluate(response.toolCalls(), ctx);
+                if (evaluation.hasSuspensions()) {
+                    throw new HitlSuspendedException(evaluation.getTicket());
+                }
+            }
+
             // 添加 assistant 消息（含 tool calls）
             messages.add(SpiMessage.assistant(response.content(), response.toolCalls()));
             ctx.getMessages().add(SpiMessage.assistant(response.content(), response.toolCalls()));
 
             // 执行 tool calls 并将结果回注到消息列表
             for (SpiToolCall tc : response.toolCalls()) {
-                ToolCallback callback = toolMap.get(tc.getName());
-                String result;
-                if (callback != null) {
-                    try {
-                        String argsJson = objectMapper.writeValueAsString(tc.getArguments());
-                        result = callback.call(argsJson);
-                        log.debug("Tool {} executed, result: {}", tc.getName(), result);
-                    } catch (Exception e) {
-                        log.warn("Tool {} execution failed: {}", tc.getName(), e.getMessage(), e);
-                        result = "Error: " + e.getMessage();
-                    }
-                } else {
-                    log.warn("Tool {} not found in registry", tc.getName());
-                    result = "Error: tool not found";
-                }
-
-                String toolResultJson;
-                try {
-                    toolResultJson = objectMapper.writeValueAsString(Map.of(
-                            "toolCallId", tc.getId(),
-                            "toolName", tc.getName(),
-                            "result", result
-                    ));
-                } catch (Exception e) {
-                    toolResultJson = "{\"toolCallId\":\"" + tc.getId() + "\",\"result\":\"" + result.replace("\"", "\\\"") + "\"}";
-                }
+                String result = executeToolCall(toolMap.get(tc.getName()), tc);
+                String toolResultJson = buildToolResultJson(tc.getId(), tc.getName(), result);
                 messages.add(SpiMessage.tool(toolResultJson));
                 ctx.getMessages().add(SpiMessage.tool(toolResultJson));
             }
         }
 
         throw new RuntimeException("超过最大步数: " + maxSteps);
+    }
+
+    private Map<String, ToolCallback> buildToolMap(List<ToolCallback> tools) {
+        return tools.stream()
+                .collect(Collectors.toMap(
+                        tc -> tc.getToolDefinition().name(),
+                        Function.identity(),
+                        (a, b) -> a));
+    }
+
+    private String executeToolCall(ToolCallback callback, SpiToolCall tc) {
+        if (callback == null) {
+            log.warn("Tool {} not found in registry", tc.getName());
+            return "Error: tool not found";
+        }
+        try {
+            String argsJson = objectMapper.writeValueAsString(tc.getArguments());
+            String result = callback.call(argsJson);
+            log.debug("Tool {} executed, result: {}", tc.getName(), result);
+            return result;
+        } catch (Exception e) {
+            log.warn("Tool {} execution failed: {}", tc.getName(), e.getMessage(), e);
+            return "Error: " + e.getMessage();
+        }
+    }
+
+    private String executeToolCall(ToolCallback callback, ApprovalItem item) {
+        if (callback == null) {
+            log.warn("Tool {} not found in registry", item.getToolName());
+            return "Error: tool not found";
+        }
+        try {
+            String result = callback.call(item.getArgumentsJson());
+            log.debug("Tool {} executed, result: {}", item.getToolName(), result);
+            return result;
+        } catch (Exception e) {
+            log.warn("Tool {} execution failed: {}", item.getToolName(), e.getMessage(), e);
+            return "Error: " + e.getMessage();
+        }
+    }
+
+    private String buildToolResultJson(String toolCallId, String toolName, String result) {
+        try {
+            return objectMapper.writeValueAsString(Map.of(
+                    "toolCallId", toolCallId,
+                    "toolName", toolName,
+                    "result", result
+            ));
+        } catch (Exception e) {
+            return "{\"toolCallId\":\"" + toolCallId + "\",\"toolName\":\"" + toolName
+                    + "\",\"result\":\"" + result.replace("\"", "\\\"") + "\"}";
+        }
     }
 }
