@@ -1203,9 +1203,37 @@
   - `meta-claw-core/pom.xml` 增加 `spring-test` test 依赖
   - `claude-progress.md`、`feature_list.json`、`clean-state-checklist.md`
 - 已知风险或未解决的问题：
-  - 当前 HITL 仅集成到非流式 `AgentExecutor.execute()` 路径；`chatStream()` 未集成
   - `InMemoryHitlGate` 为内存实现，进程重启后 ticket 失效；持久化留给后续 Phase
-  - CLI 默认使用 streaming，如需在 CLI 中体验 HITL，需要新增非流式入口或 `--no-stream` 选项
+- 下一步最佳动作：
+  1. Phase 4: Skill 子系统
+  2. 或由用户决定下一项功能优先级
+
+### Session 038
+
+- 日期：2026-06-12
+- 本轮目标：将 HITL 集成到流式执行路径
+- 已完成：
+  - 修改 `SpiStreamingCallback`，新增 `onHitlSuspend(ApprovalTicket)` 回调
+  - 新增 `LlmClientManager.streamWithTools()`：一轮流式 LLM 调用，实时输出 content/reasoning/tool call 并返回最终 `SpiChatResponse`
+  - 新增 `StreamingAgentExecutor`：基于 `streamWithTools` 的流式 ReAct 循环，集成 HITL 审批与恢复
+  - 修改 `VesselRuntime.chatStream()`：创建 `TaskContext`、触发子系统生命周期、委托 `StreamingAgentExecutor`
+  - 修改 `ChatCommand`：在流式回调中处理 `onHitlSuspend`，读取用户输入并返回 `ApprovalResolution`
+  - 新增 `StreamingAgentExecutorTest` 覆盖无工具调用、自动执行、HITL 挂起恢复三种场景
+  - 更新 `init.sh` P0 测试列表
+- 运行过的验证：
+  - `./init.sh` → 成功；9 个 reactor 模块全部 SUCCESS，core 14 个测试全部通过
+- 更新过的文件或工件：
+  - `meta-claw-core/src/main/java/meta/claw/core/llm/SpiStreamingCallback.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/runtime/LlmClientManager.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/runtime/StreamingAgentExecutor.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/runtime/VesselRuntime.java`
+  - `meta-claw-cli/src/main/java/meta/claw/cli/ChatCommand.java`
+  - `meta-claw-core/src/test/java/meta/claw/core/runtime/StreamingAgentExecutorTest.java`
+  - `init.sh`
+  - `claude-progress.md`、`feature_list.json`、`clean-state-checklist.md`
+- 已知风险或未解决的问题：
+  - `InMemoryHitlGate` 为内存实现，进程重启后 ticket 失效；持久化留给后续 Phase
+  - 流式路径中 HITL 暂停时，回调会阻塞读取 `System.in`；Gateway 等渠道需要自定义 `onHitlSuspend` 行为
 - 下一步最佳动作：
   1. Phase 4: Skill 子系统
   2. 或由用户决定下一项功能优先级

@@ -679,16 +679,18 @@
         "确认 ConfigurableHitlPolicy 支持 default-require-approval 与 require/skip 名单。",
         "确认 AgentExecutor.execute() 在需要审批时抛出 HitlSuspendedException。",
         "确认 VesselRuntime.resume() 与 AgentExecutor.resume() 能从挂起状态恢复并继续循环。",
+        "确认 StreamingAgentExecutor 在流式路径中集成 HITL 审批与恢复。",
+        "确认 ChatCommand 的流式回调处理 onHitlSuspend 并收集用户输入。",
         "运行 ./init.sh 通过"
       ],
       "evidence": [
         {
           "date": "2026-06-12",
           "result": "passing",
-          "detail": "新增 HITL 值对象、策略、Gate、HitlSubSystem、HitlSuspendedException；AgentExecutor 与 VesselRuntime 支持 resume；新增 ConfigurableHitlPolicyTest、HitlSubSystemTest、AgentExecutorHitlTest；./init.sh 9 个 reactor 模块全部 SUCCESS。"
+          "detail": "新增 HITL 值对象、策略、Gate、HitlSubSystem、HitlSuspendedException；AgentExecutor 与 VesselRuntime 支持 resume；新增 StreamingAgentExecutor 与 LlmClientManager.streamWithTools()，将 HITL 集成到流式路径；ChatCommand 处理 onHitlSuspend；新增 ConfigurableHitlPolicyTest、HitlSubSystemTest、AgentExecutorHitlTest、StreamingAgentExecutorTest；./init.sh 9 个 reactor 模块全部 SUCCESS。"
         }
       ],
-      "notes": "Phase 3 完成。当前仅支持非流式执行路径；chatStream 未集成 HITL。InMemoryHitlGate 为内存实现，不支持进程重启恢复。"
+      "notes": "Phase 3 完成。非流式与流式执行路径均已集成 HITL。InMemoryHitlGate 为内存实现，不支持进程重启恢复；Gateway 等渠道需自定义 onHitlSuspend 行为。"
     }
   ]
 }
