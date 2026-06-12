@@ -1148,3 +1148,34 @@
   - 当前无新增 blocker
 - 下一步最佳动作：
   1. Phase 2: Tool 子系统 + Spring AI 1.1.7 + ReActLoop
+
+### Session 036
+
+- 日期：2026-06-06
+- 本轮目标：Phase 2 - Tool 子系统 + Spring AI 1.1.7 + ReActLoop 集成
+- 已完成：
+  - 新增 `ToolSubSystem`（priority=20），从 `ToolRegistry` 收集本地 `@Tool` 工具并注入 `tools` prompt 变量
+  - 重构 `LlmClientManager`：使用 `ChatClient.tools(Object...)` 适配 Spring AI 1.1.7 ToolCallback API
+  - 新增 `AgentExecutor` / `ReActLoop`：多轮 tool-call 循环，支持工具执行、结果回注、HITL 检查点、`maxSteps` 限制
+  - `VesselRuntime.execute()` 改为 `agentExecutor.execute(ctx, request)`
+  - 新增 `ToolSubSystemTest`、`AgentExecutorTest` 等测试
+- 运行过的验证：
+  - `mvn test`（全仓）→ 成功
+  - `./init.sh` → 成功；9 个 reactor 模块全部 SUCCESS
+- 更新过的文件或工件：
+  - `meta-claw-core/src/main/java/meta/claw/core/runtime/subsystem/ToolSubSystem.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/runtime/AgentExecutor.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/runtime/LlmClientManager.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/runtime/VesselRuntime.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/llm/provider/LlmClientProvider.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/llm/provider/LlmClientProviderManager.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/llm/provider/OpenAiLlmClientProvider.java`
+  - `meta-claw-bootstrap/pom.xml`
+  - `meta-claw-bootstrap/src/main/resources/application.yml`
+  - 新增测试：`ToolSubSystemTest`、`AgentExecutorTest`
+  - `feature_list.json`、`claude-progress.md`
+- 已知风险或未解决的问题：
+  - 当前无新增 blocker
+- 下一步最佳动作：
+  1. Phase 3: HITL 子系统
+  2. 或由用户决定下一项功能优先级
