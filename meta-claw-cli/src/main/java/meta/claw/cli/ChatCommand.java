@@ -8,6 +8,10 @@ import meta.claw.core.memory.shortterm.SessionSelection;
 import meta.claw.core.llm.SpiChatResponse;
 import meta.claw.core.llm.SpiStreamingCallback;
 import meta.claw.core.llm.SpiUsage;
+import meta.claw.core.runtime.hitl.ApprovalItem;
+import meta.claw.core.runtime.hitl.ApprovalResolution;
+import meta.claw.core.runtime.hitl.ApprovalStatus;
+import meta.claw.core.runtime.hitl.ApprovalTicket;
 import meta.claw.core.runtime.VesselManager;
 import meta.claw.core.runtime.VesselRuntime;
 import meta.claw.core.tool.SpiToolCall;
@@ -175,6 +179,39 @@ public class ChatCommand implements Runnable {
                         terminal.writer().print(chunk);
                         terminal.writer().flush();
                         responseBuffer.append(chunk);
+                    }
+
+                    @Override
+                    public ApprovalResolution onHitlSuspend(ApprovalTicket ticket) {
+                        // 如果正在输出 thinking，先关闭灰色模式
+                        if (hasReasoning[0] && !hasContent[0]) {
+                            terminal.writer().println("\u001B[0m");
+                            hasContent[0] = true;
+                        }
+                        terminal.writer().println("\n🔒 以下工具调用需要审批：");
+                        for (ApprovalItem item : ticket.getItems()) {
+                            terminal.writer().printf("  - %s: %s%n", item.getToolName(), item.getArgumentsJson());
+                        }
+                        terminal.writer().print("批准全部? (Y/n): ");
+                        terminal.writer().flush();
+                        try {
+                            String input = reader.readLine();
+                            boolean approved = input == null || input.trim().isEmpty()
+                                    || input.trim().equalsIgnoreCase("Y")
+                                    || input.trim().equalsIgnoreCase("yes");
+                            java.util.Map<String, ApprovalStatus> decisions = new java.util.HashMap<>();
+                            for (ApprovalItem item : ticket.getItems()) {
+                                decisions.put(item.getToolCallId(), approved ? ApprovalStatus.APPROVED : ApprovalStatus.REJECTED);
+                            }
+                            return ApprovalResolution.builder()
+                                    .ticketId(ticket.getTicketId())
+                                    .decisions(decisions)
+                                    .operator("cli-user")
+                                    .build();
+                        } catch (IOException e) {
+                            log.warn("Failed to read HITL approval input", e);
+                            return null;
+                        }
                     }
 
                     @Override

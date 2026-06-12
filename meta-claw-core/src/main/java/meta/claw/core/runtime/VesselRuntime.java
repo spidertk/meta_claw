@@ -52,6 +52,8 @@ public class VesselRuntime implements InitializingBean {
     private LlmClientManager llmClient;
     @Autowired
     private AgentExecutor agentExecutor;
+    @Autowired
+    private StreamingAgentExecutor streamingAgentExecutor;
 
     /** 所有子系统，Spring 自动收集（含 VesselProfile） */
     @Autowired(required = false)
@@ -182,13 +184,20 @@ public class VesselRuntime implements InitializingBean {
     public void chatStream(String sessionId, String userMessage, SpiStreamingCallback callback) {
         String systemPrompt = renderSystemPrompt();
         VesselTask task = newTask(sessionId, userMessage);
-        List<SpiMessage> messages = buildLlmRequest(task, systemPrompt);
-        SpiChatRequest request = SpiChatRequest.builder()
-                .vesselId(task.getVesselId())
-                .messages(messages)
-                .sessionId(task.getSessionId())
-                .build();
-        llmClient.chatStream(request, callback);
+        TaskContext ctx = new TaskContext(task, getProfile(), registry);
+        registry.listAll().forEach(sub -> sub.onTaskStart(ctx));
+        try {
+            List<SpiMessage> messages = buildLlmRequest(task, systemPrompt);
+            SpiChatRequest request = SpiChatRequest.builder()
+                    .vesselId(task.getVesselId())
+                    .messages(messages)
+                    .sessionId(task.getSessionId())
+                    .build();
+            Reply reply = streamingAgentExecutor.execute(ctx, request, callback);
+            saveAssistantMessage(task, reply.getContent());
+        } finally {
+            registry.listAll().forEach(sub -> sub.onTaskEnd(ctx));
+        }
     }
 
     // ========== 便捷方法（向后兼容）==========

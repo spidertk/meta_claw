@@ -110,6 +110,106 @@ public class LlmClientManager implements SpiLlmClient {
                 .build();
     }
 
+    /**
+     * 单次 tool-aware 流式调用，返回最终响应（含 toolCalls），不执行 tool-call 循环。
+     * <p>内容 chunk 通过 callback 实时输出。</p>
+     */
+    public SpiChatResponse streamWithTools(SpiChatRequest request, ToolCallback[] toolCallbacks,
+                                           SpiStreamingCallback callback) {
+        long startTime = System.currentTimeMillis();
+        callback.onStart();
+
+        List<Message> messages = request.getMessages().stream()
+                .map(this::toSpringMessage)
+                .collect(Collectors.toCollection(ArrayList::new));
+
+        StringBuilder contentBuilder = new StringBuilder();
+        StringBuilder reasoningBuilder = new StringBuilder();
+        AtomicReference<SpiUsage> usageRef = new AtomicReference<>();
+        AtomicReference<List<SpiToolCall>> toolCallsRef = new AtomicReference<>(List.of());
+        ObjectMapper objectMapper = new ObjectMapper();
+
+        try {
+            buildRawChatClient(request.getVesselId())
+                    .prompt(new Prompt(messages))
+                    .tools(toolCallbacks)
+                    .stream()
+                    .chatResponse()
+                    .doOnNext(response -> {
+                        Generation gen = response.getResult();
+                        if (gen != null && gen.getOutput() != null) {
+                            String content = gen.getOutput().getText();
+                            String reasoningChunk = extractReasoningContent(gen);
+
+                            if (reasoningChunk != null && !reasoningChunk.isEmpty()) {
+                                reasoningBuilder.append(reasoningChunk);
+                                callback.onReasoningChunk(reasoningChunk);
+                            }
+                            if (content != null && !content.isEmpty()) {
+                                contentBuilder.append(content);
+                                callback.onChunk(content);
+                            }
+
+                            if (gen.getOutput() instanceof AssistantMessage am && am.hasToolCalls()) {
+                                String finishReason = gen.getMetadata() != null ? gen.getMetadata().getFinishReason() : null;
+                                if ("tool_calls".equals(finishReason)) {
+                                    List<SpiToolCall> calls = new ArrayList<>();
+                                    am.getToolCalls().forEach(tc -> {
+                                        try {
+                                            Map<String, Object> args = objectMapper.readValue(
+                                                    tc.arguments(), new TypeReference<>() {});
+                                            SpiToolCall spiToolCall = SpiToolCall.builder()
+                                                    .id(tc.id())
+                                                    .name(tc.name())
+                                                    .arguments(args)
+                                                    .build();
+                                            calls.add(spiToolCall);
+                                            callback.onToolCall(spiToolCall);
+                                        } catch (Exception e) {
+                                            log.warn("Failed to parse tool call arguments: {}", tc.arguments(), e);
+                                        }
+                                    });
+                                    toolCallsRef.set(calls);
+                                }
+                            }
+                        }
+
+                        SpiUsage usage = extractUsage(response);
+                        if (usage != null) {
+                            usageRef.set(usage);
+                            callback.onUsage(usage);
+                        }
+                    })
+                    .doOnError(error -> {
+                        long totalTime = System.currentTimeMillis() - startTime;
+                        log.error("[STREAM-WITH-TOOLS] Error after {}ms: {}", totalTime, error.getMessage(), error);
+                        callback.onError(error);
+                    })
+                    .doOnComplete(() -> {
+                        SpiChatResponse spiResponse = SpiChatResponse.builder()
+                                .content(contentBuilder.toString())
+                                .reasoningContent(reasoningBuilder.toString())
+                                .toolCalls(toolCallsRef.get())
+                                .usage(usageRef.get())
+                                .build();
+                        callback.onComplete(spiResponse);
+                    })
+                    .blockLast();
+        } catch (Exception e) {
+            long totalTime = System.currentTimeMillis() - startTime;
+            log.error("[STREAM-WITH-TOOLS] Exception after {}ms: {}", totalTime, e.getMessage(), e);
+            callback.onError(e);
+            throw new RuntimeException("Stream with tools failed", e);
+        }
+
+        return SpiChatResponse.builder()
+                .content(contentBuilder.toString())
+                .reasoningContent(reasoningBuilder.toString())
+                .toolCalls(toolCallsRef.get())
+                .usage(usageRef.get())
+                .build();
+    }
+
     @Override
     public void chatStream(SpiChatRequest request, SpiStreamingCallback callback) {
         long startTime = System.currentTimeMillis();
