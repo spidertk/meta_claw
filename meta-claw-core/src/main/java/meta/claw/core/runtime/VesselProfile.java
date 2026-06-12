@@ -7,6 +7,7 @@ import meta.claw.core.config.resolver.RuntimeConfigResolver;
 import meta.claw.core.infra.ProjectRootFinder;
 import meta.claw.core.prompt.PromptVars;
 import meta.claw.core.runtime.subsystem.SubSystemRegistry;
+import meta.claw.core.runtime.subsystem.VesselAwareSubSystem;
 import meta.claw.core.runtime.subsystem.VesselSubSystem;
 import meta.claw.core.vessel.VesselProfileLoader;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,7 +23,7 @@ import java.nio.file.Path;
 @Slf4j
 @Component
 @Scope("prototype")
-public class VesselProfile implements VesselSubSystem {
+public class VesselProfile implements VesselSubSystem, VesselAwareSubSystem {
 
     @Autowired
     private RuntimeConfigResolver runtimeConfigResolver;

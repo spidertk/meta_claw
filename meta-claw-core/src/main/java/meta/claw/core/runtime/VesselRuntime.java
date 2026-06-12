@@ -18,6 +18,7 @@ import meta.claw.core.prompt.PromptRenderer;
 import meta.claw.core.prompt.PromptVars;
 import meta.claw.core.runtime.subsystem.MemorySubSystem;
 import meta.claw.core.runtime.subsystem.SubSystemRegistry;
+import meta.claw.core.runtime.subsystem.VesselAwareSubSystem;
 import meta.claw.core.runtime.subsystem.VesselSubSystem;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.InitializingBean;
@@ -74,8 +75,8 @@ public class VesselRuntime implements InitializingBean {
                 .forEach(sub -> {
                     registry.register(sub);
                     sub.configure(registry);
-                    if (sub instanceof VesselProfile) {
-                        ((VesselProfile) sub).loadForVessel(vesselId);
+                    if (sub instanceof VesselAwareSubSystem aware) {
+                        aware.loadForVessel(vesselId);
                     }
                 });
     }
