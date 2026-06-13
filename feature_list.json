@@ -1,6 +1,6 @@
 {
   "project": "meta-claw",
-  "last_updated": "2026-06-12",
+  "last_updated": "2026-06-13",
   "package_structure": {
     "config": "meta.claw.core.config — 所有配置模型 + 加载器 + 解析器",
     "vessel": "meta.claw.core.vessel — Vessel 用户域（Profile + Initializer）",
@@ -719,13 +719,15 @@
       "id": "metrics-001",
       "priority": 24,
       "area": "metrics",
-      "title": "Metrics 子系统：任务完成与步数基础指标",
-      "user_visible_behavior": "每个 Vessel 任务结束时，系统通过 Micrometer 记录 agent.task.completed 与 agent.steps 计数器，并附带 vessel 标签，方便后续对接 Prometheus 等监控系统。",
+      "title": "Metrics 子系统：任务完成、步数、Token、延迟与工具调用指标",
+      "user_visible_behavior": "每个 Vessel 任务结束时系统记录任务完成数、步数与任务时长；每次 LLM 调用记录延迟与 Token 消耗；每次工具调用记录次数（带 tool 标签）。所有指标均附带 vessel 标签，方便对接 Prometheus 等监控系统。",
       "status": "passing",
       "verification": [
-        "确认 MetricsSubSystem 作为 VesselSubSystem 实现存在（priority=100）。",
-        "确认 MetricSnapshot 值对象已定义。",
-        "确认 onTaskEnd 正确写入 agent.task.completed 与 agent.steps 计数器。",
+        "确认 MetricsSubSystem 作为 VesselSubSystem 实现存在（priority=40）。",
+        "确认 MetricsRecorder 提供任务/步数/时长、LLM 延迟、Token 消耗、工具调用次数的记录方法。",
+        "确认 LlmClientManager 在 chat/chatWithTools/streamWithTools/chatStream 中记录 LLM 延迟与 Token 消耗。",
+        "确认 AgentExecutor 与 StreamingAgentExecutor 在 tool call 执行后记录 agent.tool.calls。",
+        "确认 TaskContext 累计 toolCallCount 与 totalTokenUsage，供 MetricSnapshot 使用。",
         "运行 ./init.sh 通过"
       ],
       "evidence": [
@@ -733,9 +735,14 @@
           "date": "2026-06-12",
           "result": "passing",
           "detail": "新增 MetricSnapshot、MetricsSubSystem、MetricsSubSystemTest；MetricsSubSystemTest 验证任务完成计数器与步数计数器正确累加；./init.sh 9 个 reactor 模块全部 SUCCESS，core 22 个测试全部通过。"
+        },
+        {
+          "date": "2026-06-13",
+          "result": "passing",
+          "detail": "新增 MetricsRecorder，扩展 MetricSnapshot 与 TaskContext；LlmClientManager 记录 agent.llm.latency 与 agent.llm.tokens.*；AgentExecutor/StreamingAgentExecutor 记录 agent.tool.calls；新增 MetricsRecorderTest 6/6 与 MetricsSubSystemTest 扩展用例；./init.sh 9 个 reactor 模块全部 SUCCESS，core 29 个测试全部通过。"
         }
       ],
-      "notes": "Phase 5 初版完成。当前仅记录任务完成与步数；Token 消耗、LLM 延迟、工具调用次数等细化指标待后续补充。"
+      "notes": "Phase 5 完成。当前已覆盖任务完成、步数、任务时长、LLM 延迟、Token 消耗、工具调用次数六类指标；后续可按需要增加错误率、首次 token 延迟等高级指标。"
     }
   ]
 }

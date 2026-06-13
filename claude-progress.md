@@ -1272,7 +1272,7 @@
 - 本轮目标：Phase 5 - Metrics 子系统实现
 - 已完成：
   - 新增 `MetricSnapshot` 值对象：封装单次任务的 vesselId、taskId、stepCount、durationMs、tokenUsage
-  - 新增 `MetricsSubSystem`（priority=100）：作为 `VesselSubSystem` 接入，在 `onTaskEnd` 记录 `agent.task.completed` 与 `agent.steps` 计数器，标签带 `vessel`
+  - 新增 `MetricsSubSystem`（priority=40）：作为 `VesselSubSystem` 接入，在 `onTaskEnd` 记录 `agent.task.completed` 与 `agent.steps` 计数器，标签带 `vessel`
   - 新增 `MetricsSubSystemTest`：验证任务完成计数器与步数计数器正确累加
   - 更新 `init.sh`：将 `MetricsSubSystemTest` 纳入 P0 测试列表
 - 运行过的验证：
@@ -1285,6 +1285,35 @@
   - `claude-progress.md`、`feature_list.json`、`clean-state-checklist.md`
 - 已知风险或未解决的问题：
   - Metrics 当前仅记录任务完成与步数；Token 消耗、LLM 延迟、工具调用次数等细化指标待后续补充
+- 下一步最佳动作：
+  1. 完善 Token 消耗、LLM 延迟、工具调用次数等细化指标
+  2. 提交本轮修改
+  3. 由用户决定下一项功能优先级
+
+### Session 041
+
+- 日期：2026-06-13
+- 本轮目标：Metrics 细化指标增强——Token 消耗、LLM 延迟、工具调用次数
+- 已完成：
+  - 新增 `MetricsRecorder`：统一封装 Micrometer 指标写入，提供任务/步数/任务时长、LLM 延迟、Token 消耗、工具调用次数的记录方法
+  - 扩展 `MetricSnapshot`：增加 `toolCallCount` 字段
+  - 扩展 `TaskContext`：增加 `toolCallCount`、`totalTokenUsage` 累计与 `durationMs`，供任务级快照使用
+  - 修改 `MetricsSubSystem`：在 `onTaskEnd` 通过 `MetricsRecorder` 记录任务完成、步数、任务时长，并构建 `MetricSnapshot`
+  - 修改 `LlmClientManager`：在 `chat`、`chatWithTools`、`streamWithTools`、`chatStream` 中测量并记录 LLM 延迟与 Token 消耗
+  - 修改 `AgentExecutor` 与 `StreamingAgentExecutor`：在每次 tool call 执行后累计工具调用次数，并通过 `MetricsRecorder` 记录 `agent.tool.calls`（带 `tool` 标签）
+  - 新增 `MetricsRecorderTest`：覆盖任务/步数、LLM 延迟、Token 消耗、工具调用、null 安全与无 registry 容错
+  - 扩展 `MetricsSubSystemTest`：验证 `MetricsRecorder` 委托路径与任务级累计值
+  - 更新 `init.sh`：将 `MetricsRecorderTest` 纳入 P0 测试列表
+- 运行过的验证：
+  - `./init.sh` → 成功；9 个 reactor 模块全部 SUCCESS，core 29 个测试全部通过（新增 MetricsRecorderTest 6/6）
+- 更新过的文件或工件：
+  - 新增 `meta-claw-core/src/main/java/meta/claw/core/runtime/metrics/MetricsRecorder.java`
+  - 新增 `meta-claw-core/src/test/java/meta/claw/core/runtime/metrics/MetricsRecorderTest.java`
+  - 修改 `MetricSnapshot.java`、`TaskContext.java`、`MetricsSubSystem.java`、`LlmClientManager.java`、`AgentExecutor.java`、`StreamingAgentExecutor.java`
+  - 修改 `MetricsSubSystemTest.java`、`init.sh`
+  - `claude-progress.md`、`feature_list.json`、`clean-state-checklist.md`
+- 已知风险或未解决的问题：
+  - 当前无新增 blocker
 - 下一步最佳动作：
   1. 提交本轮修改
   2. 由用户决定下一项功能优先级

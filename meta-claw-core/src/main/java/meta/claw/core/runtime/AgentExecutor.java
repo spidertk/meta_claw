@@ -11,6 +11,7 @@ import meta.claw.core.runtime.hitl.*;
 import meta.claw.core.runtime.subsystem.HitlSubSystem;
 import meta.claw.core.runtime.subsystem.ToolSubSystem;
 import meta.claw.core.tool.SpiToolCall;
+import meta.claw.core.runtime.metrics.MetricsRecorder;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -35,6 +36,9 @@ public class AgentExecutor {
 
     @Autowired
     private LlmClientManager llmClient;
+
+    @Autowired(required = false)
+    private MetricsRecorder metricsRecorder;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -73,6 +77,7 @@ public class AgentExecutor {
             String result = (status == ApprovalStatus.APPROVED)
                     ? executeToolCall(toolMap.get(item.getToolName()), item)
                     : "REJECTED by operator";
+            recordToolCall(ctx, item.getToolName());
 
             String toolResultJson = buildToolResultJson(item.getToolCallId(), item.getToolName(), result);
             messages.add(SpiMessage.tool(toolResultJson));
@@ -101,6 +106,7 @@ public class AgentExecutor {
                             .build(),
                     tools.toArray(new ToolCallback[0])
             );
+            ctx.addTokenUsage(response != null ? response.usage() : null);
 
             if (response == null || response.toolCalls() == null || response.toolCalls().isEmpty()) {
                 String content = response != null ? response.content() : "";
@@ -122,6 +128,7 @@ public class AgentExecutor {
             // 执行 tool calls 并将结果回注到消息列表
             for (SpiToolCall tc : response.toolCalls()) {
                 String result = executeToolCall(toolMap.get(tc.getName()), tc);
+                recordToolCall(ctx, tc.getName());
                 String toolResultJson = buildToolResultJson(tc.getId(), tc.getName(), result);
                 messages.add(SpiMessage.tool(toolResultJson));
                 ctx.getMessages().add(SpiMessage.tool(toolResultJson));
@@ -167,6 +174,13 @@ public class AgentExecutor {
         } catch (Exception e) {
             log.warn("Tool {} execution failed: {}", item.getToolName(), e.getMessage(), e);
             return "Error: " + e.getMessage();
+        }
+    }
+
+    private void recordToolCall(TaskContext ctx, String toolName) {
+        ctx.incrementToolCallCount();
+        if (metricsRecorder != null) {
+            metricsRecorder.recordToolCall(ctx.getTask().getVesselId(), toolName);
         }
     }
 

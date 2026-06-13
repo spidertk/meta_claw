@@ -14,6 +14,7 @@ import meta.claw.core.tool.registry.ToolRegistry;
 import meta.claw.core.config.resolver.RuntimeConfigResolver;
 import meta.claw.core.llm.SpiUsage;
 import meta.claw.core.tool.SpiToolCall;
+import meta.claw.core.runtime.metrics.MetricsRecorder;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.ai.chat.client.ChatClient;
@@ -51,6 +52,9 @@ public class LlmClientManager implements SpiLlmClient {
 
     @Autowired
     private ToolRegistry toolRegistry;
+
+    @Autowired(required = false)
+    private MetricsRecorder metricsRecorder;
 
     private ChatClient buildChatClient(String vesselName) {
         ProviderConfig providerConfig = runtimeConfigResolver.resolve(vesselName).getProviderConfig();
@@ -90,17 +94,21 @@ public class LlmClientManager implements SpiLlmClient {
         List<Object> toolInstances = toolRegistry.getToolInstances();
         logRequestParams(messages, toolInstances);
 
+        long startTime = System.currentTimeMillis();
         ChatResponse chatResponse = buildChatClient(request.getVesselId())
                 .prompt(new Prompt(messages))
                 .tools(toolInstances.toArray())
                 .call()
                 .chatResponse();
+        long latency = System.currentTimeMillis() - startTime;
 
         Generation gen = chatResponse.getResult();
         String content = gen != null && gen.getOutput() != null ? gen.getOutput().getText() : "";
         String reasoningContent = extractReasoningContent(gen);
         SpiUsage usage = extractUsage(chatResponse);
         List<SpiToolCall> toolCalls = extractToolCalls(gen);
+
+        recordLlmMetrics(request.getVesselId(), latency, usage);
 
         return SpiChatResponse.builder()
                 .content(content != null ? content : "")
@@ -201,6 +209,9 @@ public class LlmClientManager implements SpiLlmClient {
             callback.onError(e);
             throw new RuntimeException("Stream with tools failed", e);
         }
+
+        long totalLatency = System.currentTimeMillis() - startTime;
+        recordLlmMetrics(request.getVesselId(), totalLatency, usageRef.get());
 
         return SpiChatResponse.builder()
                 .content(contentBuilder.toString())
@@ -306,6 +317,7 @@ public class LlmClientManager implements SpiLlmClient {
                     })
                     .doOnComplete(() -> {
                         long totalTime = System.currentTimeMillis() - startTime;
+                        recordLlmMetrics(request.getVesselId(), totalTime, usageRef.get());
 
                         SpiChatResponse spiResponse = SpiChatResponse.builder()
                                 .content(contentBuilder.toString())
@@ -375,11 +387,13 @@ public class LlmClientManager implements SpiLlmClient {
                 .map(this::toSpringMessage)
                 .collect(Collectors.toCollection(ArrayList::new));
 
+        long startTime = System.currentTimeMillis();
         ChatResponse chatResponse = buildRawChatClient(request.getVesselId())
                 .prompt(new Prompt(messages))
                 .tools(toolCallbacks)
                 .call()
                 .chatResponse();
+        long latency = System.currentTimeMillis() - startTime;
 
         Generation gen = chatResponse.getResult();
         String content = gen != null && gen.getOutput() != null ? gen.getOutput().getText() : "";
@@ -387,12 +401,22 @@ public class LlmClientManager implements SpiLlmClient {
         SpiUsage usage = extractUsage(chatResponse);
         List<SpiToolCall> toolCalls = extractToolCalls(gen);
 
+        recordLlmMetrics(request.getVesselId(), latency, usage);
+
         return SpiChatResponse.builder()
                 .content(content != null ? content : "")
                 .reasoningContent(reasoningContent)
                 .toolCalls(toolCalls)
                 .usage(usage)
                 .build();
+    }
+
+    private void recordLlmMetrics(String vesselId, long latencyMs, SpiUsage usage) {
+        if (metricsRecorder == null) {
+            return;
+        }
+        metricsRecorder.recordLlmLatency(vesselId, latencyMs);
+        metricsRecorder.recordTokenUsage(vesselId, usage);
     }
 
     private ChatClient buildRawChatClient(String vesselId) {
