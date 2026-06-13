@@ -743,6 +743,29 @@
         }
       ],
       "notes": "Phase 5 完成。当前已覆盖任务完成、步数、任务时长、LLM 延迟、Token 消耗、工具调用次数六类指标；后续可按需要增加错误率、首次 token 延迟等高级指标。"
+    },
+    {
+      "id": "tool-ecosystem-001",
+      "priority": 25,
+      "area": "tool-engine",
+      "title": "工具生态扩展：Spring AI 原生 @Tool 扫描 + MCP 客户端",
+      "user_visible_behavior": "系统不仅能使用自定义 @ToolService 工具，还能自动发现 Spring AI 原生 @Tool 工具（如 Spring AI Alibaba 工具集），并通过 MCP 客户端接入外部 MCP Server 提供的工具。",
+      "status": "passing",
+      "verification": [
+        "确认 ToolRegistry 同时扫描 @ToolService 与 Spring AI 原生 @Tool 注解。",
+        "确认 meta-claw-core 已引入 spring-ai-starter-mcp-client。",
+        "确认 ToolSubSystem 将本地工具与 MCP ToolCallbackProvider 合并。",
+        "确认 application.yml 与 application-cli.yml 提供 MCP 配置示例且默认关闭。",
+        "运行 ./init.sh 通过"
+      ],
+      "evidence": [
+        {
+          "date": "2026-06-13",
+          "result": "passing",
+          "detail": "扩展 ToolRegistry 扫描原生 @Tool；新增 ToolRegistryTest 5/5；引入 spring-ai-starter-mcp-client；新增 ToolSubSystemTest 2/2 验证本地+MCP 工具合并；更新 application.yml/application-cli.yml；./init.sh 9 个 reactor 模块全部 SUCCESS，core 36 个测试全部通过。"
+        }
+      ],
+      "notes": "Spring AI Alibaba 工具集若基于原生 @Tool，现在可被自动发现；MCP 客户端默认关闭，启用后需配置具体 Server。Spring AI Agent Utils 需 Spring AI 2.x，当前未集成。"
     }
   ]
 }

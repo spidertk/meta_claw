@@ -1317,3 +1317,32 @@
 - 下一步最佳动作：
   1. 提交本轮修改
   2. 由用户决定下一项功能优先级
+
+### Session 042
+
+- 日期：2026-06-13
+- 本轮目标：工具生态查缺补漏——接入 Spring AI 原生 `@Tool` 扫描与 MCP 客户端
+- 已完成：
+  - 扩展 `ToolRegistry`：除自定义 `@ToolService` 外，额外扫描类或方法上带有 Spring AI 原生 `@org.springframework.ai.tool.annotation.Tool` 注解的 Bean，使 Spring AI Alibaba 等基于原生 `@Tool` 的工具集可被自动发现
+  - 新增 `ToolRegistryTest`：覆盖 `@ToolService`、原生 `@Tool`、双注解去重、无注解忽略、运行时注册/卸载
+  - 接入 MCP 客户端：在 `meta-claw-core/pom.xml` 引入 `spring-ai-starter-mcp-client`；`ToolSubSystem` 已支持注入 `List<ToolCallbackProvider>`，自动合并本地工具与 MCP 工具
+  - 新增 `ToolSubSystemTest`：验证本地工具与 MCP 工具合并到同一 ToolCallback 列表，并正确生成 `{tools}` prompt 变量
+  - 更新 `application.yml`（bootstrap）与 `application-cli.yml`（cli）：添加 MCP 客户端配置示例，默认 `enabled: false`
+  - 更新 `init.sh`：将 `ToolRegistryTest`、`ToolSubSystemTest` 纳入 P0 测试列表
+- 运行过的验证：
+  - `./init.sh` → 成功；9 个 reactor 模块全部 SUCCESS，core 36 个测试全部通过（新增 ToolRegistryTest 5/5、ToolSubSystemTest 2/2）
+- 更新过的文件或工件：
+  - 修改 `meta-claw-core/src/main/java/meta/claw/core/tool/registry/ToolRegistry.java`
+  - 新增 `meta-claw-core/src/test/java/meta/claw/core/tool/registry/ToolRegistryTest.java`
+  - 新增 `meta-claw-core/src/test/java/meta/claw/core/runtime/subsystem/ToolSubSystemTest.java`
+  - 修改 `meta-claw-core/pom.xml`
+  - 修改 `meta-claw-bootstrap/src/main/resources/application.yml`
+  - 修改 `meta-claw-cli/src/main/resources/application-cli.yml`
+  - 修改 `init.sh`
+  - `claude-progress.md`、`feature_list.json`、`clean-state-checklist.md`
+- 已知风险或未解决的问题：
+  - 当前无新增 blocker
+  - Spring AI Agent Utils（含 AskUserQuestionTool）要求 Spring AI 2.x，当前 1.1.7 不兼容；若需使用需单独进行大版本升级
+- 下一步最佳动作：
+  1. 提交本轮修改
+  2. 由用户决定下一项功能优先级
