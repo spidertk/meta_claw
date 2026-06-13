@@ -771,12 +771,12 @@
       "id": "tool-ecosystem-002",
       "priority": 26,
       "area": "tool-engine",
-      "title": "本地基础工具集：shell / file / web search / git",
-      "user_visible_behavior": "系统内置四类常用工具：执行 shell 命令、读写本地文件、搜索网页、查询 Git 仓库状态与历史。这些工具通过 @ToolService + @Tool 接入，自动被 ToolRegistry 发现并注入系统提示。",
+      "title": "本地基础工具集：shell / file / git + 聚合搜索（混合架构）",
+      "user_visible_behavior": "系统内置 shell、file、git 三类本地工具（自研 @ToolService），并通过 Spring AI Alibaba searches starter 接入网页搜索能力；所有工具自动被 ToolRegistry 发现并注入系统提示。",
       "status": "passing",
       "verification": [
-        "确认 ShellTool、FileTool、WebSearchTool、GitTool 以 @ToolService 形式存在。",
-        "确认四类工具均有单元测试并通过。",
+        "确认 ShellTool、FileTool、GitTool 以 @ToolService 形式存在并有单元测试。",
+        "确认 meta-claw-tool 引入 spring-ai-alibaba-starter-tool-calling-searches 替代自研 WebSearchTool。",
         "确认 meta-claw-bootstrap 依赖 meta-claw-tool，使 web 与 CLI 两种入口都能加载工具。",
         "运行 ./init.sh 通过"
       ],
@@ -784,10 +784,32 @@
         {
           "date": "2026-06-13",
           "result": "passing",
-          "detail": "新增 ShellTool、FileTool、WebSearchTool、GitTool 及对应测试；meta-claw-tool 引入 JGit；meta-claw-bootstrap 增加 meta-claw-tool 依赖；./init.sh 9 个 reactor 模块全部 SUCCESS，tool 模块 21 个测试全部通过，全仓 P0 测试通过。"
+          "detail": "自研 ShellTool/FileTool/GitTool 及测试保留；删除 WebSearchTool，改为引入 spring-ai-alibaba-starter-tool-calling-searches；新增 spring-ai-alibaba-starter-tool-calling-githubtoolkit；./init.sh 9 个 reactor 模块全部 SUCCESS，tool 模块 18 个测试全部通过，全仓 P0 测试通过。"
         }
       ],
-      "notes": "Spring AI Agent Utils 与 Spring AI Alibaba tool-calling starters 均要求 Spring AI 2.x 或 1.0.0-Mx，与当前 1.1.7 不兼容，因此四类工具采用自研实现；WebSearchTool 使用 DuckDuckGo HTML 端点，无需 API Key。"
+      "notes": "方向 C 第一阶段：shell/file/git 保持自研（Alibaba 1.1.x 无独立 starter），网页搜索改为 Alibaba searches starter；GitHub 远程能力由 githubtoolkit starter 提供。运行时 API Key 配置待后续会话补充。"
+    },
+    {
+      "id": "arch-001",
+      "priority": 27,
+      "area": "core-architecture",
+      "title": "混合架构基线升级：Spring Boot 3.5.x + Spring AI 1.1.8 + Spring AI Alibaba 1.1.2.3",
+      "user_visible_behavior": "仓库依赖基线升级到 Spring Boot 3.5.x + Spring AI 1.1.8，并引入 Spring AI Alibaba 1.1.2.3 BOM，为后续接入 Alibaba ReactAgent/Graph/工具生态做好准备。",
+      "status": "passing",
+      "verification": [
+        "确认 root pom 中 spring-boot.version=3.5.15、spring-ai.version=1.1.8、spring-ai-alibaba.version=1.1.2.3。",
+        "确认 root pom 导入 spring-ai-alibaba-bom。",
+        "确认仓库配置使用 Maven Central 并可正常下载 Spring AI 1.1.8 及其 MCP client starter。",
+        "运行 ./init.sh 通过"
+      ],
+      "evidence": [
+        {
+          "date": "2026-06-13",
+          "result": "passing",
+          "detail": "升级 Spring Boot 3.2.5→3.5.15、Spring AI 1.1.7→1.1.8；导入 spring-ai-alibaba-bom 1.1.2.3；将仓库配置从 spring-milestones/spring-releases 改为 Maven Central；./init.sh 全仓编译 + P0 测试通过。"
+        }
+      ],
+      "notes": "方向 C 第一阶段完成。Spring-releases 仓库对 1.1.8 返回 401，已移除；当前依赖 Maven Central + 用户 settings.xml 中的 Aliyun mirror。Alibaba tool-calling starters 未纳入其 BOM，需显式版本。"
     }
   ]
 }

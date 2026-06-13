@@ -59,6 +59,18 @@
             <groupId>org.eclipse.jgit</groupId>
             <artifactId>org.eclipse.jgit</artifactId>
         </dependency>
+        <!-- Spring AI Alibaba Searches：聚合网页搜索工具（Baidu / DuckDuckGo / Tavily / SerpAPI / AliyunAI / Metaso） -->
+        <dependency>
+            <groupId>com.alibaba.cloud.ai</groupId>
+            <artifactId>spring-ai-alibaba-starter-tool-calling-searches</artifactId>
+            <version>${spring-ai-alibaba.version}</version>
+        </dependency>
+        <!-- Spring AI Alibaba GitHub Toolkit：提供 GitHub 仓库/PR/Issue 查询能力 -->
+        <dependency>
+            <groupId>com.alibaba.cloud.ai</groupId>
+            <artifactId>spring-ai-alibaba-starter-tool-calling-githubtoolkit</artifactId>
+            <version>${spring-ai-alibaba.version}</version>
+        </dependency>
     </dependencies>
 
     <build>

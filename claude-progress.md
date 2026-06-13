@@ -6,7 +6,7 @@
 - 当前架构基线：Java 21 + Maven 多模块仓库；已存在 `meta-claw-core`、`meta-claw-vessel`、`meta-claw-store`、`meta-claw-cli`、`meta-claw-gateway*`、`meta-claw-bootstrap`
 - 标准启动路径：`./init.sh`
 - 标准验证路径：`./init.sh` 先执行全仓编译，再运行初始化阶段 P0 测试集
-- 最近已通过证据：2026-05-20 在真实 Maven 环境中执行新版 `./init.sh`，完成全仓编译并通过 P0 测试集；`ChatCommandTest` 覆盖新会话即时初始化
+- 最近已通过证据：2026-06-13 在真实 Maven 环境中执行新版 `./init.sh`，完成全仓编译并通过 P0 测试集；混合架构基线（Spring Boot 3.5.15 + Spring AI 1.1.8 + Spring AI Alibaba 1.1.2.3）编译通过
 - 当前最高优先级未完成功能：暂无新的已选定功能
 - 当前 blocker：
   1. 当前无 blocker
@@ -1382,3 +1382,34 @@
 - 下一步最佳动作：
   1. 提交本轮修改
   2. 由用户决定下一项功能优先级
+
+### Session 044
+
+- 日期：2026-06-13
+- 本轮目标：执行方向 C（混合架构）第一阶段：升级 Spring AI / Spring Boot 基线，引入 Spring AI Alibaba 1.1.2.3 独立 tool starters，替换自研 WebSearchTool
+- 已完成：
+  - 升级 `spring-ai.version` 1.1.7 → 1.1.8，`spring-boot.version` 3.2.5 → 3.5.15
+  - 新增 `spring-ai-alibaba.version=1.1.2.3`，并在 root pom 导入 `spring-ai-alibaba-bom`
+  - `meta-claw-tool/pom.xml` 引入 `spring-ai-alibaba-starter-tool-calling-searches` 与 `spring-ai-alibaba-starter-tool-calling-githubtoolkit`（显式版本 `${spring-ai-alibaba.version}`，因为 Alibaba BOM 未覆盖 tool-calling starters）
+  - 删除自研 `WebSearchTool.java` 与 `WebSearchToolTest.java`，网页搜索能力改由 `searches` starter 提供
+  - 保留自研 `ShellTool`、`FileTool`、`GitTool` 及对应测试（Alibaba 1.1.x 没有独立的 shell/file/本地 git starter）
+  - 修复仓库配置：原 `spring-releases` 仓库对 Spring AI 1.1.8 返回 401，改为仅配置 Maven Central；结合 settings.xml 中的 Aliyun mirror 可正常下载
+  - 增强 `init.sh`：自动检测并设置 `JAVA_HOME`（优先 JDK 21 已知路径），自动查找 Maven（PATH → `~/.local/tools/apache-maven-3.9.15/bin/mvn`）
+- 运行过的验证：
+  - `mvn clean compile -DskipTests -U` → 成功；9 个 reactor 模块全部 SUCCESS
+  - P0 测试集（core 36 个 + tool 18 个）→ 全部通过
+  - `./init.sh` → 成功；全仓编译 + P0 测试通过，脚本自动使用检测到的 JDK 21 与 Maven 3.9.15
+- 更新过的文件或工件：
+  - 修改 `pom.xml`（root：版本升级、Alibaba BOM、仓库配置改为 Maven Central）
+  - 修改 `meta-claw-tool/pom.xml`（替换 duckduckgo 为 searches，新增 githubtoolkit）
+  - 删除 `meta-claw-tool/src/main/java/meta/claw/tool/WebSearchTool.java`
+  - 删除 `meta-claw-tool/src/test/java/meta/claw/tool/WebSearchToolTest.java`
+  - 修改 `init.sh`（自动检测 JDK 与 Maven）
+  - `claude-progress.md`、`feature_list.json`、`clean-state-checklist.md`
+- 已知风险或未解决的问题：
+  - `spring-ai-alibaba-bom` 未覆盖 `tool-calling-searches` / `tool-calling-githubtoolkit`，需要显式版本号；后续若 BOM 补齐可移除
+  - `searches` / `githubtoolkit` starter 默认需要配置对应 API Key 才能实际调用；当前仅完成依赖引入与编译，运行时配置待后续会话补充
+  - Spring AI 1.1.8 + Spring Boot 3.5.15 组合刚发布，本地 P0 测试已通过，但真实 LLM provider 与 Alibaba 工具的端到端集成尚未验证
+- 下一步最佳动作：
+  1. 提交本轮修改
+  2. 由用户决定方向 C 下一阶段：配置 searches/githubtoolkit 运行时参数，或集成 ReactAgent/Graph 执行引擎
