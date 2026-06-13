@@ -1346,3 +1346,39 @@
 - 下一步最佳动作：
   1. 提交本轮修改
   2. 由用户决定下一项功能优先级
+
+### Session 043
+
+- 日期：2026-06-13
+- 本轮目标：引入本地基础工具集：shell / file / web search / git
+- 已完成：
+  - 调研结论：Spring AI Agent Utils（含 FileSystemTools/ShellTools/WebSearchTools）要求 Spring AI 2.x；Spring AI Alibaba tool-calling starters 基于 1.0.0-Mx 线，与当前 Spring AI 1.1.7 API/依赖不兼容。因此四类工具采用自研 `@ToolService` + `@Tool` 实现，确保与 Spring AI 1.1.7 兼容。
+  - 新增 `ShellTool`：使用 `ProcessBuilder` 执行 shell 命令，支持超时、返回 JSON（exitCode/stdout/stderr），可通过 `meta.claw.tool.shell.enabled` 关闭。
+  - 新增 `FileTool`：支持 read/write/list/exists，所有路径必须落在 `meta.claw.tool.file.base-path` 下（默认 JVM 启动目录），防止越权访问。
+  - 新增 `WebSearchTool`：使用 `java.net.http.HttpClient` + DuckDuckGo HTML 端点实现搜索，无需 API Key；同时提供 `fetchPage` 抓取指定 URL 内容。
+  - 新增 `GitTool`：基于 Eclipse JGit 实现 status/log/diff，不依赖系统 git 可执行文件；diff 返回 name-status 列表，避免未暂存工作区 blob 缺失问题。
+  - 新增四类工具单元测试：`ShellToolTest`、`FileToolTest`、`WebSearchToolTest`、`GitToolTest`，均通过。
+  - 依赖与模块调整：root pom 增加 `jgit.version` 与 JGit dependencyManagement；`meta-claw-tool/pom.xml` 引入 JGit；`meta-claw-bootstrap/pom.xml` 增加 `meta-claw-tool` 依赖，使 web 入口也能加载工具。
+  - 更新 `init.sh`：将四类工具测试纳入 P0 测试列表。
+- 运行过的验证：
+  - `./init.sh` → 成功；9 个 reactor 模块全部 SUCCESS，core 36 个测试全部通过，tool 模块 21 个测试全部通过（新增 14/14）
+- 更新过的文件或工件：
+  - 新增 `meta-claw-tool/src/main/java/meta/claw/tool/ShellTool.java`
+  - 新增 `meta-claw-tool/src/main/java/meta/claw/tool/FileTool.java`
+  - 新增 `meta-claw-tool/src/main/java/meta/claw/tool/WebSearchTool.java`
+  - 新增 `meta-claw-tool/src/main/java/meta/claw/tool/GitTool.java`
+  - 新增 `meta-claw-tool/src/test/java/meta/claw/tool/ShellToolTest.java`
+  - 新增 `meta-claw-tool/src/test/java/meta/claw/tool/FileToolTest.java`
+  - 新增 `meta-claw-tool/src/test/java/meta/claw/tool/WebSearchToolTest.java`
+  - 新增 `meta-claw-tool/src/test/java/meta/claw/tool/GitToolTest.java`
+  - 修改 `pom.xml`（root：jgit 版本管理）
+  - 修改 `meta-claw-tool/pom.xml`（引入 JGit）
+  - 修改 `meta-claw-bootstrap/pom.xml`（依赖 meta-claw-tool）
+  - 修改 `init.sh`
+  - `claude-progress.md`、`feature_list.json`、`clean-state-checklist.md`
+- 已知风险或未解决的问题：
+  - WebSearchTool 依赖 DuckDuckGo HTML 页面结构，若其前端改版可能需要调整解析正则；当前仅返回标题/URL/摘要，不保证结果排序与商业搜索 API 一致。
+  - GitTool 的 diff 目前只返回 name-status 变更列表；如需完整 patch 内容，可后续在暂存或已提交场景下扩展。
+- 下一步最佳动作：
+  1. 提交本轮修改
+  2. 由用户决定下一项功能优先级

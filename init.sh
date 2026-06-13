@@ -10,7 +10,7 @@ VERIFY_CMD=(
   mvn test
   -pl meta-claw-core,meta-claw-store,meta-claw-cli,meta-claw-bootstrap,meta-claw-tool
   -am
-  -Dtest=VesselConfigLoaderTest,VesselManagerTest,SystemPromptBuilderTest,JsonlShortMemoryStoreTest,FileLongMemoryStoreTest,ChatCommandTest,MessageFlowIntegrationTest,ConfigurableHitlPolicyTest,HitlSubSystemTest,AgentExecutorHitlTest,StreamingAgentExecutorTest,SkillRegistryTest,SkillSubSystemTest,ReadSkillToolTest,MetricsSubSystemTest,MetricsRecorderTest,ToolRegistryTest,ToolSubSystemTest
+  -Dtest=VesselConfigLoaderTest,VesselManagerTest,SystemPromptBuilderTest,JsonlShortMemoryStoreTest,FileLongMemoryStoreTest,ChatCommandTest,MessageFlowIntegrationTest,ConfigurableHitlPolicyTest,HitlSubSystemTest,AgentExecutorHitlTest,StreamingAgentExecutorTest,SkillRegistryTest,SkillSubSystemTest,ReadSkillToolTest,MetricsSubSystemTest,MetricsRecorderTest,ToolRegistryTest,ToolSubSystemTest,ShellToolTest,FileToolTest,WebSearchToolTest,GitToolTest
   -Dsurefire.failIfNoSpecifiedTests=false
 )
 START_CMD=(mvn spring-boot:run -pl meta-claw-bootstrap -DskipTests)

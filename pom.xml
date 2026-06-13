@@ -55,6 +55,8 @@
         <jline.version>3.25.1</jline.version>
         <!-- Apache Commons Lang3 版本 -->
         <commons-lang3.version>3.14.0</commons-lang3.version>
+        <!-- Eclipse JGit 版本：为 GitTool 提供 Java Git 能力 -->
+        <jgit.version>6.10.0.202406032230-r</jgit.version>
     </properties>
 
     <!-- 依赖版本管理：子模块可引用而不必指定版本 -->
@@ -158,6 +160,12 @@
                 <groupId>com.openilink</groupId>
                 <artifactId>openilink-sdk-java</artifactId>
                 <version>1.0.0-SNAPSHOT</version>
+            </dependency>
+            <!-- Eclipse JGit：Java Git 库，供 GitTool 使用 -->
+            <dependency>
+                <groupId>org.eclipse.jgit</groupId>
+                <artifactId>org.eclipse.jgit</artifactId>
+                <version>${jgit.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

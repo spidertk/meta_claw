@@ -766,6 +766,28 @@
         }
       ],
       "notes": "Spring AI Alibaba 工具集若基于原生 @Tool，现在可被自动发现；MCP 客户端默认关闭，启用后需配置具体 Server。Spring AI Agent Utils 需 Spring AI 2.x，当前未集成。"
+    },
+    {
+      "id": "tool-ecosystem-002",
+      "priority": 26,
+      "area": "tool-engine",
+      "title": "本地基础工具集：shell / file / web search / git",
+      "user_visible_behavior": "系统内置四类常用工具：执行 shell 命令、读写本地文件、搜索网页、查询 Git 仓库状态与历史。这些工具通过 @ToolService + @Tool 接入，自动被 ToolRegistry 发现并注入系统提示。",
+      "status": "passing",
+      "verification": [
+        "确认 ShellTool、FileTool、WebSearchTool、GitTool 以 @ToolService 形式存在。",
+        "确认四类工具均有单元测试并通过。",
+        "确认 meta-claw-bootstrap 依赖 meta-claw-tool，使 web 与 CLI 两种入口都能加载工具。",
+        "运行 ./init.sh 通过"
+      ],
+      "evidence": [
+        {
+          "date": "2026-06-13",
+          "result": "passing",
+          "detail": "新增 ShellTool、FileTool、WebSearchTool、GitTool 及对应测试；meta-claw-tool 引入 JGit；meta-claw-bootstrap 增加 meta-claw-tool 依赖；./init.sh 9 个 reactor 模块全部 SUCCESS，tool 模块 21 个测试全部通过，全仓 P0 测试通过。"
+        }
+      ],
+      "notes": "Spring AI Agent Utils 与 Spring AI Alibaba tool-calling starters 均要求 Spring AI 2.x 或 1.0.0-Mx，与当前 1.1.7 不兼容，因此四类工具采用自研实现；WebSearchTool 使用 DuckDuckGo HTML 端点，无需 API Key。"
     }
   ]
 }
