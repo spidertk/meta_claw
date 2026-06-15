@@ -1443,3 +1443,29 @@
 - 下一步最佳动作：
   1. 提交本轮文档变更
   2. 由用户 review 设计方案并决定是否进入 Phase 0（引入 SAA agent-framework/graph-core 依赖并跑 smoke test）
+
+### Session 045 续
+
+- 日期：2026-06-15
+- 本轮目标：补充工具执行层隔离的 optional 深化设计
+- 已完成：
+  - 在主设计文档中新增第 9 章《可选深化：工具执行层进一步隔离》
+  - 定义 `ExecutableTool` SPI：name / description / inputSchema / execute(argumentsJson)
+  - 设计 `SpringAiToolCallbackAdapter`：Spring AI `ToolCallback` → `ExecutableTool`，并提供 `unwrap()` 回包能力
+  - 给出 `ToolSubSystem` 改造示例：`getToolCallbacks()` → `getExecutableTools()`
+  - 给出 `AgentExecutor` 改造示例：执行循环只依赖 `ExecutableTool`，仅在调用 `LlmClientManager` 时做反向适配
+  - 分析收益/代价与三阶段实施建议（短期不改、中期改造 ToolSubSystem+AgentExecutor、长期改造 LlmClientManager）
+  - 更新接口清单，列出工具抽象隔离涉及的新增/修改类
+  - 更新 `feature_list.json` 的 `agent-engine-001` 证据与 notes
+  - 再次运行 `./init.sh` 确认文档更新未破坏基线
+- 运行过的验证：
+  - `./init.sh` → 成功；9 个 reactor 模块全部 SUCCESS，全仓编译与 P0 测试集通过
+- 更新过的文件或工件：
+  - 修改 `docs/superpowers/specs/2026-06-15-agent-execution-abstraction-design.md`
+  - 修改 `feature_list.json`
+  - 修改 `claude-progress.md`
+- 已知风险或未解决的问题：
+  - 同 Session 045
+- 下一步最佳动作：
+  1. 提交本轮文档补充变更
+  2. 由用户 review 并决定是否进入 Phase 0 实施

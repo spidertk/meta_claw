@@ -833,9 +833,14 @@
           "date": "2026-06-15",
           "result": "verified",
           "detail": "执行 ./init.sh 成功；9 个 reactor 模块全部 SUCCESS，全仓编译与 P0 测试集通过。"
+        },
+        {
+          "date": "2026-06-15",
+          "result": "passing",
+          "detail": "按反馈补充文档第 9 章《可选深化：工具执行层进一步隔离》：定义 ExecutableTool SPI、SpringAiToolCallbackAdapter、ToolSubSystem 与 AgentExecutor 改造示例、收益/代价与实施建议。"
         }
       ],
-      "notes": "本文为设计阶段交付物，尚未修改代码。后续按 Phase 0~6 逐步实施：先验证 SAA 依赖兼容性，再抽 SPI、实现 NativeAgentEngine 兜底，最后接入 Alibaba 引擎并补齐流式、HITL、Metrics、多 Agent 与 checkpoint 持久化。"
+      "notes": "本文为设计阶段交付物，尚未修改代码。后续按 Phase 0~6 逐步实施：先验证 SAA 依赖兼容性，再抽 SPI、实现 NativeAgentEngine 兜底，最后接入 Alibaba 引擎并补齐流式、HITL、Metrics、多 Agent 与 checkpoint 持久化。工具抽象隔离作为可选深化项，建议在 AgentEngine SPI 稳定后中期实施。"
     }
   ]
 }

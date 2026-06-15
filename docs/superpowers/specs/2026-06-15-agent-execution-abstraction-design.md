@@ -749,7 +749,242 @@ memory:
 
 ---
 
-## 9. 依赖变更
+## 9. 可选深化：工具执行层进一步隔离
+
+### 9.1 问题背景
+
+当前 `AgentExecutor` / `StreamingAgentExecutor` 直接依赖 `org.springframework.ai.tool.ToolCallback`：
+
+```java
+import org.springframework.ai.tool.ToolCallback;
+
+private Map<String, ToolCallback> buildToolMap(List<ToolCallback> tools) { ... }
+private String executeToolCall(ToolCallback callback, SpiToolCall tc) { ... }
+```
+
+虽然 Spring AI `ToolCallback` 已经成为事实标准，但执行层直接引用具体协议会带来两个问题：
+
+1. **执行引擎与工具协议耦合**：未来若引入非 Spring AI 协议的工具（如 Python 远端工具、HTTP 函数、自定义脚本），执行层需要大面积改动。
+2. **单元测试成本**：测试 `AgentExecutor` 时必须构造 Spring AI 的 `ToolCallback` / `ToolDefinition`，而不是使用简单的 mock。
+
+### 9.2 目标
+
+让 `AgentExecutor` / `StreamingAgentExecutor` 只依赖 meta-claw 自研的工具执行抽象；Spring AI `ToolCallback` 通过适配器接入。
+
+### 9.3 建议抽象
+
+```java
+package meta.claw.core.tool;
+
+/**
+ * 对执行引擎暴露的“可执行工具”最小契约。
+ *
+ * <p>执行引擎只关心：工具叫什么、做什么、怎么调用、返回什么。
+ * 具体是本地 Java 方法、Spring AI ToolCallback、MCP Server、HTTP 函数，
+ * 由适配层隐藏。</p>
+ */
+public interface ExecutableTool {
+
+    /** 工具唯一名称，对应 LLM tool_calls 中的 name。 */
+    String getName();
+
+    /** 工具自然语言描述，用于注入系统提示。 */
+    String getDescription();
+
+    /** 工具输入参数的 JSON Schema（可选，用于本地校验或日志）。 */
+    default String getInputSchema() { return null; }
+
+    /**
+     * 执行工具。
+     *
+     * @param argumentsJson LLM 传来的参数 JSON
+     * @return 工具结果，建议为 JSON 字符串；执行失败时抛出异常
+     */
+    String execute(String argumentsJson);
+}
+```
+
+### 9.4 ToolSubSystem 改造
+
+`ToolSubSystem` 当前返回 `List<ToolCallback>`，改造后返回 `List<ExecutableTool>`：
+
+```java
+@Component
+public class ToolSubSystem implements VesselSubSystem {
+
+    @Autowired
+    private ToolRegistry toolRegistry;
+    @Autowired(required = false)
+    private List<ToolCallbackProvider> mcpToolProviders;
+
+    /**
+     * 获取本 Vessel 可用的所有 ExecutableTool（本地 + MCP）。
+     */
+    public List<ExecutableTool> getExecutableTools() {
+        List<ExecutableTool> all = new ArrayList<>();
+
+        // 本地 @ToolService / @Tool Bean → SpringAiToolCallbackAdapter
+        Object[] localBeans = toolRegistry.getToolInstances().toArray();
+        if (localBeans.length > 0) {
+            for (ToolCallback tc : ToolCallbacks.from(localBeans)) {
+                all.add(new SpringAiToolCallbackAdapter(tc));
+            }
+        }
+
+        // MCP ToolCallbackProvider → SpringAiToolCallbackAdapter
+        if (mcpToolProviders != null) {
+            for (ToolCallbackProvider provider : mcpToolProviders) {
+                for (ToolCallback tc : provider.getToolCallbacks()) {
+                    all.add(new SpringAiToolCallbackAdapter(tc));
+                }
+            }
+        }
+
+        return all;
+    }
+
+    @Override
+    public PromptVars promptVars() {
+        List<ExecutableTool> tools = getExecutableTools();
+        if (tools.isEmpty()) {
+            return PromptVars.empty();
+        }
+        String toolsText = tools.stream()
+            .map(t -> "- " + t.getName() + ": " + t.getDescription())
+            .collect(Collectors.joining("\n"));
+        return PromptVars.of("tools", toolsText);
+    }
+}
+```
+
+### 9.5 Spring AI 适配器
+
+```java
+package meta.claw.core.tool.adapter;
+
+import meta.claw.core.tool.ExecutableTool;
+import org.springframework.ai.tool.ToolCallback;
+
+/**
+ * 把 Spring AI {@link ToolCallback} 包装为 {@link ExecutableTool}。
+ */
+public class SpringAiToolCallbackAdapter implements ExecutableTool {
+
+    private final ToolCallback delegate;
+
+    public SpringAiToolCallbackAdapter(ToolCallback delegate) {
+        this.delegate = delegate;
+    }
+
+    @Override
+    public String getName() {
+        return delegate.getToolDefinition().name();
+    }
+
+    @Override
+    public String getDescription() {
+        return delegate.getToolDefinition().description();
+    }
+
+    @Override
+    public String getInputSchema() {
+        return delegate.getToolDefinition().inputSchema();
+    }
+
+    @Override
+    public String execute(String argumentsJson) {
+        return delegate.call(argumentsJson);
+    }
+
+    /**
+     * 暴露底层 Spring AI ToolCallback，供 LLM 调用层使用。
+     * 当执行层完全解耦后，此方法可由 LlmClientManager 内部消化。
+     */
+    public Optional<ToolCallback> unwrap() {
+        return Optional.of(delegate);
+    }
+
+    /**
+     * 便捷方法：若传入的是本适配器则解包，否则返回 empty。
+     */
+    public static Optional<ToolCallback> unwrap(ExecutableTool tool) {
+        return tool instanceof SpringAiToolCallbackAdapter adapter
+            ? adapter.unwrap()
+            : Optional.empty();
+    }
+}
+```
+
+### 9.6 AgentExecutor 改造
+
+```java
+@Slf4j
+@Component
+public class AgentExecutor {
+
+    @Value("${vessel.agent.max-steps:50}")
+    private int maxSteps;
+
+    @Autowired
+    private LlmClientManager llmClient;
+
+    public Reply execute(TaskContext ctx, SpiChatRequest request) {
+        ToolSubSystem toolSub = ctx.getSubSystem("tool");
+        HitlSubSystem hitlSub = ctx.getSubSystem("hitl");
+        List<ExecutableTool> tools = toolSub != null ? toolSub.getExecutableTools() : List.of();
+        Map<String, ExecutableTool> toolMap = buildToolMap(tools);
+
+        // 注意：传给 LlmClientManager 时仍需要 Spring AI ToolCallback，
+        // 因此 LlmClientManager 内部再做 ExecutableTool → ToolCallback 的反向适配
+        List<ToolCallback> toolCallbacks = tools.stream()
+            .map(SpringAiToolCallbackAdapter::unwrap)
+            .filter(Optional::isPresent)
+            .map(Optional::get)
+            .collect(Collectors.toList());
+
+        List<SpiMessage> messages = new ArrayList<>(request.getMessages());
+        return reactLoop(ctx, request, messages, toolCallbacks, toolMap, hitlSub, 1);
+    }
+
+    private Map<String, ExecutableTool> buildToolMap(List<ExecutableTool> tools) {
+        return tools.stream()
+            .collect(Collectors.toMap(ExecutableTool::getName, Function.identity()));
+    }
+
+    private String executeToolCall(ExecutableTool tool, SpiToolCall tc) {
+        return tool.execute(tc.getArgumentsJson());
+    }
+
+    // ...
+}
+```
+
+> **说明**：`LlmClientManager` 当前直接消费 Spring AI `ToolCallback`，所以 `AgentExecutor` 执行循环内部仍需要把 `ExecutableTool` 转回 `ToolCallback` 传给 LLM。真正的完全解耦需要同步改造 `LlmClientManager` 的接口，让它也接受 `List<ExecutableTool>`，内部再统一适配。这会是一次更大的重构，建议放在 `AgentEngine` SPI 稳定后再做。
+
+### 9.7 收益与代价
+
+| 收益 | 说明 |
+|------|------|
+| 执行层与 Spring AI 工具协议解耦 | `AgentExecutor` 不再 import `ToolCallback` |
+| 单测更简单 | 可以用 lambda / mock 直接构造 `ExecutableTool` |
+| 支持非 Spring AI 工具 | 例如 HTTP 函数、Python 远端工具，只需新增适配器 |
+| HITL 策略更纯粹 | `HitlSubSystem` 评估时也只依赖 `ExecutableTool`，不依赖具体协议 |
+
+| 代价 | 说明 |
+|------|------|
+| 多一层转换 | `ToolCallback` → `ExecutableTool` → `ToolCallback`，有轻微运行时开销 |
+| 需要同步改 `LlmClientManager` | 否则执行循环里仍要做反向适配 |
+| 当前收益有限 | 因为工具协议短期内仍是 Spring AI |
+
+### 9.8 实施建议
+
+- **短期（AgentEngine SPI 阶段）**：不改。优先保证执行引擎抽象落地，避免同时改两条线。
+- **中期（Alibaba 引擎稳定后）**：把 `ToolSubSystem.getToolCallbacks()` 改为 `getExecutableTools()`，`AgentExecutor` / `StreamingAgentExecutor` 同步改造。
+- **长期**：`LlmClientManager` 也接受 `List<ExecutableTool>`，彻底消灭执行层对 `org.springframework.ai.tool.ToolCallback` 的依赖。
+
+---
+
+## 10. 依赖变更
 
 在 `meta-claw-core/pom.xml` 中新增：
 
@@ -768,7 +1003,7 @@ memory:
 
 ---
 
-## 10. 接口与实现类清单
+## 11. 接口与实现类清单
 
 | 类别 | 类/接口 | 所属包 | 说明 |
 |------|---------|--------|------|
@@ -784,9 +1019,19 @@ memory:
 | 修改 | `VesselMeta` / `AlibabaAgentConfig` | `meta.claw.core.config` | 新增配置字段 |
 | 修改 | `LlmClientProviderManager` | `meta.claw.core.llm` | 新增 `createChatModel` |
 
+### 11.2 可选工具抽象隔离新增/修改清单
+
+| 类别 | 类/接口 | 所属包 | 说明 |
+|------|---------|--------|------|
+| SPI | `ExecutableTool` | `meta.claw.core.tool` | 新增，执行引擎面向的最小工具契约 |
+| Adapter | `SpringAiToolCallbackAdapter` | `meta.claw.core.tool.adapter` | 新增，Spring AI ToolCallback → ExecutableTool |
+| 修改 | `ToolSubSystem` | `meta.claw.core.runtime.subsystem` | `getToolCallbacks()` 改为 `getExecutableTools()` |
+| 修改 | `AgentExecutor` / `StreamingAgentExecutor` | `meta.claw.core.runtime` | 只依赖 `ExecutableTool` |
+| 修改（长期） | `LlmClientManager` | `meta.claw.core.llm` | 接受 `List<ExecutableTool>`，内部统一适配 |
+
 ---
 
-## 11. 结论
+## 12. 结论
 
 - **meta-claw 当前自研执行模型已经能支撑单 Agent、工具循环、HITL、Skill、Metrics 等核心能力**，但多 Agent 编排和状态机恢复是明显短板。
 - **Spring AI Alibaba 的 ReactAgent/Graph 能补齐这些短板**，但直接替换会浪费现有投资并引入版本风险。
@@ -796,7 +1041,7 @@ memory:
 
 ---
 
-## 12. 参考文档
+## 13. 参考文档
 
 - [Spring AI Alibaba GitHub](https://github.com/alibaba/spring-ai-alibaba)
 - [Spring AI Alibaba 官方文档](https://java2ai.com)
