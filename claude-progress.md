@@ -7,7 +7,7 @@
 - 标准启动路径：`./init.sh`
 - 标准验证路径：`./init.sh` 先执行全仓编译，再运行初始化阶段 P0 测试集
 - 最近已通过证据：2026-06-13 在真实 Maven 环境中执行新版 `./init.sh`，完成全仓编译并通过 P0 测试集；混合架构基线（Spring Boot 3.5.15 + Spring AI 1.1.8 + Spring AI Alibaba 1.1.2.3）编译通过
-- 当前最高优先级未完成功能：暂无新的已选定功能
+- 当前最高优先级未完成功能：agent-engine-001（Agent 执行引擎抽象：native / alibaba 双实现设计）设计已完成，代码实现尚未开始
 - 当前 blocker：
   1. 当前无 blocker
 
@@ -1413,3 +1413,33 @@
 - 下一步最佳动作：
   1. 提交本轮修改
   2. 由用户决定方向 C 下一阶段：配置 searches/githubtoolkit 运行时参数，或集成 ReactAgent/Graph 执行引擎
+
+### Session 045
+
+- 日期：2026-06-15
+- 本轮目标：作为 meta-claw 重度使用用户，总结当前项目结合 Spring AI Alibaba 的混合架构现状，对比两套执行框架优劣，提出 Agent 执行抽象改进方案，并生成技术实现文档
+- 已完成：
+  - 读取 `claude-progress.md`、`feature_list.json`、最近提交，并执行 `./init.sh`
+  - 通过 explore agent 并行调研 meta-claw 当前架构（VesselRuntime、AgentExecutor、SubSystemRegistry、ToolSubSystem、HITL、Skill、Metrics）与 Spring AI Alibaba（ReactAgent/Graph/工具生态/版本兼容性）
+  - 综合两份调研报告，梳理 meta-claw 自研模型与 SAA 模型的优势、不足与关键差异
+  - 提出 `AgentEngine` SPI + `NativeAgentEngine` + `SpringAiAlibabaAgentEngine` 双实现方案，明确 VesselRuntime 改造点、ReactAgentFactory、SpiMessageConverter、HITL/Metrics 桥接 Hook
+  - 生成技术实现文档：`docs/superpowers/specs/2026-06-15-agent-execution-abstraction-design.md`
+  - 修正文档中的代码示例，使其与当前仓库事实一致（Reply 构造、SpiMessage role、VesselConfig 字段）
+  - 更新 `feature_list.json`：新增 `agent-engine-001` 并标记为 passing
+  - 更新 `claude-progress.md` 顶部状态与 Session 记录
+- 运行过的验证：
+  - `./init.sh` → 成功；9 个 reactor 模块全部 SUCCESS，全仓编译与 P0 测试集通过
+  - 静态核查：确认文档中引用的类名、方法名、字段名与仓库当前源码一致
+- 已记录证据：
+  - 设计文档已写入 `docs/superpowers/specs/2026-06-15-agent-execution-abstraction-design.md`
+  - `feature_list.json` 的 `agent-engine-001` 已补充设计与验证记录
+- 更新过的文件或工件：
+  - 新增 `docs/superpowers/specs/2026-06-15-agent-execution-abstraction-design.md`
+  - 修改 `feature_list.json`
+  - 修改 `claude-progress.md`
+- 已知风险或未解决的问题：
+  - Spring AI Alibaba 1.1.2.3 官方编译依赖 Spring AI 1.1.2，meta-claw 使用 1.1.8，后续实施 Phase 0 需重点验证二进制兼容性
+  - `SpiMessageConverter` 中 tool 消息的 `toolCallId` 映射需要与当前 `LlmClientManager` 实现对齐
+- 下一步最佳动作：
+  1. 提交本轮文档变更
+  2. 由用户 review 设计方案并决定是否进入 Phase 0（引入 SAA agent-framework/graph-core 依赖并跑 smoke test）

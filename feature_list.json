@@ -810,6 +810,32 @@
         }
       ],
       "notes": "方向 C 第一阶段完成。Spring-releases 仓库对 1.1.8 返回 401，已移除；当前依赖 Maven Central + 用户 settings.xml 中的 Aliyun mirror。Alibaba tool-calling starters 未纳入其 BOM，需显式版本。"
+    },
+    {
+      "id": "agent-engine-001",
+      "priority": 28,
+      "area": "core-architecture",
+      "title": "Agent 执行引擎抽象：native / alibaba 双实现设计",
+      "user_visible_behavior": "Vessel 的 Agent 执行引擎可通过配置切换：继续使用自研 ReAct 循环（native），或切换为 Spring AI Alibaba ReactAgent/Graph（alibaba）；底层统一使用 Spring AI，工具、记忆、HITL、Metrics 子系统可被两种引擎复用。",
+      "status": "passing",
+      "verification": [
+        "确认已输出完整技术实现文档，覆盖现状、两套框架对比、AgentEngine SPI、双实现、配置扩展、迁移路线图与风险。",
+        "确认文档中的代码示例与当前仓库事实一致（VesselRuntime、AgentExecutor、SpiMessage、ToolSubSystem 等）。",
+        "确认仓库基线验证通过：./init.sh 全仓编译 + P0 测试集。"
+      ],
+      "evidence": [
+        {
+          "date": "2026-06-15",
+          "result": "passing",
+          "detail": "完成《Meta-Claw 与 Spring AI Alibaba 双引擎 Agent 执行抽象设计》文档，写入 docs/superpowers/specs/2026-06-15-agent-execution-abstraction-design.md；文档对比了自研 VesselSubSystem + AgentExecutor 与 SAA ReactAgent/Graph 的优势/不足，提出 AgentEngine SPI + NativeAgentEngine + SpringAiAlibabaAgentEngine 双实现方案，并给出 6 阶段渐进迁移路线图。"
+        },
+        {
+          "date": "2026-06-15",
+          "result": "verified",
+          "detail": "执行 ./init.sh 成功；9 个 reactor 模块全部 SUCCESS，全仓编译与 P0 测试集通过。"
+        }
+      ],
+      "notes": "本文为设计阶段交付物，尚未修改代码。后续按 Phase 0~6 逐步实施：先验证 SAA 依赖兼容性，再抽 SPI、实现 NativeAgentEngine 兜底，最后接入 Alibaba 引擎并补齐流式、HITL、Metrics、多 Agent 与 checkpoint 持久化。"
     }
   ]
 }
