@@ -106,4 +106,19 @@ public class VesselConfigBundle {
     public VesselConfig getRuntimeVesselConfig() {
         return runtimeConfig != null ? runtimeConfig.getVesselConfig() : vesselConfig;
     }
+
+    public String getAgentEngine() {
+        VesselConfig config = getRuntimeVesselConfig();
+        if (config != null && config.getAgentEngine() != null && !config.getAgentEngine().isBlank()) {
+            return config.getAgentEngine();
+        }
+        return "native";
+    }
+
+    public VesselConfig.AlibabaAgentConfig getAlibabaAgentConfig() {
+        VesselConfig config = getRuntimeVesselConfig();
+        return config != null && config.getAlibabaAgent() != null
+                ? config.getAlibabaAgent()
+                : new VesselConfig.AlibabaAgentConfig();
+    }
 }

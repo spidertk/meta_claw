@@ -55,6 +55,12 @@ public class VesselConfig {
     /** 工具系统配置（排除列表等） */
     private ToolConfig tools = new ToolConfig();
 
+    /** Agent 执行引擎类型：native（默认）或 alibaba */
+    private String agentEngine = "native";
+
+    /** Spring AI Alibaba 引擎专属配置（仅 agentEngine=alibaba 时生效） */
+    private AlibabaAgentConfig alibabaAgent = new AlibabaAgentConfig();
+
     /** 短期记忆最大保留轮数（默认 20，超过则丢弃最早的消息） */
     private Integer maxHistoryRounds = 20;
 
@@ -138,5 +144,19 @@ public class VesselConfig {
     public static class ToolConfig {
         /** 要排除的工具名称列表（为空表示不排除任何工具） */
         private List<String> exclude = List.of();
+    }
+
+    /**
+     * Spring AI Alibaba Agent 引擎配置。
+     */
+    @Getter
+    @Setter
+    public static class AlibabaAgentConfig {
+        /** 是否启用并行工具执行 */
+        private boolean parallelToolExecution = true;
+        /** 最大并行工具数 */
+        private int maxParallelTools = 5;
+        /** 是否返回 reasoning_content */
+        private boolean returnReasoningContents = true;
     }
 }
