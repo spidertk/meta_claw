@@ -6,8 +6,8 @@
 - 当前架构基线：Java 21 + Maven 多模块仓库；已存在 `meta-claw-core`、`meta-claw-vessel`、`meta-claw-store`、`meta-claw-cli`、`meta-claw-gateway*`、`meta-claw-bootstrap`
 - 标准启动路径：`./init.sh`
 - 标准验证路径：`./init.sh` 先执行全仓编译，再运行初始化阶段 P0 测试集
-- 最近已通过证据：2026-06-16 在真实 Maven 环境中执行新版 `./init.sh`，完成全仓编译并通过 P0 测试集（含新增 AgentEngineFactoryTest、NativeAgentEngineTest、AlibabaEngineSmokeTest）；混合架构基线（Spring Boot 3.5.15 + Spring AI 1.1.8 + Spring AI Alibaba 1.1.2.3）编译与 SAA ReactAgent 冒烟测试通过；随后产出 Phase 2+ 实施计划并维护主设计文档进度
-- 当前最高优先级未完成功能：agent-engine-001（Agent 执行引擎抽象：native / alibaba 双实现设计）Phase 0+1+2 已实现完成；下一步为 Phase 3：Alibaba 引擎流式 + Metrics Hook（详见 docs/superpowers/plans/2026-06-16-agent-engine-spi-phase2-plus.md）
+- 最近已通过证据：2026-06-16 在真实 Maven 环境中执行新版 `./init.sh`，完成全仓编译并通过 P0 测试集（含新增 Phase 3 测试：SpringAiAlibabaAgentEngineStreamTest、MetaClawAgentMetricsHookTest、MetaClawModelMetricsHookTest）；混合架构基线（Spring Boot 3.5.15 + Spring AI 1.1.8 + Spring AI Alibaba 1.1.2.3）编译与 SAA 流式/Metrics Hook 测试通过；产出 Phase 3+ 实施计划并维护主设计文档进度
+- 当前最高优先级未完成功能：agent-engine-001（Agent 执行引擎抽象：native / alibaba 双实现设计）Phase 0+1+2+3 已实现完成；下一步为 Phase 4：Alibaba 引擎 HITL Hook（详见 docs/superpowers/plans/2026-06-16-agent-engine-spi-phase3-plus.md）
 - 当前 blocker：
   1. 当前无 blocker
 
@@ -35,6 +35,49 @@
 - `serve/start/stop/restart/status/logs`、工具引擎、MCP、Skill 系统仍未实现
 
 ## 会话记录
+
+### Session 047
+
+- 日期：2026-06-16
+- 本轮目标：继续实现 AgentEngine SPI 后续部分（Phase 3）：Alibaba 引擎流式输出 + Metrics Hook，并产出后续 todo 与主文档进度维护
+- 已完成：
+  - 更新主设计文档 `docs/superpowers/specs/2026-06-15-agent-execution-abstraction-design.md`：Phase 3 标注为 ✅ 已完成
+  - 产出 Phase 3+ 后续实施计划 `docs/superpowers/plans/2026-06-16-agent-engine-spi-phase3-plus.md`
+  - 实现 `SpringAiAlibabaAgentEngine.executeStream()`：接入 `ReactAgent.streamMessages()`，将 content/reasoning/tool-call 实时透传到 `SpiStreamingCallback`
+  - 实现 `MetaClawAgentMetricsHook`（任务完成/步数/时长）与 `MetaClawModelMetricsHook`（LLM latency/token usage/tool calls）
+  - 改造 `ReactAgentFactory`：按请求构建 ReactAgent，注册上述 Metrics Hook，避免 `TaskContext` 跨请求串用
+  - 新增测试：`SpringAiAlibabaAgentEngineStreamTest`（3 个）、`MetaClawAgentMetricsHookTest`（2 个）、`MetaClawModelMetricsHookTest`（4 个）
+  - 调整 `SpringAiAlibabaAgentEngineTest`：移除已失效的 "executeStream 抛 UnsupportedOperationException" 断言
+  - 将新增测试纳入 `init.sh` P0 基线
+  - 更新 `feature_list.json` 与 `claude-progress.md`
+- 运行过的验证：
+  - `mvn clean compile -pl meta-claw-core -am -q` → 成功
+  - 定向测试：`SpringAiAlibabaAgentEngineTest`、`SpringAiAlibabaAgentEngineStreamTest`、`MetaClawAgentMetricsHookTest`、`MetaClawModelMetricsHookTest` → 11/11 通过
+  - `./init.sh`（真实环境，Java 21）→ 成功；9 个 reactor 模块全部 SUCCESS，core 67 个测试全部通过
+- 已记录证据：
+  - `feature_list.json` 的 `agent-engine-001` 已补充 Phase 3 实现证据
+  - 主设计文档进度表已更新
+- 更新过的文件或工件：
+  - `meta-claw-core/src/main/java/meta/claw/core/runtime/engine/SpringAiAlibabaAgentEngine.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/runtime/engine/ReactAgentFactory.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/runtime/engine/alibabahook/MetaClawAgentMetricsHook.java`（新增）
+  - `meta-claw-core/src/main/java/meta/claw/core/runtime/engine/alibabahook/MetaClawModelMetricsHook.java`（新增）
+  - `meta-claw-core/src/test/java/meta/claw/core/runtime/engine/SpringAiAlibabaAgentEngineStreamTest.java`（新增）
+  - `meta-claw-core/src/test/java/meta/claw/core/runtime/engine/alibabahook/MetaClawAgentMetricsHookTest.java`（新增）
+  - `meta-claw-core/src/test/java/meta/claw/core/runtime/engine/alibabahook/MetaClawModelMetricsHookTest.java`（新增）
+  - `meta-claw-core/src/test/java/meta/claw/core/runtime/engine/SpringAiAlibabaAgentEngineTest.java`
+  - `init.sh`
+  - `docs/superpowers/specs/2026-06-15-agent-execution-abstraction-design.md`
+  - `docs/superpowers/plans/2026-06-16-agent-engine-spi-phase3-plus.md`（新增）
+  - `feature_list.json`
+  - `claude-progress.md`
+- 已知风险或未解决的问题：
+  - `ReactAgentFactory` 已改为按请求构建 ReactAgent，理论上会增加每次请求的构建开销；当前 P0 测试未观察到明显延迟，后续若成为瓶颈可引入 Vessel 级缓存，但需保证 Hook 中的 `TaskContext` 不串用
+  - `MetaClawModelMetricsHook` 中的 token usage 依赖 `AssistantMessage.getMetadata()` 中存在 `usage` 键；SAA 默认是否填充需真实 LLM 调用验证
+  - Phase 4 HITL Hook 尚未实现
+- 下一步最佳动作：
+  1. 提交本轮修改
+  2. 进入 Phase 4：实现 `MetaClawHitlHook` 与 Alibaba 引擎 HITL 恢复
 
 ### Session 001
 

@@ -16,14 +16,14 @@
 |------|------|-----------|---------|
 | **Phase 0** | ✅ 已完成 | `spring-ai-alibaba-agent-framework` / `spring-ai-alibaba-graph-core` 依赖；`AlibabaEngineSmokeTest` | `./init.sh` 编译 + 测试通过 |
 | **Phase 1** | ✅ 已完成 | `AgentEngine` SPI、`AgentEngineFactory`、`NativeAgentEngine`；`VesselRuntime` 工厂路由；`VesselConfig.agentEngine` / `AlibabaAgentConfig` | `./init.sh` 全量 P0 测试通过 |
-| **Phase 2** | ⬜ 未开始 | `SpiMessageConverter`、`ReactAgentFactory`、`SpringAiAlibabaAgentEngine`（同步 call） | 待实施 |
-| **Phase 3** | ⬜ 未开始 | 流式 `executeStream`、`MetaClawMetricsHook` | 待实施 |
+| **Phase 2** | ✅ 已完成 | `SpiMessageConverter`、`ReactAgentFactory`、`SpringAiAlibabaAgentEngine`（同步 call）；Vessel 模板补充 engine 示例 | `./init.sh` 全量 P0 测试通过 |
+| **Phase 3** | ✅ 已完成 | 流式 `executeStream`、`MetaClawAgentMetricsHook`、`MetaClawModelMetricsHook` | `./init.sh` 全量 P0 测试通过 |
 | **Phase 4** | ⬜ 未开始 | `MetaClawHitlHook`、Alibaba 引擎 HITL 恢复 | 待实施 |
 | **Phase 5** | ⬜ 未开始 | 多 Agent 编排（Sequential / Routing / Supervisor） | 待实施 |
 | **Phase 6** | ⬜ 未开始 | `VesselCheckpointSaver` 持久化 SAA thread 状态 | 待实施 |
 | **可选深化** | ⬜ 未开始 | `ExecutableTool` SPI + 工具执行层隔离 | 待评估 |
 
-> 最新进度维护：本表随代码实现同步更新。最近一次更新 2026-06-16，Phase 0+1 已完成并通过 `./init.sh`。
+> 最新进度维护：本表随代码实现同步更新。最近一次更新 2026-06-16，Phase 0+1+2+3 已完成并通过 `./init.sh`。
 
 当前仓库已完成：
 - Spring Boot 3.5.15 + Spring AI 1.1.8 + Spring AI Alibaba 1.1.2.3 的混合基线升级；
@@ -746,7 +746,7 @@ memory:
 | **Phase 0** | 引入 `spring-ai-alibaba-agent-framework` / `spring-ai-alibaba-graph-core` 依赖；验证与 Spring AI 1.1.8 的兼容性 | ✅ 已完成 | `./init.sh` 编译通过；新增 AlibabaEngineSmokeTest 能构建 ReactAgent 并调用一次无工具对话 |
 | **Phase 1** | 定义 `AgentEngine` SPI；创建 `AgentEngineFactory`；实现 `NativeAgentEngine`；改造 `VesselRuntime` 从 factory 获取引擎 | ✅ 已完成 | `./init.sh` 全量通过；CLI chat 行为与改造前完全一致 |
 | **Phase 2** | 实现 `SpringAiAlibabaAgentEngine`（同步 call）；实现 `ReactAgentFactory`；修复 `SpiMessageConverter` tool 消息的 `toolCallId` | ✅ 已完成 | 单个 tool-call 对话用 alibaba 引擎跑通；CLI 可切换 `agent_engine: alibaba` 运行；新增 3 个测试并纳入 P0 基线 |
-| **Phase 3** | 接入流式 `streamMessages`；实现 `MetaClawMetricsHook`；记录 LLM latency / token usage / tool call | ⬜ 未开始 | 流式输出 + token 统计在 alibaba 引擎下与 native 一致 |
+| **Phase 3** | 接入流式 `streamMessages`；实现 `MetaClawAgentMetricsHook` / `MetaClawModelMetricsHook`；记录 LLM latency / token usage / tool call | ✅ 已完成 | `SpringAiAlibabaAgentEngine.executeStream()` 透传 content/reasoning/tool-call 到 `SpiStreamingCallback`；`ReactAgentFactory` 注册任务级与模型级 Metrics Hook；新增 `SpringAiAlibabaAgentEngineStreamTest`、`MetaClawAgentMetricsHookTest`、`MetaClawModelMetricsHookTest` 并纳入 P0 基线；`./init.sh` 全量通过 |
 | **Phase 4** | 实现 `MetaClawHitlHook`，支持 HITL 中断/恢复 | ⬜ 未开始 | HITL 审批流程在 alibaba 引擎下与 native 行为一致 |
 | **Phase 5** | 多 Agent 编排：在 `VesselProfile` 中支持子 Agent 配置，把 `SequentialAgent` / `LlmRoutingAgent` 接入 VesselRuntime | ⬜ 未开始 | 一个 Vessel 可配置多个子 Agent 并按路由策略执行 |
 | **Phase 6**（可选） | 自定义 `VesselCheckpointSaver`：把 SAA thread 状态持久化到 meta-claw MemorySubSystem | ⬜ 未开始 | 进程重启后可从 checkpoint 恢复未完成的 Agent 任务 |

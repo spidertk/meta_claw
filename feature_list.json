@@ -853,9 +853,14 @@
           "date": "2026-06-16",
           "result": "passing",
           "detail": "Phase 2 实现完成：新增 SpiMessageConverter、ReactAgentFactory、SpringAiAlibabaAgentEngine；LlmClientProviderManager / OpenAiLlmClientProvider 支持 createChatModel；Vessel 配置模板补充 agent_engine / alibaba_agent 示例；新增 SpiMessageConverterTest、LlmClientProviderManagerTest、SpringAiAlibabaAgentEngineTest 并纳入 init.sh P0 基线；./init.sh 全量通过，core 59 个测试全部通过。"
+        },
+        {
+          "date": "2026-06-16",
+          "result": "passing",
+          "detail": "Phase 3 实现完成：SpringAiAlibabaAgentEngine.executeStream() 接入 ReactAgent.streamMessages()，将 content/reasoning/tool-call 实时透传到 SpiStreamingCallback 并返回 Reply；新增 MetaClawAgentMetricsHook（任务完成/步数/时长）与 MetaClawModelMetricsHook（LLM latency/token usage/tool calls），并在 ReactAgentFactory 注册；ReactAgentFactory 改为按请求构建 ReactAgent，避免 Hook 中的 TaskContext 跨请求串用；新增 SpringAiAlibabaAgentEngineStreamTest、MetaClawAgentMetricsHookTest、MetaClawModelMetricsHookTest 并纳入 init.sh P0 基线；./init.sh 全量通过，core 67 个测试全部通过。"
         }
       ],
-      "notes": "设计文档已落地为 Phase 0+1+2 代码实现。当前 AgentEngine.executeStream 返回 Reply 以保持 VesselRuntime 落盘逻辑简单，后续接入 SAA 流式时可再评估是否调整为 void + callback 持久化。AlibabaEngineSmokeTest 已验证 SAA 1.1.2.3 与 Spring AI 1.1.8 的依赖兼容性。下一步进入 Phase 3：Alibaba 引擎流式 + Metrics Hook。"
+      "notes": "设计文档已落地为 Phase 0+1+2+3 代码实现。AgentEngine.executeStream 返回 Reply 以保持 VesselRuntime 落盘逻辑简单；SAA 流式通过 streamMessages() 驱动 callback，usage 信息当前由 ModelMetricsHook 从 AssistantMessage metadata 最佳 effort 读取。下一步进入 Phase 4：Alibaba 引擎 HITL Hook。"
     }
   ]
 }

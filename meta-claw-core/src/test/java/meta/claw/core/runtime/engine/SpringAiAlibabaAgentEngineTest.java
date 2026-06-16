@@ -16,7 +16,6 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
@@ -47,16 +46,6 @@ class SpringAiAlibabaAgentEngineTest {
         Reply reply = engine.execute(ctx, request);
 
         assertEquals("hello from alibaba", reply.getContent());
-    }
-
-    @Test
-    void executeStreamThrowsUnsupported() {
-        SpringAiAlibabaAgentEngine engine = new SpringAiAlibabaAgentEngine();
-        TaskContext ctx = dummyContext();
-        SpiChatRequest request = SpiChatRequest.builder().vesselId("v1").build();
-
-        assertThrows(UnsupportedOperationException.class,
-                () -> engine.executeStream(ctx, request, null));
     }
 
     private TaskContext anyTaskContext() {
