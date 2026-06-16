@@ -6,8 +6,8 @@
 - 当前架构基线：Java 21 + Maven 多模块仓库；已存在 `meta-claw-core`、`meta-claw-vessel`、`meta-claw-store`、`meta-claw-cli`、`meta-claw-gateway*`、`meta-claw-bootstrap`
 - 标准启动路径：`./init.sh`
 - 标准验证路径：`./init.sh` 先执行全仓编译，再运行初始化阶段 P0 测试集
-- 最近已通过证据：2026-06-13 在真实 Maven 环境中执行新版 `./init.sh`，完成全仓编译并通过 P0 测试集；混合架构基线（Spring Boot 3.5.15 + Spring AI 1.1.8 + Spring AI Alibaba 1.1.2.3）编译通过
-- 当前最高优先级未完成功能：agent-engine-001（Agent 执行引擎抽象：native / alibaba 双实现设计）设计已完成，代码实现尚未开始
+- 最近已通过证据：2026-06-16 在真实 Maven 环境中执行新版 `./init.sh`，完成全仓编译并通过 P0 测试集（含新增 AgentEngineFactoryTest、NativeAgentEngineTest、AlibabaEngineSmokeTest）；混合架构基线（Spring Boot 3.5.15 + Spring AI 1.1.8 + Spring AI Alibaba 1.1.2.3）编译与 SAA ReactAgent 冒烟测试通过
+- 当前最高优先级未完成功能：agent-engine-001（Agent 执行引擎抽象：native / alibaba 双实现设计）Phase 0+1 已实现完成；下一步为 Phase 2：SpringAiAlibabaAgentEngine 同步调用
 - 当前 blocker：
   1. 当前无 blocker
 
@@ -1469,3 +1469,45 @@
 - 下一步最佳动作：
   1. 提交本轮文档补充变更
   2. 由用户 review 并决定是否进入 Phase 0 实施
+
+### Session 046
+
+- 日期：2026-06-16
+- 本轮目标：实现 AgentEngine SPI + NativeAgentEngine，验证 SAA 依赖兼容性
+- 已完成：
+  - 按 2026-06-15 设计文档 Phase 0+1 完成代码实现
+  - 在 `meta-claw-core` 引入 `spring-ai-alibaba-agent-framework` / `spring-ai-alibaba-graph-core`
+  - 新增 `AgentEngine` SPI、`AgentEngineFactory`、`NativeAgentEngine`
+  - 改造 `VesselRuntime` 通过 `AgentEngineFactory` 按配置选择引擎
+  - 在 `VesselConfig` / `VesselConfigBundle` 中新增 `agentEngine` 与 `AlibabaAgentConfig`
+  - 新增 `AgentEngineFactoryTest`、`NativeAgentEngineTest`、`AlibabaEngineSmokeTest`
+  - 更新 `init.sh` P0 测试列表，将新增测试纳入基线
+  - 更新 `feature_list.json` 与 `claude-progress.md`
+- 运行过的验证：
+  - `mvn clean compile -pl meta-claw-core -am -q` → 成功
+  - `mvn test -pl meta-claw-core -am -Dtest=AgentEngineFactoryTest,NativeAgentEngineTest -Dsurefire.failIfNoSpecifiedTests=false` → 成功，8/8 通过
+  - `mvn test -pl meta-claw-core -am -Dtest=AlibabaEngineSmokeTest -Dsurefire.failIfNoSpecifiedTests=false` → 成功，1/1 通过
+  - `./init.sh` → 成功；全仓编译与 P0 测试集全部通过
+- 已记录证据：
+  - `feature_list.json` 的 `agent-engine-001` 已补充 Phase 0+1 实现证据
+  - `docs/superpowers/plans/2026-06-16-agent-engine-spi-phase0-phase1.md` 为本次实施计划
+- 更新过的文件或工件：
+  - `meta-claw-core/pom.xml`
+  - `meta-claw-core/src/main/java/meta/claw/core/config/VesselConfig.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/config/bundle/VesselConfigBundle.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/runtime/engine/AgentEngine.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/runtime/engine/AgentEngineFactory.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/runtime/engine/NativeAgentEngine.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/runtime/VesselRuntime.java`
+  - `meta-claw-core/src/test/java/meta/claw/core/runtime/engine/AgentEngineFactoryTest.java`
+  - `meta-claw-core/src/test/java/meta/claw/core/runtime/engine/NativeAgentEngineTest.java`
+  - `meta-claw-core/src/test/java/meta/claw/core/runtime/engine/AlibabaEngineSmokeTest.java`
+  - `init.sh`
+  - `feature_list.json`
+  - `claude-progress.md`
+- 已知风险或未解决的问题：
+  - 当前 `AgentEngine.executeStream` 返回 `Reply` 以保持 `VesselRuntime` 落盘逻辑简单；后续若接入 SAA 流式需要重新评估返回类型。
+  - `AlibabaEngineSmokeTest` 中 `ReactAgent.call(...)` 会抛出 `GraphRunnerException`；已用 `throws Exception` 让测试方法声明，实际调用 mock ChatModel 时不会触发真实网络请求。
+- 下一步最佳动作：
+  1. 提交本轮修改
+  2. 进入 Phase 2：实现 `SpringAiAlibabaAgentEngine` 同步调用
