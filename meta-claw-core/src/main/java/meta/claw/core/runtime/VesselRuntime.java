@@ -2,20 +2,20 @@ package meta.claw.core.runtime;
 
 import lombok.extern.slf4j.Slf4j;
 import meta.claw.core.llm.SpiChatRequest;
-import meta.claw.core.llm.SpiChatResponse;
 import meta.claw.core.llm.SpiMessage;
 import meta.claw.core.llm.SpiStreamingCallback;
 import meta.claw.core.memory.MemoryMessage;
 import meta.claw.core.memory.MemoryMessageConverter;
 import meta.claw.core.memory.shortterm.ShortMemory;
 import meta.claw.core.message.Reply;
-import meta.claw.core.message.ReplyType;
 import meta.claw.core.runtime.hitl.ApprovalResolution;
 import meta.claw.core.runtime.hitl.ApprovalTicket;
 import meta.claw.core.tool.SpiToolCall;
 import meta.claw.core.prompt.PromptComposer;
 import meta.claw.core.prompt.PromptRenderer;
 import meta.claw.core.prompt.PromptVars;
+import meta.claw.core.runtime.engine.AgentEngine;
+import meta.claw.core.runtime.engine.AgentEngineFactory;
 import meta.claw.core.runtime.subsystem.MemorySubSystem;
 import meta.claw.core.runtime.subsystem.SubSystemRegistry;
 import meta.claw.core.runtime.subsystem.VesselAwareSubSystem;
@@ -50,11 +50,7 @@ public class VesselRuntime implements InitializingBean {
     @Autowired
     private PromptRenderer promptRenderer;
     @Autowired
-    private LlmClientManager llmClient;
-    @Autowired
-    private AgentExecutor agentExecutor;
-    @Autowired
-    private StreamingAgentExecutor streamingAgentExecutor;
+    private AgentEngineFactory agentEngineFactory;
 
     /** 所有子系统，Spring 自动收集（含 VesselProfile） */
     @Autowired(required = false)
@@ -95,6 +91,10 @@ public class VesselRuntime implements InitializingBean {
     /** 便捷查询：获取 Vessel 配置画像 */
     public VesselProfile getProfile() {
         return registry.get("profile");
+    }
+
+    private AgentEngine currentEngine() {
+        return agentEngineFactory.getEngine(getProfile().getBundle().getAgentEngine());
     }
 
     // ========== Prompt 组装与渲染 ==========
@@ -142,7 +142,7 @@ public class VesselRuntime implements InitializingBean {
                     .sessionId(task.getSessionId())
                     .build();
 
-            Reply reply = agentExecutor.resume(ctx, request, ticket, resolution);
+            Reply reply = currentEngine().resume(ctx, request, ticket, resolution);
             saveAssistantMessage(task, reply.getContent());
             return reply;
         } finally {
@@ -169,8 +169,7 @@ public class VesselRuntime implements InitializingBean {
                     .sessionId(task.getSessionId())
                     .build();
 
-            // Phase 2: 使用 AgentExecutor 执行，支持多轮 tool-call
-            Reply reply = agentExecutor.execute(ctx, request);
+            Reply reply = currentEngine().execute(ctx, request);
 
             // 保存 assistant 消息到短期记忆
             saveAssistantMessage(task, reply.getContent());
@@ -194,7 +193,7 @@ public class VesselRuntime implements InitializingBean {
                     .messages(messages)
                     .sessionId(task.getSessionId())
                     .build();
-            Reply reply = streamingAgentExecutor.execute(ctx, request, callback);
+            Reply reply = currentEngine().executeStream(ctx, request, callback);
             saveAssistantMessage(task, reply.getContent());
         } finally {
             registry.listAll().forEach(sub -> sub.onTaskEnd(ctx));
