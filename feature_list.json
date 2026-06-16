@@ -1,6 +1,6 @@
 {
   "project": "meta-claw",
-  "last_updated": "2026-06-13",
+  "last_updated": "2026-06-16",
   "package_structure": {
     "config": "meta.claw.core.config — 所有配置模型 + 加载器 + 解析器",
     "vessel": "meta.claw.core.vessel — Vessel 用户域（Profile + Initializer）",
@@ -843,9 +843,14 @@
           "date": "2026-06-16",
           "result": "passing",
           "detail": "Phase 0+1 实现完成：新增 AgentEngine SPI、AgentEngineFactory、NativeAgentEngine；VesselRuntime 通过工厂按 agentEngine 配置路由；VesselConfig 新增 agentEngine 与 AlibabaAgentConfig；新增 AgentEngineFactoryTest、NativeAgentEngineTest、AlibabaEngineSmokeTest 并纳入 init.sh P0 基线；./init.sh 全量通过。"
+        },
+        {
+          "date": "2026-06-16",
+          "result": "passing",
+          "detail": "产出 Phase 2+ 实施计划 docs/superpowers/plans/2026-06-16-agent-engine-spi-phase2-plus.md；维护主设计文档进度（新增实现进度总览、路线图状态列、接口清单状态列、VesselConfig 实现注记）。"
         }
       ],
-      "notes": "设计文档已落地为 Phase 0+1 代码实现。当前 AgentEngine.executeStream 返回 Reply 以保持 VesselRuntime 落盘逻辑简单，后续接入 SAA 流式时可再评估是否调整为 void + callback 持久化。AlibabaEngineSmokeTest 已验证 SAA 1.1.2.3 与 Spring AI 1.1.8 的依赖兼容性。"
+      "notes": "设计文档已落地为 Phase 0+1 代码实现。当前 AgentEngine.executeStream 返回 Reply 以保持 VesselRuntime 落盘逻辑简单，后续接入 SAA 流式时可再评估是否调整为 void + callback 持久化。AlibabaEngineSmokeTest 已验证 SAA 1.1.2.3 与 Spring AI 1.1.8 的依赖兼容性。Phase 2+ 计划已输出，下一步按 Task 1 开始实现 SpiMessageConverter。"
     }
   ]
 }

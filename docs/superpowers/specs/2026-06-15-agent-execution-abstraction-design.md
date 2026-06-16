@@ -10,6 +10,21 @@
 
 **一句话概括：meta-claw 已经建成以 `VesselSubSystem` SPI 为核心的单 Agent 运行时，Spring AI Alibaba 则提供成熟的 Graph 状态机与多 Agent 编排能力；通过 `AgentEngine` 接口把两者封装为可切换实现，可以在不破坏现有投资的前提下，渐进引入 Alibaba 的 Graph/HITL/多 Agent 能力。**
 
+### 1.1 实现进度总览
+
+| 阶段 | 状态 | 关键交付物 | 验证方式 |
+|------|------|-----------|---------|
+| **Phase 0** | ✅ 已完成 | `spring-ai-alibaba-agent-framework` / `spring-ai-alibaba-graph-core` 依赖；`AlibabaEngineSmokeTest` | `./init.sh` 编译 + 测试通过 |
+| **Phase 1** | ✅ 已完成 | `AgentEngine` SPI、`AgentEngineFactory`、`NativeAgentEngine`；`VesselRuntime` 工厂路由；`VesselConfig.agentEngine` / `AlibabaAgentConfig` | `./init.sh` 全量 P0 测试通过 |
+| **Phase 2** | ⬜ 未开始 | `SpiMessageConverter`、`ReactAgentFactory`、`SpringAiAlibabaAgentEngine`（同步 call） | 待实施 |
+| **Phase 3** | ⬜ 未开始 | 流式 `executeStream`、`MetaClawMetricsHook` | 待实施 |
+| **Phase 4** | ⬜ 未开始 | `MetaClawHitlHook`、Alibaba 引擎 HITL 恢复 | 待实施 |
+| **Phase 5** | ⬜ 未开始 | 多 Agent 编排（Sequential / Routing / Supervisor） | 待实施 |
+| **Phase 6** | ⬜ 未开始 | `VesselCheckpointSaver` 持久化 SAA thread 状态 | 待实施 |
+| **可选深化** | ⬜ 未开始 | `ExecutableTool` SPI + 工具执行层隔离 | 待评估 |
+
+> 最新进度维护：本表随代码实现同步更新。最近一次更新 2026-06-16，Phase 0+1 已完成并通过 `./init.sh`。
+
 当前仓库已完成：
 - Spring Boot 3.5.15 + Spring AI 1.1.8 + Spring AI Alibaba 1.1.2.3 的混合基线升级；
 - 自研 `VesselSubSystem` SPI（Profile/Memory/Tool/HITL/Skill/Metrics）+ `AgentExecutor` / `StreamingAgentExecutor` ReAct 循环；
@@ -703,6 +718,8 @@ public class AlibabaAgentConfig {
 }
 ```
 
+> **实现注记（2026-06-16）：** 当前仓库的配置模型为 `meta.claw.core.config.VesselConfig`（而非独立的 `VesselMeta`），`agentEngine` 与 `AlibabaAgentConfig` 已作为其字段落地，并通过 `VesselConfigBundle.getAgentEngine()` / `getAlibabaAgentConfig()` 暴露。YAML key 使用 `agent_engine` 与 `alibaba_agent`，由 SnakeYAML 驼峰映射到 Java 字段。
+
 ### 6.2 vessel.meta.yaml 示例
 
 ```yaml
@@ -724,15 +741,15 @@ memory:
 
 ## 7. 渐进式迁移路线图
 
-| 阶段 | 工作项 | 验证标准 |
-|------|--------|---------|
-| **Phase 0** | 引入 `spring-ai-alibaba-agent-framework` / `spring-ai-alibaba-graph-core` 依赖；验证与 Spring AI 1.1.8 的兼容性 | `./init.sh` 编译通过；新增 AlibabaEngineSmokeTest 能构建 ReactAgent 并调用一次无工具对话 |
-| **Phase 1** | 定义 `AgentEngine` SPI；创建 `AgentEngineFactory`；实现 `NativeAgentEngine`；改造 `VesselRuntime` 从 factory 获取引擎 | `./init.sh` 全量通过；CLI chat 行为与改造前完全一致 |
-| **Phase 2** | 实现 `SpringAiAlibabaAgentEngine`（同步 call）；实现 `ReactAgentFactory`；修复 `SpiMessageConverter` tool 消息的 `toolCallId` | 单个 tool-call 对话用 alibaba 引擎跑通；CLI 可切换 `agent_engine: alibaba` 运行 |
-| **Phase 3** | 接入流式 `streamMessages`；实现 `MetaClawMetricsHook`；记录 LLM latency / token usage / tool call | 流式输出 + token 统计在 alibaba 引擎下与 native 一致 |
-| **Phase 4** | 实现 `MetaClawHitlHook`，支持 HITL 中断/恢复 | HITL 审批流程在 alibaba 引擎下与 native 行为一致 |
-| **Phase 5** | 多 Agent 编排：在 `VesselProfile` 中支持子 Agent 配置，把 `SequentialAgent` / `LlmRoutingAgent` 接入 VesselRuntime | 一个 Vessel 可配置多个子 Agent 并按路由策略执行 |
-| **Phase 6**（可选） | 自定义 `VesselCheckpointSaver`：把 SAA thread 状态持久化到 meta-claw MemorySubSystem | 进程重启后可从 checkpoint 恢复未完成的 Agent 任务 |
+| 阶段 | 工作项 | 状态 | 验证标准 |
+|------|--------|------|---------|
+| **Phase 0** | 引入 `spring-ai-alibaba-agent-framework` / `spring-ai-alibaba-graph-core` 依赖；验证与 Spring AI 1.1.8 的兼容性 | ✅ 已完成 | `./init.sh` 编译通过；新增 AlibabaEngineSmokeTest 能构建 ReactAgent 并调用一次无工具对话 |
+| **Phase 1** | 定义 `AgentEngine` SPI；创建 `AgentEngineFactory`；实现 `NativeAgentEngine`；改造 `VesselRuntime` 从 factory 获取引擎 | ✅ 已完成 | `./init.sh` 全量通过；CLI chat 行为与改造前完全一致 |
+| **Phase 2** | 实现 `SpringAiAlibabaAgentEngine`（同步 call）；实现 `ReactAgentFactory`；修复 `SpiMessageConverter` tool 消息的 `toolCallId` | ⬜ 未开始 | 单个 tool-call 对话用 alibaba 引擎跑通；CLI 可切换 `agent_engine: alibaba` 运行 |
+| **Phase 3** | 接入流式 `streamMessages`；实现 `MetaClawMetricsHook`；记录 LLM latency / token usage / tool call | ⬜ 未开始 | 流式输出 + token 统计在 alibaba 引擎下与 native 一致 |
+| **Phase 4** | 实现 `MetaClawHitlHook`，支持 HITL 中断/恢复 | ⬜ 未开始 | HITL 审批流程在 alibaba 引擎下与 native 行为一致 |
+| **Phase 5** | 多 Agent 编排：在 `VesselProfile` 中支持子 Agent 配置，把 `SequentialAgent` / `LlmRoutingAgent` 接入 VesselRuntime | ⬜ 未开始 | 一个 Vessel 可配置多个子 Agent 并按路由策略执行 |
+| **Phase 6**（可选） | 自定义 `VesselCheckpointSaver`：把 SAA thread 状态持久化到 meta-claw MemorySubSystem | ⬜ 未开始 | 进程重启后可从 checkpoint 恢复未完成的 Agent 任务 |
 
 ---
 
@@ -1005,19 +1022,19 @@ public class AgentExecutor {
 
 ## 11. 接口与实现类清单
 
-| 类别 | 类/接口 | 所属包 | 说明 |
-|------|---------|--------|------|
-| SPI | `AgentEngine` | `meta.claw.core.runtime.engine` | 新增 |
-| Factory | `AgentEngineFactory` | `meta.claw.core.runtime.engine` | 新增 |
-| 实现 | `NativeAgentEngine` | `meta.claw.core.runtime.engine` | 新增，复用现有执行器 |
-| 实现 | `SpringAiAlibabaAgentEngine` | `meta.claw.core.runtime.engine` | 新增 |
-| Factory | `ReactAgentFactory` | `meta.claw.core.runtime.engine` | 新增 |
-| Converter | `SpiMessageConverter` | `meta.claw.core.runtime.engine` | 新增，需修复 toolCallId |
-| Hook | `MetaClawHitlHook` | `meta.claw.core.runtime.engine.alibabahook` | Phase 3 |
-| Hook | `MetaClawMetricsHook` | `meta.claw.core.runtime.engine.alibabahook` | Phase 3 |
-| 修改 | `VesselRuntime` | `meta.claw.core.runtime` | 注入 AgentEngineFactory |
-| 修改 | `VesselMeta` / `AlibabaAgentConfig` | `meta.claw.core.config` | 新增配置字段 |
-| 修改 | `LlmClientProviderManager` | `meta.claw.core.llm` | 新增 `createChatModel` |
+| 类别 | 类/接口 | 所属包 | 状态 | 说明 |
+|------|---------|--------|------|------|
+| SPI | `AgentEngine` | `meta.claw.core.runtime.engine` | ✅ 已完成 | Phase 1 落地 |
+| Factory | `AgentEngineFactory` | `meta.claw.core.runtime.engine` | ✅ 已完成 | Phase 1 落地 |
+| 实现 | `NativeAgentEngine` | `meta.claw.core.runtime.engine` | ✅ 已完成 | Phase 1 落地，复用现有执行器 |
+| 实现 | `SpringAiAlibabaAgentEngine` | `meta.claw.core.runtime.engine` | ⬜ 未开始 | Phase 2 |
+| Factory | `ReactAgentFactory` | `meta.claw.core.runtime.engine` | ⬜ 未开始 | Phase 2 |
+| Converter | `SpiMessageConverter` | `meta.claw.core.runtime.engine` | ⬜ 未开始 | Phase 2，需修复 toolCallId |
+| Hook | `MetaClawHitlHook` | `meta.claw.core.runtime.engine.alibabahook` | ⬜ 未开始 | Phase 4 |
+| Hook | `MetaClawMetricsHook` | `meta.claw.core.runtime.engine.alibabahook` | ⬜ 未开始 | Phase 3 |
+| 修改 | `VesselRuntime` | `meta.claw.core.runtime` | ✅ 已完成 | Phase 1 落地，注入 AgentEngineFactory |
+| 修改 | `VesselConfig` / `AlibabaAgentConfig` | `meta.claw.core.config` | ✅ 已完成 | Phase 1 落地，新增配置字段 |
+| 修改 | `LlmClientProviderManager` | `meta.claw.core.llm` | ⬜ 未开始 | Phase 2，新增 `createChatModel` |
 
 ### 11.2 可选工具抽象隔离新增/修改清单
 

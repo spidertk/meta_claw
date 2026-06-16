@@ -6,8 +6,8 @@
 - 当前架构基线：Java 21 + Maven 多模块仓库；已存在 `meta-claw-core`、`meta-claw-vessel`、`meta-claw-store`、`meta-claw-cli`、`meta-claw-gateway*`、`meta-claw-bootstrap`
 - 标准启动路径：`./init.sh`
 - 标准验证路径：`./init.sh` 先执行全仓编译，再运行初始化阶段 P0 测试集
-- 最近已通过证据：2026-06-16 在真实 Maven 环境中执行新版 `./init.sh`，完成全仓编译并通过 P0 测试集（含新增 AgentEngineFactoryTest、NativeAgentEngineTest、AlibabaEngineSmokeTest）；混合架构基线（Spring Boot 3.5.15 + Spring AI 1.1.8 + Spring AI Alibaba 1.1.2.3）编译与 SAA ReactAgent 冒烟测试通过
-- 当前最高优先级未完成功能：agent-engine-001（Agent 执行引擎抽象：native / alibaba 双实现设计）Phase 0+1 已实现完成；下一步为 Phase 2：SpringAiAlibabaAgentEngine 同步调用
+- 最近已通过证据：2026-06-16 在真实 Maven 环境中执行新版 `./init.sh`，完成全仓编译并通过 P0 测试集（含新增 AgentEngineFactoryTest、NativeAgentEngineTest、AlibabaEngineSmokeTest）；混合架构基线（Spring Boot 3.5.15 + Spring AI 1.1.8 + Spring AI Alibaba 1.1.2.3）编译与 SAA ReactAgent 冒烟测试通过；随后产出 Phase 2+ 实施计划并维护主设计文档进度
+- 当前最高优先级未完成功能：agent-engine-001（Agent 执行引擎抽象：native / alibaba 双实现设计）Phase 0+1 已实现完成；下一步为 Phase 2：SpringAiAlibabaAgentEngine 同步调用（详见 docs/superpowers/plans/2026-06-16-agent-engine-spi-phase2-plus.md）
 - 当前 blocker：
   1. 当前无 blocker
 
@@ -981,6 +981,33 @@
 - 下一步最佳动作：
   1. 提交本轮修改
   2. 由用户决定下一项功能优先级
+
+### Session 032
+
+- 日期：2026-06-16
+- 本轮目标：在 Phase 0+1 完成后，产出后续实施计划并维护主设计文档进度，防止遗忘
+- 已完成：
+  - 确认 Phase 0+1 代码已落地：`AgentEngine` SPI、`AgentEngineFactory`、`NativeAgentEngine`、`VesselRuntime` 工厂路由、`VesselConfig.agentEngine` / `AlibabaAgentConfig`
+  - 运行 `./init.sh` 验证当前基线通过
+  - 创建 Phase 2+ 实施计划文档 `docs/superpowers/plans/2026-06-16-agent-engine-spi-phase2-plus.md`，覆盖 Task 1~15（Phase 2~6 + 可选工具抽象隔离）
+  - 更新主设计文档 `docs/superpowers/specs/2026-06-15-agent-execution-abstraction-design.md`：
+    - 新增第 1.1 节《实现进度总览》
+    - 第 7 章路线图增加“状态”列并标注 Phase 0/1 已完成
+    - 第 11 章接口清单增加“状态”列
+    - 第 6.1 节补充 `VesselConfig` 实现注记
+- 运行过的验证：
+  - `./init.sh` → 成功；9 个 reactor 模块全部 SUCCESS，P0 测试通过
+- 更新过的文件或工件：
+  - `docs/superpowers/plans/2026-06-16-agent-engine-spi-phase2-plus.md`（新增）
+  - `docs/superpowers/specs/2026-06-15-agent-execution-abstraction-design.md`
+  - `claude-progress.md`
+  - `feature_list.json`
+- 已知风险或未解决的问题：
+  - Phase 2 实施前需确认 `ReactAgent.call(List<Message>)` 在当前 SAA 1.1.2.3 中的准确签名；计划文档中的代码基于设计文档示例，若编译报错需按实际 API 调整
+  - `LlmClientProviderManager` 当前仅暴露 `ChatClient create/createRaw`，Phase 2 需新增 `createChatModel` 路由
+- 下一步最佳动作：
+  1. 按 `docs/superpowers/plans/2026-06-16-agent-engine-spi-phase2-plus.md` Task 1 开始实现 `SpiMessageConverter`
+  2. 每完成一个 Task 即运行 `./init.sh` 保持基线通过
 
 ### Session 031
 
