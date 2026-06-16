@@ -6,6 +6,7 @@ import meta.claw.core.config.ProviderConfig;
 import meta.claw.core.llm.advisor.ShortMemoryAdvisor;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.ToolCallAdvisor;
+import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.ai.openai.api.OpenAiApi;
@@ -58,6 +59,11 @@ public class OpenAiLlmClientProvider implements LlmClientProvider {
         return ChatClient.builder(buildChatModel(providerConfig)).build();
     }
 
+    @Override
+    public ChatModel createChatModel(ProviderConfig providerConfig) {
+        return buildChatModel(providerConfig);
+    }
+
     /**
      * 构建缓存 key：baseUrl + model + temperature + timeout + apiKeyHash。
      * 任一配置项变化都会创建新的 ChatClient。
@@ -85,7 +91,7 @@ public class OpenAiLlmClientProvider implements LlmClientProvider {
         return chatClient;
     }
 
-    private org.springframework.ai.chat.model.ChatModel buildChatModel(ProviderConfig providerConfig) {
+    public org.springframework.ai.chat.model.ChatModel buildChatModel(ProviderConfig providerConfig) {
         String apiKey = providerConfig.getApiKey();
         String baseUrl = normalizeBaseUrl(providerConfig.getBaseUrl());
         String model = providerConfig.getModel();

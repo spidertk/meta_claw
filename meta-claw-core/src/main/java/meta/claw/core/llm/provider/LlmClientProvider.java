@@ -32,6 +32,19 @@ public interface LlmClientProvider {
     }
 
     /**
+     * 创建 ChatModel，供 Spring AI Alibaba ReactAgent 等直接消费。
+     *
+     * <p>默认实现直接抛出异常，要求各 provider 显式覆写。</p>
+     *
+     * @param providerConfig 全局 provider 配置
+     * @return Spring AI ChatModel 实例
+     */
+    default ChatModel createChatModel(ProviderConfig providerConfig) {
+        throw new UnsupportedOperationException(
+                "Provider " + providerName() + " must implement createChatModel directly");
+    }
+
+    /**
      *  代理名称
      ** @return 代理名称 
      */

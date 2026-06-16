@@ -3,6 +3,7 @@ package meta.claw.core.llm.provider;
 import lombok.extern.slf4j.Slf4j;
 import meta.claw.core.config.ProviderConfig;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.beans.BeansException;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
@@ -98,33 +99,9 @@ public class LlmClientProviderManager implements ApplicationContextAware, Applic
      * @throws IllegalArgumentException 如果没有找到支持该 provider 的工厂
      */
     public ChatClient create(ProviderConfig providerConfig) {
-
-        if (allProviders==null || allProviders.isEmpty()) {
-
-            String    errorMsg = String.format(
-                        "No LlmClientFactory supports provider: '%s'. Available providers",
-                        providerConfig.getProvider()
-                );
-
-            log.error(errorMsg);
-            throw new IllegalArgumentException(
-                    errorMsg);
-
-        }
-       LlmClientProvider provider= allProviders.get(providerConfig.getProvider());
-        if (provider==null){
-            String    errorMsg = String.format(
-                    "No LlmClientFactory supports provider: '%s'. Available providers:'%s' ",
-                    providerConfig.getProvider(), allProviders.values().stream().map(LlmClientProvider::providerName).toList()
-            );
-            log.error(errorMsg);
-            throw new IllegalArgumentException(
-                    errorMsg);
-        }
-
+        LlmClientProvider provider = resolveProvider(providerConfig);
         log.debug("Routing provider '{}' to factory: {}", provider.providerName(), provider.getClass().getSimpleName());
         return provider.create(providerConfig);
-
     }
 
     /**
@@ -135,9 +112,28 @@ public class LlmClientProviderManager implements ApplicationContextAware, Applic
      * @throws IllegalArgumentException 如果没有找到支持该 provider 的工厂
      */
     public ChatClient createRaw(ProviderConfig providerConfig) {
+        LlmClientProvider provider = resolveProvider(providerConfig);
+        log.debug("Routing provider '{}' to raw ChatClient factory: {}", provider.providerName(), provider.getClass().getSimpleName());
+        return provider.createRaw(providerConfig);
+    }
+
+    /**
+     * 根据 provider 名称创建 ChatModel，供 Spring AI Alibaba ReactAgent 直接消费。
+     *
+     * @param providerConfig provider 配置
+     * @return ChatModel 实例
+     * @throws IllegalArgumentException 如果没有找到支持该 provider 的工厂
+     */
+    public ChatModel createChatModel(ProviderConfig providerConfig) {
+        LlmClientProvider provider = resolveProvider(providerConfig);
+        log.debug("Routing provider '{}' to ChatModel factory: {}", provider.providerName(), provider.getClass().getSimpleName());
+        return provider.createChatModel(providerConfig);
+    }
+
+    private LlmClientProvider resolveProvider(ProviderConfig providerConfig) {
         if (allProviders == null || allProviders.isEmpty()) {
             String errorMsg = String.format(
-                    "No LlmClientFactory supports provider: '%s'. Available providers",
+                    "No LlmClientProvider supports provider: '%s'",
                     providerConfig.getProvider()
             );
             log.error(errorMsg);
@@ -146,15 +142,14 @@ public class LlmClientProviderManager implements ApplicationContextAware, Applic
         LlmClientProvider provider = allProviders.get(providerConfig.getProvider());
         if (provider == null) {
             String errorMsg = String.format(
-                    "No LlmClientFactory supports provider: '%s'. Available providers:'%s' ",
-                    providerConfig.getProvider(), allProviders.values().stream().map(LlmClientProvider::providerName).toList()
+                    "No LlmClientProvider supports provider: '%s'. Available providers: %s",
+                    providerConfig.getProvider(),
+                    allProviders.values().stream().map(LlmClientProvider::providerName).toList()
             );
             log.error(errorMsg);
             throw new IllegalArgumentException(errorMsg);
         }
-        log.debug("Routing provider '{}' to raw ChatClient factory: {}", provider.providerName(), provider.getClass().getSimpleName());
-        return provider.createRaw(providerConfig);
-
-}
+        return provider;
+    }
 
 }
