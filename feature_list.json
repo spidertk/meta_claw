@@ -873,6 +873,11 @@
           "date": "2026-06-16",
           "result": "verified",
           "detail": "基于已完成实现更新总文档进度与资深用户不足点：维护主设计文档进度表与第 11 章接口清单，新增“资深用户视角：当前实现不足点”章节；同步更新 Phase 3+ 实施计划；重新执行 ./init.sh 全量通过，core 69 个测试全部通过。"
+        },
+        {
+          "date": "2026-06-16",
+          "result": "passing",
+          "detail": "Phase 5 Step 8 实现完成：新增 SaaMultiAgentFactory，按 flow.mode 组装 SequentialAgent / ParallelAgent / LlmRoutingAgent；重构 ReactAgentFactory 拆分 buildSingleAgent / buildSubAgent，支持子 Agent 模型覆盖与工具过滤；改造 SpringAiAlibabaAgentEngine 在 hasAgents() 时走 FlowAgent 路径；新增 SaaMultiAgentFactoryTest（4 个）与 SpringAiAlibabaAgentEngineMultiAgentTest（2 个）并纳入 init.sh P0 基线；./init.sh 全量通过，core 80 个测试全部通过。"
         }
       ],
       "notes": "设计文档已落地为 Phase 0+1+2+3+4 代码实现，Phase 5 Step 7 配置模型已完成。AgentEngine.executeStream 返回 Reply 以保持 VesselRuntime 落盘逻辑简单；SAA 流式通过 streamMessages() 驱动 callback，usage 信息当前由 ModelMetricsHook 从 AssistantMessage metadata 最佳 effort 读取；HITL 已在 alibaba 引擎下通过 AFTER_MODEL Hook 实现中断/恢复。下一步进入 Phase 5 Step 8：接入 SAA 多 Agent 模式。当前实现不足点详见主设计文档 1.2 节与 Phase 3+ 实施计划对应章节。"

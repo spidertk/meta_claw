@@ -2,6 +2,8 @@ package meta.claw.core.runtime.engine;
 
 import com.alibaba.cloud.ai.graph.agent.ReactAgent;
 import meta.claw.core.config.ProviderConfig;
+import meta.claw.core.config.VesselAgentConfig;
+import meta.claw.core.config.bundle.VesselConfigBundle;
 import meta.claw.core.llm.provider.LlmClientProviderManager;
 import meta.claw.core.runtime.TaskContext;
 import meta.claw.core.runtime.engine.alibabahook.MetaClawAgentMetricsHook;
@@ -15,6 +17,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * 根据 {@link TaskContext} 构造 SAA {@link ReactAgent} 实例。
@@ -32,10 +36,13 @@ public class ReactAgentFactory {
     private MetricsRecorder metricsRecorder;
 
     public ReactAgent get(TaskContext ctx) {
-        return build(ctx);
+        return buildSingleAgent(ctx);
     }
 
-    private ReactAgent build(TaskContext ctx) {
+    /**
+     * 构建 Vessel 主 ReactAgent（单 Agent 模式）。
+     */
+    public ReactAgent buildSingleAgent(TaskContext ctx) {
         var bundle = ctx.getProfile().getBundle();
         ProviderConfig providerConfig = bundle.getProviderConfig();
         ChatModel chatModel = llmClientProviderManager.createChatModel(providerConfig);
@@ -43,18 +50,84 @@ public class ReactAgentFactory {
         ToolSubSystem toolSubSystem = ctx.getSubSystem("tool");
         List<ToolCallback> toolCallbacks = toolSubSystem != null ? toolSubSystem.getToolCallbacks() : List.of();
 
+        return buildReactAgent(ctx, bundle.getVesselName(), bundle.getVesselDescription(),
+                chatModel, "", toolCallbacks);
+    }
+
+    /**
+     * 根据 {@link VesselAgentConfig} 构建子 Agent（多 Agent 编排模式）。
+     *
+     * <p>子 Agent 可覆盖主模型，可指定独占工具列表；其余配置继承 Vessel 主配置。</p>
+     */
+    public ReactAgent buildSubAgent(TaskContext ctx, VesselAgentConfig config) {
+        var bundle = ctx.getProfile().getBundle();
+
+        ProviderConfig providerConfig = resolveProviderConfig(bundle, config.getModel());
+        ChatModel chatModel = llmClientProviderManager.createChatModel(providerConfig);
+
+        ToolSubSystem toolSubSystem = ctx.getSubSystem("tool");
+        List<ToolCallback> toolCallbacks = filterToolCallbacks(toolSubSystem, config.getTools());
+
+        return buildReactAgent(ctx, config.getName(), config.getDescription(),
+                chatModel, defaultString(config.getSystemPrompt()), toolCallbacks);
+    }
+
+    private ReactAgent buildReactAgent(TaskContext ctx, String name, String description,
+                                       ChatModel chatModel, String systemPrompt,
+                                       List<ToolCallback> toolCallbacks) {
         MetaClawAgentMetricsHook agentMetricsHook = new MetaClawAgentMetricsHook(ctx, metricsRecorder);
         MetaClawModelMetricsHook modelMetricsHook = new MetaClawModelMetricsHook(ctx, metricsRecorder);
         MetaClawHitlHook hitlHook = new MetaClawHitlHook(ctx);
 
         return ReactAgent.builder()
-                .name(bundle.getVesselName())
-                .description(bundle.getVesselDescription())
+                .name(name)
+                .description(description)
                 .model(chatModel)
-                .systemPrompt("") // system prompt 已由 VesselRuntime 组装进 messages
+                .systemPrompt(systemPrompt)
                 .tools(toolCallbacks.toArray(new ToolCallback[0]))
                 .hooks(agentMetricsHook, modelMetricsHook, hitlHook)
                 .build();
+    }
+
+    private ProviderConfig resolveProviderConfig(VesselConfigBundle bundle, String subAgentModel) {
+        ProviderConfig baseConfig = bundle.getProviderConfig();
+        if (baseConfig == null) {
+            baseConfig = new ProviderConfig();
+        }
+        if (subAgentModel == null || subAgentModel.isBlank()) {
+            return baseConfig;
+        }
+        ProviderConfig copy = copyProviderConfig(baseConfig);
+        copy.setModel(subAgentModel);
+        return copy;
+    }
+
+    private ProviderConfig copyProviderConfig(ProviderConfig source) {
+        ProviderConfig copy = new ProviderConfig();
+        copy.setProvider(source.getProvider());
+        copy.setApiKey(source.getApiKey());
+        copy.setBaseUrl(source.getBaseUrl());
+        copy.setModel(source.getModel());
+        copy.setTemperature(source.getTemperature());
+        copy.setTimeout(source.getTimeout());
+        return copy;
+    }
+
+    private List<ToolCallback> filterToolCallbacks(ToolSubSystem toolSubSystem, List<String> allowedTools) {
+        List<ToolCallback> all = toolSubSystem != null ? toolSubSystem.getToolCallbacks() : List.of();
+        if (allowedTools == null || allowedTools.isEmpty()) {
+            return all;
+        }
+        Set<String> allowed = allowedTools.stream()
+                .filter(t -> t != null && !t.isBlank())
+                .collect(Collectors.toSet());
+        return all.stream()
+                .filter(tc -> allowed.contains(tc.getToolDefinition().name()))
+                .collect(Collectors.toList());
+    }
+
+    private String defaultString(String value) {
+        return value != null ? value : "";
     }
 
     /**

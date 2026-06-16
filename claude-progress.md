@@ -6,8 +6,8 @@
 - 当前架构基线：Java 21 + Maven 多模块仓库；已存在 `meta-claw-core`、`meta-claw-vessel`、`meta-claw-store`、`meta-claw-cli`、`meta-claw-gateway*`、`meta-claw-bootstrap`
 - 标准启动路径：`./init.sh`
 - 标准验证路径：`./init.sh` 先执行全仓编译，再运行初始化阶段 P0 测试集
-- 最近已通过证据：2026-06-16 在真实 Maven 环境中执行新版 `./init.sh`，完成全仓编译并通过 P0 测试集（core 69 个测试全部通过，含 Phase 3/4 Metrics/HITL Hook 测试、Phase 5 Step 7 多 Agent 配置模型测试）；基于已完成实现更新了主设计文档 `docs/superpowers/specs/2026-06-15-agent-execution-abstraction-design.md` 的进度表与接口清单，新增“资深用户视角：当前实现不足点”章节；同步更新了 Phase 3+ 实施计划 `docs/superpowers/plans/2026-06-16-agent-engine-spi-phase3-plus.md`
-- 当前最高优先级未完成功能：agent-engine-001（Agent 执行引擎抽象：native / alibaba 双实现设计）Phase 0+1+2+3+4 已实现完成；Phase 5 Step 7（多 Agent 配置模型扩展）已完成；下一步为 Phase 5 Step 8：接入 SAA 多 Agent 模式（详见 docs/superpowers/plans/2026-06-16-agent-engine-spi-phase3-plus.md）
+- 最近已通过证据：2026-06-16 在真实 Maven 环境中执行新版 `./init.sh`，完成全仓编译并通过 P0 测试集（core 80 个测试全部通过，含 Phase 3/4 Metrics/HITL Hook 测试、Phase 5 Step 7 多 Agent 配置模型测试、Phase 5 Step 8 SAA 多 Agent 调用接入测试）；基于已完成实现更新了主设计文档 `docs/superpowers/specs/2026-06-15-agent-execution-abstraction-design.md` 的进度表、接口清单与资深用户不足点；同步更新了 Phase 3+ 实施计划 `docs/superpowers/plans/2026-06-16-agent-engine-spi-phase3-plus.md`、`feature_list.json` 与本文件
+- 当前最高优先级未完成功能：agent-engine-001（Agent 执行引擎抽象：native / alibaba 双实现设计）Phase 0+1+2+3+4+5 已实现完成；下一步为 Phase 6：`VesselCheckpointSaver` 持久化 SAA thread 状态（可选）或真实 LLM 端到端验证
 - 当前 blocker：
   1. 当前无 blocker
 
@@ -35,6 +35,44 @@
 - `serve/start/stop/restart/status/logs`、工具引擎、MCP、Skill 系统仍未实现
 
 ## 会话记录
+
+### Session 050
+
+- 日期：2026-06-16
+- 本轮目标：实现 Phase 5 Step 8：接入 SAA 多 Agent 模式，让 `agent_engine: alibaba` 的 Vessel 在配置多个子 Agent 时真正走 SequentialAgent / ParallelAgent / LlmRoutingAgent 执行路径
+- 已完成：
+  - 重构 `ReactAgentFactory`：拆分 `buildSingleAgent(TaskContext)` 与 `buildSubAgent(TaskContext, VesselAgentConfig)`，支持子 Agent 覆盖模型、过滤独占工具列表，并继续注册 Metrics / HITL Hook
+  - 新增 `SaaMultiAgentFactory`：读取 `VesselConfigBundle` 的 `agents` / `flow`，按 `AgentFlowMode` 分发到 `SequentialAgent` / `ParallelAgent` / `LlmRoutingAgent`
+  - 改造 `SpringAiAlibabaAgentEngine`：在 `execute()` / `executeStream()` 中根据 `bundle.hasAgents()` 选择 FlowAgent 或单 ReactAgent 路径；新增 `extractTextFromState()` 从 `OverAllState` 提取最终答案
+  - 新增 `SaaMultiAgentFactoryTest`（4 个用例）验证三种 FlowAgent 构建与无子 Agent 异常
+  - 新增 `SpringAiAlibabaAgentEngineMultiAgentTest`（2 个用例）验证同步/流式多 Agent 分支
+  - 将新增测试纳入 `init.sh` P0 基线
+  - 更新主设计文档进度表、第 11 章接口清单、资深用户不足点；更新 Phase 3+ 实施计划 Step 8 为已完成；更新 `feature_list.json` 与本文件
+- 运行过的验证：
+  - `mvn clean compile -pl meta-claw-core -am -q` → 成功
+  - 定向测试：`SaaMultiAgentFactoryTest`、`SpringAiAlibabaAgentEngineMultiAgentTest`、`SpringAiAlibabaAgentEngineTest`、`SpringAiAlibabaAgentEngineStreamTest` → 全部通过
+  - `./init.sh`（真实环境，Java 21）→ 成功；9 个 reactor 模块全部 SUCCESS，core 80 个测试全部通过
+- 已记录证据：
+  - `feature_list.json` 的 `agent-engine-001` 已补充 Phase 5 Step 8 实现证据
+  - 主设计文档与 Phase 3+ 实施计划已更新
+- 更新过的文件或工件：
+  - `meta-claw-core/src/main/java/meta/claw/core/runtime/engine/ReactAgentFactory.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/runtime/engine/SaaMultiAgentFactory.java`（新增）
+  - `meta-claw-core/src/main/java/meta/claw/core/runtime/engine/SpringAiAlibabaAgentEngine.java`
+  - `meta-claw-core/src/test/java/meta/claw/core/runtime/engine/SaaMultiAgentFactoryTest.java`（新增）
+  - `meta-claw-core/src/test/java/meta/claw/core/runtime/engine/SpringAiAlibabaAgentEngineMultiAgentTest.java`（新增）
+  - `init.sh`
+  - `docs/superpowers/specs/2026-06-15-agent-execution-abstraction-design.md`
+  - `docs/superpowers/plans/2026-06-16-agent-engine-spi-phase3-plus.md`
+  - `feature_list.json`
+  - `claude-progress.md`
+- 已知风险或未解决的问题：
+  - 当前无新增 blocker
+  - 多 Agent 模式尚未经过真实 LLM 端到端验证（列为后续 P1 任务）
+  - 多 Agent 场景的 HITL 恢复未实现，当前 `resume()` 仍走单 ReactAgent 路径
+- 下一步最佳动作：
+  1. 提交本轮修改
+  2. 继续 Phase 6 或真实 LLM 端到端验证
 
 ### Session 049
 

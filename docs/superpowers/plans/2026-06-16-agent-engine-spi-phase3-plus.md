@@ -367,12 +367,12 @@ SAA API（已确认）：
   - `executeStream()` 判断是否有子 Agent；若有则调用 FlowAgent.streamMessages()。
   - `resume()` 暂保持单 ReactAgent 路径；多 Agent 场景的 HITL 恢复可作为后续增强。
 
-- [ ] **Step 8.1: 创建 `SaaMultiAgentFactory`**
-- [ ] **Step 8.2: 重构 `ReactAgentFactory` 支持单 Agent / 多 Agent 构建**
-- [ ] **Step 8.3: 修改 `SpringAiAlibabaAgentEngine` 多 Agent 调用路径**
-- [ ] **Step 8.4: 创建多 Agent 单元测试（mock SAA FlowAgent）**
-- [ ] **Step 8.5: 编译验证与 `./init.sh` 全量验证**
-- [ ] **Step 8.6: Commit**
+- [x] **Step 8.1: 创建 `SaaMultiAgentFactory`**
+- [x] **Step 8.2: 重构 `ReactAgentFactory` 支持单 Agent / 多 Agent 构建**
+- [x] **Step 8.3: 修改 `SpringAiAlibabaAgentEngine` 多 Agent 调用路径**
+- [x] **Step 8.4: 创建多 Agent 单元测试（mock SAA FlowAgent）**
+- [x] **Step 8.5: 编译验证与 `./init.sh` 全量验证**
+- [x] **Step 8.6: Commit**
 
 ---
 

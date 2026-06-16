@@ -1,5 +1,7 @@
 package meta.claw.core.runtime.engine;
 
+import com.alibaba.cloud.ai.graph.OverAllState;
+import com.alibaba.cloud.ai.graph.agent.Agent;
 import com.alibaba.cloud.ai.graph.agent.ReactAgent;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -24,12 +26,14 @@ import org.springframework.stereotype.Component;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * 基于 Spring AI Alibaba {@link ReactAgent} 的执行引擎实现。
  *
- * <p>Phase 2 实现同步 call；Phase 3 接入 streamMessages；Phase 4 接入 HITL Hook。</p>
+ * <p>Phase 2 实现同步 call；Phase 3 接入 streamMessages；Phase 4 接入 HITL Hook；
+ * Phase 5 接入多 Agent 编排（Sequential / Parallel / Routing）。</p>
  */
 @Component
 public class SpringAiAlibabaAgentEngine implements AgentEngine {
@@ -37,10 +41,25 @@ public class SpringAiAlibabaAgentEngine implements AgentEngine {
     @Autowired
     private ReactAgentFactory reactAgentFactory;
 
+    @Autowired
+    private SaaMultiAgentFactory multiAgentFactory;
+
     @Override
     public Reply execute(TaskContext ctx, SpiChatRequest request) {
-        ReactAgent agent = reactAgentFactory.get(ctx);
         List<Message> messages = SpiMessageConverter.toSpringMessages(request.getMessages());
+
+        if (ctx.getProfile().getBundle().hasAgents()) {
+            Agent flowAgent = multiAgentFactory.get(ctx);
+            try {
+                Optional<OverAllState> state = flowAgent.invoke(messages);
+                String text = state.map(this::extractTextFromState).orElse("");
+                return new Reply(ReplyType.TEXT, text);
+            } catch (com.alibaba.cloud.ai.graph.exception.GraphRunnerException e) {
+                throw new RuntimeException("Alibaba multi-agent execution failed: " + e.getMessage(), e);
+            }
+        }
+
+        ReactAgent agent = reactAgentFactory.get(ctx);
         try {
             AssistantMessage result = agent.call(messages);
             return new Reply(ReplyType.TEXT, result.getText());
@@ -51,9 +70,14 @@ public class SpringAiAlibabaAgentEngine implements AgentEngine {
 
     @Override
     public Reply executeStream(TaskContext ctx, SpiChatRequest request, SpiStreamingCallback callback) {
-        ReactAgent agent = reactAgentFactory.get(ctx);
+        Agent agent = ctx.getProfile().getBundle().hasAgents()
+                ? multiAgentFactory.get(ctx)
+                : reactAgentFactory.get(ctx);
         List<Message> messages = SpiMessageConverter.toSpringMessages(request.getMessages());
+        return streamAgentMessages(agent, messages, callback);
+    }
 
+    private Reply streamAgentMessages(Agent agent, List<Message> messages, SpiStreamingCallback callback) {
         callback.onStart();
 
         StringBuilder contentBuilder = new StringBuilder();
@@ -65,7 +89,7 @@ public class SpringAiAlibabaAgentEngine implements AgentEngine {
             agent.streamMessages(messages)
                     .doOnNext(message -> handleStreamMessage(message, callback, contentBuilder,
                             reasoningBuilder, lastAssistantRef, objectMapper))
-                    .doOnError(error -> callback.onError(error))
+                    .doOnError(callback::onError)
                     .doOnComplete(() -> {
                         SpiChatResponse response = SpiChatResponse.builder()
                                 .content(contentBuilder.toString())
@@ -144,6 +168,23 @@ public class SpringAiAlibabaAgentEngine implements AgentEngine {
                     .arguments(Map.of())
                     .build();
         }
+    }
+
+    @SuppressWarnings("unchecked")
+    private String extractTextFromState(OverAllState state) {
+        Object messagesObj = state.data().get("messages");
+        if (!(messagesObj instanceof List<?> messageList) || messageList.isEmpty()) {
+            return "";
+        }
+        Object last = messageList.get(messageList.size() - 1);
+        return extractTextFromMessage(last);
+    }
+
+    private String extractTextFromMessage(Object message) {
+        if (message instanceof AssistantMessage am) {
+            return am.getText() != null ? am.getText() : "";
+        }
+        return "";
     }
 
     @Override
