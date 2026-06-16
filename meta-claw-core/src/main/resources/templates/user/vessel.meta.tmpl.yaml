@@ -75,3 +75,13 @@ tools:
   # 要排除的工具列表（按名称排除，空列表表示不排除任何工具）
   # → 映射到 VesselConfig.ToolConfig.exclude
   exclude: []
+
+# Agent 执行引擎：native（自研 ReAct）或 alibaba（Spring AI Alibaba ReactAgent）
+# → 映射到 VesselConfig.agentEngine
+agent_engine: native
+# Spring AI Alibaba 引擎专属配置（仅 agent_engine=alibaba 时生效）
+# → 映射到 VesselConfig.alibabaAgent
+alibaba_agent:
+  parallel_tool_execution: true
+  max_parallel_tools: 5
+  return_reasoning_contents: true
