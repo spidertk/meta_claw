@@ -85,3 +85,22 @@ alibaba_agent:
   parallel_tool_execution: true
   max_parallel_tools: 5
   return_reasoning_contents: true
+
+# 多 Agent 编排配置（仅 agent_engine=alibaba 时生效；留空则按单 Agent 执行）
+# → 映射到 VesselConfig.agents / VesselConfig.flow
+#agents:
+#  - name: planner
+#    description: 把用户需求拆分为可执行步骤
+#    model: gpt-4o-mini
+#    system_prompt: You are a planner. Break down the user request into clear steps.
+#    tools: []
+#  - name: coder
+#    description: 根据步骤编写代码
+#    model: gpt-4o
+#    system_prompt: You are a coder. Implement the steps provided by the planner.
+#    tools: [shell, file]
+#flow:
+#  mode: sequential        # sequential | parallel | routing
+#  routing_prompt: |
+#    Given the user request, choose the most appropriate agent: planner or coder.
+#  fallback_agent: planner

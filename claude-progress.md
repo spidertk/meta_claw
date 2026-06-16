@@ -6,8 +6,8 @@
 - 当前架构基线：Java 21 + Maven 多模块仓库；已存在 `meta-claw-core`、`meta-claw-vessel`、`meta-claw-store`、`meta-claw-cli`、`meta-claw-gateway*`、`meta-claw-bootstrap`
 - 标准启动路径：`./init.sh`
 - 标准验证路径：`./init.sh` 先执行全仓编译，再运行初始化阶段 P0 测试集
-- 最近已通过证据：2026-06-16 在真实 Maven 环境中执行新版 `./init.sh`，完成全仓编译并通过 P0 测试集（含新增 Phase 3 测试：SpringAiAlibabaAgentEngineStreamTest、MetaClawAgentMetricsHookTest、MetaClawModelMetricsHookTest）；混合架构基线（Spring Boot 3.5.15 + Spring AI 1.1.8 + Spring AI Alibaba 1.1.2.3）编译与 SAA 流式/Metrics Hook 测试通过；产出 Phase 3+ 实施计划并维护主设计文档进度
-- 当前最高优先级未完成功能：agent-engine-001（Agent 执行引擎抽象：native / alibaba 双实现设计）Phase 0+1+2+3 已实现完成；下一步为 Phase 4：Alibaba 引擎 HITL Hook（详见 docs/superpowers/plans/2026-06-16-agent-engine-spi-phase3-plus.md）
+- 最近已通过证据：2026-06-16 在真实 Maven 环境中执行新版 `./init.sh`，完成全仓编译并通过 P0 测试集（core 69 个测试全部通过，含 Phase 3/4 Metrics/HITL Hook 测试、Phase 5 Step 7 多 Agent 配置模型测试）；基于已完成实现更新了主设计文档 `docs/superpowers/specs/2026-06-15-agent-execution-abstraction-design.md` 的进度表与接口清单，新增“资深用户视角：当前实现不足点”章节；同步更新了 Phase 3+ 实施计划 `docs/superpowers/plans/2026-06-16-agent-engine-spi-phase3-plus.md`
+- 当前最高优先级未完成功能：agent-engine-001（Agent 执行引擎抽象：native / alibaba 双实现设计）Phase 0+1+2+3+4 已实现完成；Phase 5 Step 7（多 Agent 配置模型扩展）已完成；下一步为 Phase 5 Step 8：接入 SAA 多 Agent 模式（详见 docs/superpowers/plans/2026-06-16-agent-engine-spi-phase3-plus.md）
 - 当前 blocker：
   1. 当前无 blocker
 
@@ -35,6 +35,79 @@
 - `serve/start/stop/restart/status/logs`、工具引擎、MCP、Skill 系统仍未实现
 
 ## 会话记录
+
+### Session 049
+
+- 日期：2026-06-16
+- 本轮目标：基于已完成的 Phase 0~4 与 Phase 5 Step 7，更新主设计文档与 Phase 3+ 实施计划的总进度，并从资深用户视角补充当前实现不足点
+- 已完成：
+  - 更新主设计文档 `docs/superpowers/specs/2026-06-15-agent-execution-abstraction-design.md`：
+    - 在 1.1 实现进度总览中补充 Phase 5 Step 7/Step 8 状态说明
+    - 新增 1.2 节“资深用户视角：当前实现不足点”，列出 11 项影响生产可用性的缺口
+    - 更新第 11 章接口与实现类清单：`MetaClawHitlHook`、`MetaClawAgentMetricsHook`、`MetaClawModelMetricsHook` 状态改为 ✅ 已完成；修正原 `MetaClawMetricsHook` 为实际两个类；新增 `VesselAgentConfig` / `AgentFlowConfig` / `AgentFlowMode` 条目
+  - 更新 Phase 3+ 实施计划 `docs/superpowers/plans/2026-06-16-agent-engine-spi-phase3-plus.md`：
+    - 在“可选深化”之后新增“资深用户当前实现不足点”章节，按 P1/P2/P3 优先级列出 9 项缺口并关联对应 Task
+- 运行过的验证：
+  - `./init.sh`（真实环境，Java 21）→ 成功；9 个 reactor 模块全部 SUCCESS，core 69 个测试全部通过
+- 已记录证据：
+  - 主设计文档与实施计划已更新并保存
+  - `./init.sh` 通过证据已写入 `claude-progress.md`
+- 更新过的文件或工件：
+  - `docs/superpowers/specs/2026-06-15-agent-execution-abstraction-design.md`
+  - `docs/superpowers/plans/2026-06-16-agent-engine-spi-phase3-plus.md`
+  - `claude-progress.md`
+- 已知风险或未解决的问题：
+  - 与 Session 048 一致：Phase 5 Step 8、Phase 6、可选深化尚未实施
+- 下一步最佳动作：
+  1. 提交本轮文档修改
+  2. 继续 Phase 5 Step 8：实现 `SaaMultiAgentFactory` 与 `SpringAiAlibabaAgentEngine` 多 Agent 调用路径
+
+### Session 048
+
+- 日期：2026-06-16
+- 本轮目标：继续实现 AgentEngine SPI 后续部分（Phase 4 + Phase 5 Step 7）：Alibaba 引擎 HITL Hook 与多 Agent 配置模型扩展，并维护后续 todo 与主文档进度
+- 已完成：
+  - 实现 `MetaClawHitlHook`：作为 SAA `ModelHook` 注册到 `ReactAgentFactory`，在 `AFTER_MODEL` 位置检查 `AssistantMessage` 的 tool_calls，命中审批策略时抛 `HitlSuspendedException`
+  - 实现 `SpringAiAlibabaAgentEngine.resume()`：按 `ApprovalResolution` 执行 APPROVED 工具或生成 REJECTED 占位结果，把 tool result 注入 messages 后再次调用 `ReactAgent`
+  - 新增 `MetaClawHitlHookTest`（5 个用例）与 `SpringAiAlibabaAgentEngineTest#resumeExecutesApprovedToolAndContinues`
+  - 将新增测试纳入 `init.sh` P0 基线
+  - 扩展多 Agent 配置模型：新增 `AgentFlowMode`、`VesselAgentConfig`、`AgentFlowConfig`，扩展 `VesselConfig` 与 `VesselConfigBundle`
+  - 更新 Vessel 配置模板，补充 `agents` / `flow` 示例
+  - 新增 `VesselConfigLoaderTest#load_parsesMultiAgentConfig` 验证多 Agent 配置读取
+  - 更新主设计文档进度表、Phase 3+ 实施计划、`feature_list.json` 与本文件
+- 运行过的验证：
+  - `mvn clean compile -pl meta-claw-core -am -q` → 成功
+  - 定向测试：`MetaClawHitlHookTest`、`SpringAiAlibabaAgentEngineTest`、`VesselConfigLoaderTest` → 全部通过
+  - `./init.sh`（真实环境，Java 21）→ 成功；9 个 reactor 模块全部 SUCCESS，core 69 个测试全部通过
+- 已记录证据：
+  - `feature_list.json` 的 `agent-engine-001` 已补充 Phase 4 与 Phase 5 Step 7 实现证据
+  - 主设计文档 `docs/superpowers/specs/2026-06-15-agent-execution-abstraction-design.md` 进度表已更新
+  - Phase 3+ 实施计划 `docs/superpowers/plans/2026-06-16-agent-engine-spi-phase3-plus.md` 已补充 Phase 4 完成注记与 Phase 5/6 详细任务拆分
+- 更新过的文件或工件：
+  - `meta-claw-core/src/main/java/meta/claw/core/runtime/engine/alibabahook/MetaClawHitlHook.java`（新增）
+  - `meta-claw-core/src/main/java/meta/claw/core/runtime/engine/ReactAgentFactory.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/runtime/engine/SpringAiAlibabaAgentEngine.java`
+  - `meta-claw-core/src/test/java/meta/claw/core/runtime/engine/alibabahook/MetaClawHitlHookTest.java`（新增）
+  - `meta-claw-core/src/test/java/meta/claw/core/runtime/engine/SpringAiAlibabaAgentEngineTest.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/config/AgentFlowMode.java`（新增）
+  - `meta-claw-core/src/main/java/meta/claw/core/config/VesselAgentConfig.java`（新增）
+  - `meta-claw-core/src/main/java/meta/claw/core/config/AgentFlowConfig.java`（新增）
+  - `meta-claw-core/src/main/java/meta/claw/core/config/VesselConfig.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/config/bundle/VesselConfigBundle.java`
+  - `meta-claw-core/src/main/resources/templates/user/vessel.meta.tmpl.yaml`
+  - `meta-claw-core/src/test/java/meta/claw/core/config/VesselConfigLoaderTest.java`
+  - `init.sh`
+  - `docs/superpowers/specs/2026-06-15-agent-execution-abstraction-design.md`
+  - `docs/superpowers/plans/2026-06-16-agent-engine-spi-phase3-plus.md`
+  - `feature_list.json`
+  - `claude-progress.md`
+- 已知风险或未解决的问题：
+  - `AgentFlowConfig.mode` 当前以 `String` 存储并在 `getModeEnum()` 中转换，未来若 SnakeYAML 支持大小写不敏感枚举反序列化，可恢复为纯 enum 字段
+  - Phase 5 Step 8（SAA SequentialAgent / ParallelAgent / LlmRoutingAgent 接入）尚未实现
+  - Phase 6（Checkpoint Saver）与可选深化（ExecutableTool SPI）仍处于计划阶段
+- 下一步最佳动作：
+  1. 提交本轮修改
+  2. 进入 Phase 5 Step 8：实现 `SaaMultiAgentFactory` 与 `SpringAiAlibabaAgentEngine` 多 Agent 调用路径
 
 ### Session 047
 

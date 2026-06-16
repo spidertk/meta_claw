@@ -4,6 +4,7 @@ import lombok.Getter;
 import lombok.Setter;
 import meta.claw.core.config.bundle.VesselConfigBundle;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -60,6 +61,12 @@ public class VesselConfig {
 
     /** Spring AI Alibaba 引擎专属配置（仅 agentEngine=alibaba 时生效） */
     private AlibabaAgentConfig alibabaAgent = new AlibabaAgentConfig();
+
+    /** 子 Agent 列表（仅 agentEngine=alibaba 且启用多 Agent 编排时生效） */
+    private List<VesselAgentConfig> agents = new ArrayList<>();
+
+    /** 多 Agent 编排配置（为空或未指定时按单 Agent 执行） */
+    private AgentFlowConfig flow = new AgentFlowConfig();
 
     /** 短期记忆最大保留轮数（默认 20，超过则丢弃最早的消息） */
     private Integer maxHistoryRounds = 20;

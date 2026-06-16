@@ -56,4 +56,42 @@ class VesselConfigLoaderTest {
         assertEquals(0.7, meta.getLlm().getOverrides().getTemperature());
         assertEquals("jsonl", meta.getMemory().getShortTermStore());
     }
+
+    @Test
+    void load_parsesMultiAgentConfig() throws Exception {
+        String yaml = """
+            identity:
+              id: multi-bot
+              name: Multi Bot
+            agent_engine: alibaba
+            agents:
+              - name: planner
+                description: Plan tasks
+                model: gpt-4o-mini
+                system_prompt: You are a planner.
+                tools:
+                  - search
+              - name: coder
+                description: Write code
+                system_prompt: You are a coder.
+            flow:
+              mode: sequential
+              routing_prompt: Choose one agent
+              fallback_agent: planner
+            """;
+        Path vesselDir = tempDir.resolve("multi-agent-vessel");
+        Files.createDirectories(vesselDir);
+        Files.writeString(vesselDir.resolve("vessel.meta.yaml"), yaml);
+
+        VesselConfig meta = loader.load(vesselDir);
+
+        assertEquals("alibaba", meta.getAgentEngine());
+        assertEquals(2, meta.getAgents().size());
+        assertEquals("planner", meta.getAgents().get(0).getName());
+        assertEquals("gpt-4o-mini", meta.getAgents().get(0).getModel());
+        assertEquals(List.of("search"), meta.getAgents().get(0).getTools());
+        assertEquals("coder", meta.getAgents().get(1).getName());
+        assertEquals(AgentFlowMode.SEQUENTIAL, meta.getFlow().getModeEnum());
+        assertEquals("planner", meta.getFlow().getFallbackAgent());
+    }
 }

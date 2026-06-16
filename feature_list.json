@@ -858,9 +858,24 @@
           "date": "2026-06-16",
           "result": "passing",
           "detail": "Phase 3 实现完成：SpringAiAlibabaAgentEngine.executeStream() 接入 ReactAgent.streamMessages()，将 content/reasoning/tool-call 实时透传到 SpiStreamingCallback 并返回 Reply；新增 MetaClawAgentMetricsHook（任务完成/步数/时长）与 MetaClawModelMetricsHook（LLM latency/token usage/tool calls），并在 ReactAgentFactory 注册；ReactAgentFactory 改为按请求构建 ReactAgent，避免 Hook 中的 TaskContext 跨请求串用；新增 SpringAiAlibabaAgentEngineStreamTest、MetaClawAgentMetricsHookTest、MetaClawModelMetricsHookTest 并纳入 init.sh P0 基线；./init.sh 全量通过，core 67 个测试全部通过。"
+        },
+        {
+          "date": "2026-06-16",
+          "result": "passing",
+          "detail": "Phase 4 实现完成：新增 MetaClawHitlHook 作为 SAA ModelHook，在 AFTER_MODEL 位置检查 AssistantMessage tool_calls，命中审批策略时抛 HitlSuspendedException 中断图执行；ReactAgentFactory 注册 MetaClawHitlHook；SpringAiAlibabaAgentEngine.resume() 按 ApprovalResolution 执行被批准/拒绝的工具，将 tool result 注入 messages 后再次调用 ReactAgent；新增 MetaClawHitlHookTest（5 个）与 SpringAiAlibabaAgentEngineTest#resumeExecutesApprovedToolAndContinues 并纳入 init.sh P0 基线；./init.sh 全量通过，core 68 个测试全部通过。"
+        },
+        {
+          "date": "2026-06-16",
+          "result": "passing",
+          "detail": "Phase 5 Step 7 实现完成：新增 AgentFlowMode 枚举、VesselAgentConfig、AgentFlowConfig；扩展 VesselConfig 的 agents / flow 字段与 VesselConfigBundle 的 getAgents() / getFlow() / hasAgents()；更新 vessel.meta.tmpl.yaml 多 Agent 配置示例；新增 VesselConfigLoaderTest#load_parsesMultiAgentConfig；./init.sh 全量通过，core 69 个测试全部通过。"
+        },
+        {
+          "date": "2026-06-16",
+          "result": "verified",
+          "detail": "基于已完成实现更新总文档进度与资深用户不足点：维护主设计文档进度表与第 11 章接口清单，新增“资深用户视角：当前实现不足点”章节；同步更新 Phase 3+ 实施计划；重新执行 ./init.sh 全量通过，core 69 个测试全部通过。"
         }
       ],
-      "notes": "设计文档已落地为 Phase 0+1+2+3 代码实现。AgentEngine.executeStream 返回 Reply 以保持 VesselRuntime 落盘逻辑简单；SAA 流式通过 streamMessages() 驱动 callback，usage 信息当前由 ModelMetricsHook 从 AssistantMessage metadata 最佳 effort 读取。下一步进入 Phase 4：Alibaba 引擎 HITL Hook。"
+      "notes": "设计文档已落地为 Phase 0+1+2+3+4 代码实现，Phase 5 Step 7 配置模型已完成。AgentEngine.executeStream 返回 Reply 以保持 VesselRuntime 落盘逻辑简单；SAA 流式通过 streamMessages() 驱动 callback，usage 信息当前由 ModelMetricsHook 从 AssistantMessage metadata 最佳 effort 读取；HITL 已在 alibaba 引擎下通过 AFTER_MODEL Hook 实现中断/恢复。下一步进入 Phase 5 Step 8：接入 SAA 多 Agent 模式。当前实现不足点详见主设计文档 1.2 节与 Phase 3+ 实施计划对应章节。"
     }
   ]
 }

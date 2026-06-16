@@ -5,6 +5,7 @@ import meta.claw.core.config.ProviderConfig;
 import meta.claw.core.llm.provider.LlmClientProviderManager;
 import meta.claw.core.runtime.TaskContext;
 import meta.claw.core.runtime.engine.alibabahook.MetaClawAgentMetricsHook;
+import meta.claw.core.runtime.engine.alibabahook.MetaClawHitlHook;
 import meta.claw.core.runtime.engine.alibabahook.MetaClawModelMetricsHook;
 import meta.claw.core.runtime.metrics.MetricsRecorder;
 import meta.claw.core.runtime.subsystem.ToolSubSystem;
@@ -44,6 +45,7 @@ public class ReactAgentFactory {
 
         MetaClawAgentMetricsHook agentMetricsHook = new MetaClawAgentMetricsHook(ctx, metricsRecorder);
         MetaClawModelMetricsHook modelMetricsHook = new MetaClawModelMetricsHook(ctx, metricsRecorder);
+        MetaClawHitlHook hitlHook = new MetaClawHitlHook(ctx);
 
         return ReactAgent.builder()
                 .name(bundle.getVesselName())
@@ -51,7 +53,7 @@ public class ReactAgentFactory {
                 .model(chatModel)
                 .systemPrompt("") // system prompt 已由 VesselRuntime 组装进 messages
                 .tools(toolCallbacks.toArray(new ToolCallback[0]))
-                .hooks(agentMetricsHook, modelMetricsHook)
+                .hooks(agentMetricsHook, modelMetricsHook, hitlHook)
                 .build();
     }
 

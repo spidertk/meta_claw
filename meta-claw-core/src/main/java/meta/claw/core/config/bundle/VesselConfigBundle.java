@@ -2,13 +2,16 @@ package meta.claw.core.config.bundle;
 
 import lombok.Builder;
 import lombok.Getter;
+import meta.claw.core.config.AgentFlowConfig;
 import meta.claw.core.config.MemoryConfig;
 import meta.claw.core.config.ProviderConfig;
 import meta.claw.core.config.RuntimeConfig;
+import meta.claw.core.config.VesselAgentConfig;
 import meta.claw.core.config.VesselConfig;
 import meta.claw.core.vessel.VesselProfile;
 
 import java.nio.file.Path;
+import java.util.List;
 
 /**
  * Vessel 配置的统一视图。
@@ -120,5 +123,23 @@ public class VesselConfigBundle {
         return config != null && config.getAlibabaAgent() != null
                 ? config.getAlibabaAgent()
                 : new VesselConfig.AlibabaAgentConfig();
+    }
+
+    public List<VesselAgentConfig> getAgents() {
+        VesselConfig config = getRuntimeVesselConfig();
+        return config != null && config.getAgents() != null
+                ? config.getAgents()
+                : List.of();
+    }
+
+    public AgentFlowConfig getFlow() {
+        VesselConfig config = getRuntimeVesselConfig();
+        return config != null && config.getFlow() != null
+                ? config.getFlow()
+                : new AgentFlowConfig();
+    }
+
+    public boolean hasAgents() {
+        return !getAgents().isEmpty();
     }
 }

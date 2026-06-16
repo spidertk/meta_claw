@@ -18,12 +18,12 @@
 | **Phase 1** | ✅ 已完成 | `AgentEngine` SPI、`AgentEngineFactory`、`NativeAgentEngine`；`VesselRuntime` 工厂路由；`VesselConfig.agentEngine` / `AlibabaAgentConfig` | `./init.sh` 全量 P0 测试通过 |
 | **Phase 2** | ✅ 已完成 | `SpiMessageConverter`、`ReactAgentFactory`、`SpringAiAlibabaAgentEngine`（同步 call）；Vessel 模板补充 engine 示例 | `./init.sh` 全量 P0 测试通过 |
 | **Phase 3** | ✅ 已完成 | 流式 `executeStream`、`MetaClawAgentMetricsHook`、`MetaClawModelMetricsHook` | `./init.sh` 全量 P0 测试通过 |
-| **Phase 4** | ⬜ 未开始 | `MetaClawHitlHook`、Alibaba 引擎 HITL 恢复 | 待实施 |
-| **Phase 5** | ⬜ 未开始 | 多 Agent 编排（Sequential / Routing / Supervisor） | 待实施 |
+| **Phase 4** | ✅ 已完成 | `MetaClawHitlHook`、Alibaba 引擎 HITL 恢复 | `./init.sh` 全量 P0 测试通过 |
+| **Phase 5** | 🔄 进行中 | 多 Agent 编排（Sequential / Parallel / Routing / Supervisor）；Step 7 配置模型已完成，Step 8 SAA 接入待实施 | `./init.sh` 全量 P0 测试通过 |
 | **Phase 6** | ⬜ 未开始 | `VesselCheckpointSaver` 持久化 SAA thread 状态 | 待实施 |
 | **可选深化** | ⬜ 未开始 | `ExecutableTool` SPI + 工具执行层隔离 | 待评估 |
 
-> 最新进度维护：本表随代码实现同步更新。最近一次更新 2026-06-16，Phase 0+1+2+3 已完成并通过 `./init.sh`。
+> 最新进度维护：本表随代码实现同步更新。最近一次更新 2026-06-16，Phase 0+1+2+3+4 已完成并通过 `./init.sh`；Phase 5 Step 7（多 Agent 配置模型）已完成，Step 8（SAA 多 Agent 调用接入）待实施。
 
 当前仓库已完成：
 - Spring Boot 3.5.15 + Spring AI 1.1.8 + Spring AI Alibaba 1.1.2.3 的混合基线升级；
@@ -32,6 +32,24 @@
 - HITL 审批与恢复、Skill 按需加载、Metrics 观测。
 
 下一步的核心问题是：**执行引擎应该继续自研，还是引入 Spring AI Alibaba 的 ReactAgent/Graph？** 本方案给出的答案是：**不做二选一，而是通过接口抽象让两者并存、可配置切换。**
+
+### 1.2 资深用户视角：当前实现不足点
+
+> 本节从“实际使用 Alibaba 引擎”的资深用户角度，列出截至 2026-06-16 仍然明显影响可用性或可维护性的实现缺口。这些问题不影响 `./init.sh` 通过，但会决定生产环境中 `agent_engine: alibaba` 是否真正可用。
+
+| 不足点 | 当前影响 | 建议后续动作 |
+|--------|---------|-------------|
+| **多 Agent 编排“半悬空”** | Phase 5 Step 7 已完成配置模型（`agents` / `flow`），但 Step 8 未实施。用户可以在 YAML 里声明多个子 Agent 和编排模式，可切换 `agent_engine: alibaba` 后这些配置不会被实际执行，仍是单 ReactAgent 路径。 | 实现 `SaaMultiAgentFactory`，在 `SpringAiAlibabaAgentEngine` 中按 `flow.mode` 分发到 `SequentialAgent` / `ParallelAgent` / `LlmRoutingAgent`。 |
+| **Alibaba 引擎缺少真实 LLM 端到端验证** | 当前 P0 测试以 Mockito 模拟 `ReactAgent` 为主；`AlibabaEngineSmokeTest` 只验证能构造 ReactAgent 并调用一次无工具对话。真实模型返回的 `reasoningContent`、`toolCalls`、`usage` 在 `AssistantMessage.metadata` 中的格式尚未被真实网络调用验证。 | 在受控环境（配置有效 API Key）下跑通一次真实的 tool-call 对话与流式对话，固化预期行为。 |
+| **HITL 流式路径未完整覆盖** | Phase 4 的 HITL 中断/恢复基于 `ReactAgent.call()` 与 `AFTER_MODEL` Hook。`executeStream()` 触发 HITL 时，Flux 能否正确中断、`SpiStreamingCallback.onHitlSuspend` 能否收集到完整 ticket、恢复后能否继续流式输出，目前没有明确测试。 | 补充 `SpringAiAlibabaAgentEngine` 流式 HITL 的单元/集成测试，并在 CLI 真实交互中验证。 |
+| **Checkpoint 持久化未开始** | Phase 6 的 `VesselCheckpointSaver` 尚未实施。Alibaba 引擎的 HITL 中断状态仍依赖内存中的 `TaskContext` 和 `ApprovalTicket`；进程重启后 ticket 与图中间状态丢失。 | 调研 `BaseCheckpointSaver` 接口，实现以 `taskId` + `threadId` 为 key 的文件持久化，并在 `ReactAgentFactory` 中配置。 |
+| **工具执行层未完全解耦** | 可选深化任务未开始。`AgentExecutor` / `StreamingAgentExecutor` 仍直接 `import org.springframework.ai.tool.ToolCallback`，未来若要接入非 Spring AI 协议的工具（HTTP 函数、Python 远端、A2A）会牵连执行层。 | 定义 `ExecutableTool` SPI，创建 `SpringAiToolCallbackAdapter`，逐步把 `ToolSubSystem.getToolCallbacks()` 改为 `getExecutableTools()`。 |
+| **ReactAgentFactory 缺少实例缓存** | 为避免 Hook 中的 `TaskContext` 串用，当前按请求构建 ReactAgent。高频对话或高并发场景下会重复编译 SAA Graph，带来可观测的构建开销。 | 引入 Vessel 级缓存，但确保 Hook 在每次调用时拿到当前 `TaskContext`（例如通过 ThreadLocal 或请求级 wrapper）。 |
+| **Metrics Hook 的 token usage 依赖 SAA 内部 metadata** | `MetaClawModelMetricsHook` 从 `AssistantMessage.getMetadata()` 中读取 `usage`。SAA 是否总是填充、键名是否稳定，尚未经真实 LLM 验证；SAA 版本升级后可能 silently 失效。 | 真实调用后确认 metadata 结构；必要时增加 `ModelInterceptor` 或从 `ChatResponse` 显式取 usage。 |
+| **SAA 版本依赖风险持续存在** | SAA 1.1.2.3 官方编译依赖 Spring AI 1.1.2，仓库使用 1.1.8。当前编译和单测通过，但真实运行时仍可能遇到二进制不兼容（如 `NoSuchMethodError`、`NoClassDefFoundError`）。 | 在 `./init.sh` 外增加真实 LLM 调用验证；关注 SAA 发布说明，必要时升级或降级 Spring AI 版本。 |
+| **编排配置类型安全不足** | `AgentFlowConfig.mode` 当前以 `String` 存储，运行时通过 `getModeEnum()` 转换。用户拼写错误（如 `sequental`）要到执行阶段才能发现，而不是配置加载阶段。 | SnakeYAML 支持大小写不敏感枚举反序列化后，将 `mode` 改为 `AgentFlowMode` 枚举字段。 |
+| **Prompt 协议差异未完全弥合** | SAA 的 `systemPrompt` / `instruction` 与 meta-claw 的 `PromptComposer` 多子系统变量协议尚未对齐。当前把完整 messages 传入 ReactAgent，但未把 `PromptVars` 动态注入 SAA instruction，可能损失部分子系统能力。 | 在 `ReactAgentFactory` 中探索把 `PromptComposer` 输出映射为 SAA `systemPrompt` / `instruction`，保持两种引擎的 prompt 一致性。 |
+| **CLI/Gateway 层 engine 切换验收不足** | 当前验证集中在 `meta-claw-core`。CLI 和 Gateway 是否能在真实运行时正确切换 engine、流式输出与 HITL 在 UI 层表现如何，还没有端到端验收。 | 在 CLI 真实启动路径中验证 `agent_engine: alibaba` 的聊天、流式、HITL 三条路径。 |
 
 ---
 
@@ -747,8 +765,8 @@ memory:
 | **Phase 1** | 定义 `AgentEngine` SPI；创建 `AgentEngineFactory`；实现 `NativeAgentEngine`；改造 `VesselRuntime` 从 factory 获取引擎 | ✅ 已完成 | `./init.sh` 全量通过；CLI chat 行为与改造前完全一致 |
 | **Phase 2** | 实现 `SpringAiAlibabaAgentEngine`（同步 call）；实现 `ReactAgentFactory`；修复 `SpiMessageConverter` tool 消息的 `toolCallId` | ✅ 已完成 | 单个 tool-call 对话用 alibaba 引擎跑通；CLI 可切换 `agent_engine: alibaba` 运行；新增 3 个测试并纳入 P0 基线 |
 | **Phase 3** | 接入流式 `streamMessages`；实现 `MetaClawAgentMetricsHook` / `MetaClawModelMetricsHook`；记录 LLM latency / token usage / tool call | ✅ 已完成 | `SpringAiAlibabaAgentEngine.executeStream()` 透传 content/reasoning/tool-call 到 `SpiStreamingCallback`；`ReactAgentFactory` 注册任务级与模型级 Metrics Hook；新增 `SpringAiAlibabaAgentEngineStreamTest`、`MetaClawAgentMetricsHookTest`、`MetaClawModelMetricsHookTest` 并纳入 P0 基线；`./init.sh` 全量通过 |
-| **Phase 4** | 实现 `MetaClawHitlHook`，支持 HITL 中断/恢复 | ⬜ 未开始 | HITL 审批流程在 alibaba 引擎下与 native 行为一致 |
-| **Phase 5** | 多 Agent 编排：在 `VesselProfile` 中支持子 Agent 配置，把 `SequentialAgent` / `LlmRoutingAgent` 接入 VesselRuntime | ⬜ 未开始 | 一个 Vessel 可配置多个子 Agent 并按路由策略执行 |
+| **Phase 4** | 实现 `MetaClawHitlHook`，支持 HITL 中断/恢复 | ✅ 已完成 | 新增 `MetaClawHitlHook` 注册到 `ReactAgentFactory`；`SpringAiAlibabaAgentEngine.resume()` 按 `ApprovalResolution` 执行被批准/拒绝的工具并注入结果后再次调用 ReactAgent；新增 `MetaClawHitlHookTest` 与 resume 测试并纳入 P0 基线；`./init.sh` 全量通过 |
+| **Phase 5** | 多 Agent 编排：在 `VesselConfig` 中支持子 Agent 配置，把 `SequentialAgent` / `LlmRoutingAgent` 接入 VesselRuntime | 🔄 进行中 | Step 7 配置模型已完成：`AgentFlowMode`、`VesselAgentConfig`、`AgentFlowConfig` 已落地，`VesselConfig` / `VesselConfigBundle` / 配置模板 / `VesselConfigLoaderTest` 已更新；Step 8 SAA 多 Agent 调用接入待实施 |
 | **Phase 6**（可选） | 自定义 `VesselCheckpointSaver`：把 SAA thread 状态持久化到 meta-claw MemorySubSystem | ⬜ 未开始 | 进程重启后可从 checkpoint 恢复未完成的 Agent 任务 |
 
 ---
@@ -1030,10 +1048,12 @@ public class AgentExecutor {
 | 实现 | `SpringAiAlibabaAgentEngine` | `meta.claw.core.runtime.engine` | ✅ 已完成 | Phase 2 落地 |
 | Factory | `ReactAgentFactory` | `meta.claw.core.runtime.engine` | ✅ 已完成 | Phase 2 落地 |
 | Converter | `SpiMessageConverter` | `meta.claw.core.runtime.engine` | ✅ 已完成 | Phase 2 落地，已修复 toolCallId |
-| Hook | `MetaClawHitlHook` | `meta.claw.core.runtime.engine.alibabahook` | ⬜ 未开始 | Phase 4 |
-| Hook | `MetaClawMetricsHook` | `meta.claw.core.runtime.engine.alibabahook` | ⬜ 未开始 | Phase 3 |
+| Hook | `MetaClawHitlHook` | `meta.claw.core.runtime.engine.alibabahook` | ✅ 已完成 | Phase 4 落地，注册到 `ReactAgentFactory` 的 `AFTER_MODEL` 位置 |
+| Hook | `MetaClawAgentMetricsHook` | `meta.claw.core.runtime.engine.alibabahook` | ✅ 已完成 | Phase 3 落地，任务级指标（任务完成/步数/时长） |
+| Hook | `MetaClawModelMetricsHook` | `meta.claw.core.runtime.engine.alibabahook` | ✅ 已完成 | Phase 3 落地，模型级指标（LLM latency/token usage/tool calls） |
 | 修改 | `VesselRuntime` | `meta.claw.core.runtime` | ✅ 已完成 | Phase 1 落地，注入 AgentEngineFactory |
 | 修改 | `VesselConfig` / `AlibabaAgentConfig` | `meta.claw.core.config` | ✅ 已完成 | Phase 1 落地，新增配置字段 |
+| 新增 | `VesselAgentConfig` / `AgentFlowConfig` / `AgentFlowMode` | `meta.claw.core.config` | ✅ 已完成 | Phase 5 Step 7 落地，多 Agent 配置模型 |
 | 修改 | `LlmClientProviderManager` | `meta.claw.core.llm` | ✅ 已完成 | Phase 2 落地，新增 `createChatModel` |
 
 ### 11.2 可选工具抽象隔离新增/修改清单
