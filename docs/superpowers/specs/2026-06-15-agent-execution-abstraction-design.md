@@ -745,7 +745,7 @@ memory:
 |------|--------|------|---------|
 | **Phase 0** | 引入 `spring-ai-alibaba-agent-framework` / `spring-ai-alibaba-graph-core` 依赖；验证与 Spring AI 1.1.8 的兼容性 | ✅ 已完成 | `./init.sh` 编译通过；新增 AlibabaEngineSmokeTest 能构建 ReactAgent 并调用一次无工具对话 |
 | **Phase 1** | 定义 `AgentEngine` SPI；创建 `AgentEngineFactory`；实现 `NativeAgentEngine`；改造 `VesselRuntime` 从 factory 获取引擎 | ✅ 已完成 | `./init.sh` 全量通过；CLI chat 行为与改造前完全一致 |
-| **Phase 2** | 实现 `SpringAiAlibabaAgentEngine`（同步 call）；实现 `ReactAgentFactory`；修复 `SpiMessageConverter` tool 消息的 `toolCallId` | ⬜ 未开始 | 单个 tool-call 对话用 alibaba 引擎跑通；CLI 可切换 `agent_engine: alibaba` 运行 |
+| **Phase 2** | 实现 `SpringAiAlibabaAgentEngine`（同步 call）；实现 `ReactAgentFactory`；修复 `SpiMessageConverter` tool 消息的 `toolCallId` | ✅ 已完成 | 单个 tool-call 对话用 alibaba 引擎跑通；CLI 可切换 `agent_engine: alibaba` 运行；新增 3 个测试并纳入 P0 基线 |
 | **Phase 3** | 接入流式 `streamMessages`；实现 `MetaClawMetricsHook`；记录 LLM latency / token usage / tool call | ⬜ 未开始 | 流式输出 + token 统计在 alibaba 引擎下与 native 一致 |
 | **Phase 4** | 实现 `MetaClawHitlHook`，支持 HITL 中断/恢复 | ⬜ 未开始 | HITL 审批流程在 alibaba 引擎下与 native 行为一致 |
 | **Phase 5** | 多 Agent 编排：在 `VesselProfile` 中支持子 Agent 配置，把 `SequentialAgent` / `LlmRoutingAgent` 接入 VesselRuntime | ⬜ 未开始 | 一个 Vessel 可配置多个子 Agent 并按路由策略执行 |
@@ -1027,14 +1027,14 @@ public class AgentExecutor {
 | SPI | `AgentEngine` | `meta.claw.core.runtime.engine` | ✅ 已完成 | Phase 1 落地 |
 | Factory | `AgentEngineFactory` | `meta.claw.core.runtime.engine` | ✅ 已完成 | Phase 1 落地 |
 | 实现 | `NativeAgentEngine` | `meta.claw.core.runtime.engine` | ✅ 已完成 | Phase 1 落地，复用现有执行器 |
-| 实现 | `SpringAiAlibabaAgentEngine` | `meta.claw.core.runtime.engine` | ⬜ 未开始 | Phase 2 |
-| Factory | `ReactAgentFactory` | `meta.claw.core.runtime.engine` | ⬜ 未开始 | Phase 2 |
-| Converter | `SpiMessageConverter` | `meta.claw.core.runtime.engine` | ⬜ 未开始 | Phase 2，需修复 toolCallId |
+| 实现 | `SpringAiAlibabaAgentEngine` | `meta.claw.core.runtime.engine` | ✅ 已完成 | Phase 2 落地 |
+| Factory | `ReactAgentFactory` | `meta.claw.core.runtime.engine` | ✅ 已完成 | Phase 2 落地 |
+| Converter | `SpiMessageConverter` | `meta.claw.core.runtime.engine` | ✅ 已完成 | Phase 2 落地，已修复 toolCallId |
 | Hook | `MetaClawHitlHook` | `meta.claw.core.runtime.engine.alibabahook` | ⬜ 未开始 | Phase 4 |
 | Hook | `MetaClawMetricsHook` | `meta.claw.core.runtime.engine.alibabahook` | ⬜ 未开始 | Phase 3 |
 | 修改 | `VesselRuntime` | `meta.claw.core.runtime` | ✅ 已完成 | Phase 1 落地，注入 AgentEngineFactory |
 | 修改 | `VesselConfig` / `AlibabaAgentConfig` | `meta.claw.core.config` | ✅ 已完成 | Phase 1 落地，新增配置字段 |
-| 修改 | `LlmClientProviderManager` | `meta.claw.core.llm` | ⬜ 未开始 | Phase 2，新增 `createChatModel` |
+| 修改 | `LlmClientProviderManager` | `meta.claw.core.llm` | ✅ 已完成 | Phase 2 落地，新增 `createChatModel` |
 
 ### 11.2 可选工具抽象隔离新增/修改清单
 

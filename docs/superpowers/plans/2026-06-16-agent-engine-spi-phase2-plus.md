@@ -252,7 +252,7 @@ SAA `ReactAgent` 直接依赖 `ChatModel` 而不是 `ChatClient`，因此需要�
                   .description(bundle.getVesselDescription())
                   .model(chatModel)
                   .systemPrompt("") // system prompt 已由 VesselRuntime 组装进 messages
-                  .tools(toolCallbacks.toArray(new Object[0]))
+                  .tools(toolCallbacks.toArray(new ToolCallback[0]))
                   .build();
       }
 
@@ -332,8 +332,12 @@ SAA `ReactAgent` 直接依赖 `ChatModel` 而不是 `ChatClient`，因此需要�
       public Reply execute(TaskContext ctx, SpiChatRequest request) {
           ReactAgent agent = reactAgentFactory.get(ctx);
           List<Message> messages = SpiMessageConverter.toSpringMessages(request.getMessages());
-          AssistantMessage result = agent.call(messages);
-          return new Reply(ReplyType.TEXT, result.getText());
+          try {
+              AssistantMessage result = agent.call(messages);
+              return new Reply(ReplyType.TEXT, result.getText());
+          } catch (com.alibaba.cloud.ai.graph.exception.GraphRunnerException e) {
+              throw new RuntimeException("Alibaba agent execution failed: " + e.getMessage(), e);
+          }
       }
 
       @Override
@@ -349,8 +353,12 @@ SAA `ReactAgent` 直接依赖 `ChatModel` 而不是 `ChatClient`，因此需要�
           // Phase 4：把 ApprovalResolution 结果重新注入 messages 再 call
           ReactAgent agent = reactAgentFactory.get(ctx);
           List<Message> messages = SpiMessageConverter.toSpringMessages(request.getMessages());
-          AssistantMessage result = agent.call(messages);
-          return new Reply(ReplyType.TEXT, result.getText());
+          try {
+              AssistantMessage result = agent.call(messages);
+              return new Reply(ReplyType.TEXT, result.getText());
+          } catch (com.alibaba.cloud.ai.graph.exception.GraphRunnerException e) {
+              throw new RuntimeException("Alibaba agent resume failed: " + e.getMessage(), e);
+          }
       }
 
       @Override
@@ -386,13 +394,14 @@ SAA `ReactAgent` 直接依赖 `ChatModel` 而不是 `ChatClient`，因此需要�
 ### Task 5: 更新 Vessel 配置示例与文档
 
 **Files:**
-- Modify: `.meta-claw/vessels/default/config.yaml`
+- Modify: `meta-claw-core/src/main/resources/templates/user/vessel.meta.tmpl.yaml`
 
-- [ ] **Step 5.1: 在默认 Vessel 配置中补充 engine 示例**
+- [ ] **Step 5.1: 在 Vessel 配置模板中补充 engine 示例**
 
-  在 YAML 适当位置新增（默认仍保持 `native`）：
+  在 YAML 末尾新增（默认仍保持 `native`）：
 
   ```yaml
+  # Agent 执行引擎：native（自研 ReAct）或 alibaba（Spring AI Alibaba ReactAgent）
   agent_engine: native
   alibaba_agent:
     parallel_tool_execution: true
@@ -405,8 +414,8 @@ SAA `ReactAgent` 直接依赖 `ChatModel` 而不是 `ChatClient`，因此需要�
 - [ ] **Step 5.2: Commit**
 
   ```bash
-  git add .meta-claw/vessels/default/config.yaml
-  git commit -m "chore(config): add agent_engine example in default vessel config"
+  git add meta-claw-core/src/main/resources/templates/user/vessel.meta.tmpl.yaml
+  git commit -m "chore(config): add agent_engine / alibaba_agent example to vessel template"
   ```
 
 ---

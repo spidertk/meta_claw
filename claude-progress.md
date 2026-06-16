@@ -7,7 +7,7 @@
 - 标准启动路径：`./init.sh`
 - 标准验证路径：`./init.sh` 先执行全仓编译，再运行初始化阶段 P0 测试集
 - 最近已通过证据：2026-06-16 在真实 Maven 环境中执行新版 `./init.sh`，完成全仓编译并通过 P0 测试集（含新增 AgentEngineFactoryTest、NativeAgentEngineTest、AlibabaEngineSmokeTest）；混合架构基线（Spring Boot 3.5.15 + Spring AI 1.1.8 + Spring AI Alibaba 1.1.2.3）编译与 SAA ReactAgent 冒烟测试通过；随后产出 Phase 2+ 实施计划并维护主设计文档进度
-- 当前最高优先级未完成功能：agent-engine-001（Agent 执行引擎抽象：native / alibaba 双实现设计）Phase 0+1 已实现完成；下一步为 Phase 2：SpringAiAlibabaAgentEngine 同步调用（详见 docs/superpowers/plans/2026-06-16-agent-engine-spi-phase2-plus.md）
+- 当前最高优先级未完成功能：agent-engine-001（Agent 执行引擎抽象：native / alibaba 双实现设计）Phase 0+1+2 已实现完成；下一步为 Phase 3：Alibaba 引擎流式 + Metrics Hook（详见 docs/superpowers/plans/2026-06-16-agent-engine-spi-phase2-plus.md）
 - 当前 blocker：
   1. 当前无 blocker
 
@@ -985,28 +985,39 @@
 ### Session 032
 
 - 日期：2026-06-16
-- 本轮目标：在 Phase 0+1 完成后，产出后续实施计划并维护主设计文档进度，防止遗忘
+- 本轮目标：按 Phase 2+ 计划实现 Spring AI Alibaba 同步引擎
 - 已完成：
-  - 确认 Phase 0+1 代码已落地：`AgentEngine` SPI、`AgentEngineFactory`、`NativeAgentEngine`、`VesselRuntime` 工厂路由、`VesselConfig.agentEngine` / `AlibabaAgentConfig`
-  - 运行 `./init.sh` 验证当前基线通过
-  - 创建 Phase 2+ 实施计划文档 `docs/superpowers/plans/2026-06-16-agent-engine-spi-phase2-plus.md`，覆盖 Task 1~15（Phase 2~6 + 可选工具抽象隔离）
-  - 更新主设计文档 `docs/superpowers/specs/2026-06-15-agent-execution-abstraction-design.md`：
-    - 新增第 1.1 节《实现进度总览》
-    - 第 7 章路线图增加“状态”列并标注 Phase 0/1 已完成
-    - 第 11 章接口清单增加“状态”列
-    - 第 6.1 节补充 `VesselConfig` 实现注记
+  - Task 1：实现 `SpiMessageConverter`（SpiMessage ↔ Spring AI Message）并添加 8 个单元测试
+  - Task 2：扩展 `LlmClientProvider` / `LlmClientProviderManager` 支持 `createChatModel`，OpenAI provider 已覆写
+  - Task 3：实现 `ReactAgentFactory`，按 vesselId 缓存 ReactAgent
+  - Task 4：实现 `SpringAiAlibabaAgentEngine`（同步 call），处理 `GraphRunnerException`
+  - Task 5：在 Vessel 配置模板中补充 `agent_engine` / `alibaba_agent` 示例
+  - Task 6：将 `SpiMessageConverterTest`、`LlmClientProviderManagerTest`、`SpringAiAlibabaAgentEngineTest` 纳入 `init.sh` P0 基线
+  - 更新 Phase 2+ 计划文档中的代码片段与实际实现一致
+  - 更新主设计文档进度：Phase 2 标注为 ✅ 已完成
 - 运行过的验证：
-  - `./init.sh` → 成功；9 个 reactor 模块全部 SUCCESS，P0 测试通过
+  - `./init.sh` → 成功；9 个 reactor 模块全部 SUCCESS，core 59 个测试全部通过（含新增 Phase 2 测试）
 - 更新过的文件或工件：
-  - `docs/superpowers/plans/2026-06-16-agent-engine-spi-phase2-plus.md`（新增）
+  - `meta-claw-core/src/main/java/meta/claw/core/runtime/engine/SpiMessageConverter.java`（新增）
+  - `meta-claw-core/src/test/java/meta/claw/core/runtime/engine/SpiMessageConverterTest.java`（新增）
+  - `meta-claw-core/src/main/java/meta/claw/core/llm/provider/LlmClientProvider.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/llm/provider/OpenAiLlmClientProvider.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/llm/provider/LlmClientProviderManager.java`
+  - `meta-claw-core/src/test/java/meta/claw/core/llm/provider/LlmClientProviderManagerTest.java`（新增）
+  - `meta-claw-core/src/main/java/meta/claw/core/runtime/engine/ReactAgentFactory.java`（新增）
+  - `meta-claw-core/src/main/java/meta/claw/core/runtime/engine/SpringAiAlibabaAgentEngine.java`（新增）
+  - `meta-claw-core/src/test/java/meta/claw/core/runtime/engine/SpringAiAlibabaAgentEngineTest.java`（新增）
+  - `meta-claw-core/src/main/resources/templates/user/vessel.meta.tmpl.yaml`
+  - `init.sh`
+  - `docs/superpowers/plans/2026-06-16-agent-engine-spi-phase2-plus.md`
   - `docs/superpowers/specs/2026-06-15-agent-execution-abstraction-design.md`
   - `claude-progress.md`
   - `feature_list.json`
 - 已知风险或未解决的问题：
-  - Phase 2 实施前需确认 `ReactAgent.call(List<Message>)` 在当前 SAA 1.1.2.3 中的准确签名；计划文档中的代码基于设计文档示例，若编译报错需按实际 API 调整
-  - `LlmClientProviderManager` 当前仅暴露 `ChatClient create/createRaw`，Phase 2 需新增 `createChatModel` 路由
+  - `SpringAiAlibabaAgentEngine.executeStream` 与 `resume` 仍为 Phase 3/4 占位实现
+  - 当前 Alibaba 引擎的验证基于 mock；真实 provider + tool-call 循环需在后续会话中通过真实 CLI 或集成测试验证
 - 下一步最佳动作：
-  1. 按 `docs/superpowers/plans/2026-06-16-agent-engine-spi-phase2-plus.md` Task 1 开始实现 `SpiMessageConverter`
+  1. 进入 Phase 3：实现 Alibaba 引擎流式输出 + `MetaClawMetricsHook`
   2. 每完成一个 Task 即运行 `./init.sh` 保持基线通过
 
 ### Session 031
