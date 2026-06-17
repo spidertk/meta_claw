@@ -20,7 +20,7 @@
 | **Phase 3** | ✅ 已完成 | 流式 `executeStream`、`MetaClawAgentMetricsHook`、`MetaClawModelMetricsHook` | `./init.sh` 全量 P0 测试通过 |
 | **Phase 4** | ✅ 已完成 | `MetaClawHitlHook`、Alibaba 引擎 HITL 恢复 | `./init.sh` 全量 P0 测试通过 |
 | **Phase 5** | ✅ 已完成 | 多 Agent 编排（Sequential / Parallel / Routing / Supervisor）；Step 7 配置模型已完成，Step 8 SAA 接入已实施 | `./init.sh` 全量 P0 测试通过 |
-| **Phase 6** | ⬜ 未开始 | `VesselCheckpointSaver` 持久化 SAA thread 状态 | 待实施 |
+| **Phase 6** | 📝 设计中 | `VesselCheckpointSaver` 持久化 SAA thread 状态；详见 5.10 | 待实施 |
 | **可选深化** | ⬜ 未开始 | `ExecutableTool` SPI + 工具执行层隔离 | 待评估 |
 
 > 最新进度维护：本表随代码实现同步更新。最近一次更新 2026-06-16，Phase 0+1+2+3+4+5 已完成并通过 `./init.sh`；Phase 5 Step 7（多 Agent 配置模型）已完成，Step 8（SAA 多 Agent 调用接入）已完成。
@@ -42,7 +42,7 @@
 | **多 Agent 编排已落地** | Phase 5 Step 8 已实施：`SaaMultiAgentFactory` 按 `flow.mode` 构建 `SequentialAgent` / `ParallelAgent` / `LlmRoutingAgent`，`SpringAiAlibabaAgentEngine` 在 `hasAgents()` 时走 FlowAgent 路径。真实 LLM 端到端验证仍待补充。 | 在受控环境（配置有效 API Key）下跑通一次真实的多 Agent 顺序/路由对话，固化预期行为。 |
 | **Alibaba 引擎缺少真实 LLM 端到端验证** | 当前 P0 测试以 Mockito 模拟 `ReactAgent` 为主；`AlibabaEngineSmokeTest` 只验证能构造 ReactAgent 并调用一次无工具对话。真实模型返回的 `reasoningContent`、`toolCalls`、`usage` 在 `AssistantMessage.metadata` 中的格式尚未被真实网络调用验证。 | 在受控环境（配置有效 API Key）下跑通一次真实的 tool-call 对话与流式对话，固化预期行为。 |
 | **HITL 流式路径未完整覆盖** | Phase 4 的 HITL 中断/恢复基于 `ReactAgent.call()` 与 `AFTER_MODEL` Hook。`executeStream()` 触发 HITL 时，Flux 能否正确中断、`SpiStreamingCallback.onHitlSuspend` 能否收集到完整 ticket、恢复后能否继续流式输出，目前没有明确测试。 | 补充 `SpringAiAlibabaAgentEngine` 流式 HITL 的单元/集成测试，并在 CLI 真实交互中验证。 |
-| **Checkpoint 持久化未开始** | Phase 6 的 `VesselCheckpointSaver` 尚未实施。Alibaba 引擎的 HITL 中断状态仍依赖内存中的 `TaskContext` 和 `ApprovalTicket`；进程重启后 ticket 与图中间状态丢失。 | 调研 `BaseCheckpointSaver` 接口，实现以 `taskId` + `threadId` 为 key 的文件持久化，并在 `ReactAgentFactory` 中配置。 |
+| **Checkpoint 持久化已出详细设计** | Phase 6 的 `VesselCheckpointSaver` 已出详细设计（第 5.10 节）：基于文件系统、以 `vesselId + threadId` 为 key、`RunnableConfig.metadata` 透传 vesselId、`ReactAgentFactory` 按需注入 saver、`SpringAiAlibabaAgentEngine` 传入带 threadId 的 config。尚未编码实施。 | 按 Phase 3+ 实施计划 Task 9 实现 `VesselCheckpointSaver`、改造 `ReactAgentFactory` / `SpringAiAlibabaAgentEngine`、补充测试并纳入 P0 基线。 |
 | **工具执行层未完全解耦** | 可选深化任务未开始。`AgentExecutor` / `StreamingAgentExecutor` 仍直接 `import org.springframework.ai.tool.ToolCallback`，未来若要接入非 Spring AI 协议的工具（HTTP 函数、Python 远端、A2A）会牵连执行层。 | 定义 `ExecutableTool` SPI，创建 `SpringAiToolCallbackAdapter`，逐步把 `ToolSubSystem.getToolCallbacks()` 改为 `getExecutableTools()`。 |
 | **ReactAgentFactory 缺少实例缓存** | 为避免 Hook 中的 `TaskContext` 串用，当前按请求构建 ReactAgent。高频对话或高并发场景下会重复编译 SAA Graph，带来可观测的构建开销。 | 引入 Vessel 级缓存，但确保 Hook 在每次调用时拿到当前 `TaskContext`（例如通过 ThreadLocal 或请求级 wrapper）。 |
 | **Metrics Hook 的 token usage 依赖 SAA 内部 metadata** | `MetaClawModelMetricsHook` 从 `AssistantMessage.getMetadata()` 中读取 `usage`。SAA 是否总是填充、键名是否稳定，尚未经真实 LLM 验证；SAA 版本升级后可能 silently 失效。 | 真实调用后确认 metadata 结构；必要时增加 `ModelInterceptor` 或从 `ChatResponse` 显式取 usage。 |
@@ -705,6 +705,359 @@ public class MetaClawMetricsHook implements AgentHook {
 }
 ```
 
+### 5.10 Checkpoint 持久化：VesselCheckpointSaver（Phase 6）
+
+#### 5.10.1 背景与目标
+
+SAA 的 `ReactAgent` / `CompiledGraph` 在执行过程中会通过 `BaseCheckpointSaver` 把图的中间状态（`OverAllState`）写入外部存储。当任务因 HITL 被挂起、进程重启、或需要显式恢复时，可以从最近一次 checkpoint 继续执行，而不是从头开始 ReAct 循环。
+
+Phase 6 的目标是：
+1. 实现一个基于 meta-claw 文件系统的 `VesselCheckpointSaver`。
+2. 在 `ReactAgentFactory` 中为 SAA `ReactAgent` / FlowAgent 配置该 saver。
+3. 在 `SpringAiAlibabaAgentEngine` 中传入稳定的 `RunnableConfig.threadId`，使 checkpoint 与会话/任务绑定。
+4. 在 `resume()` 中支持从 checkpoint 恢复（与现有手动 tool-result 注入路径共存，默认走 SAA checkpoint 恢复）。
+
+#### 5.10.2 SAA Checkpoint API 事实
+
+截至 SAA 1.1.2.3：
+
+- `com.alibaba.cloud.ai.graph.checkpoint.BaseCheckpointSaver` 是**接口**，不是抽象类。
+- `Checkpoint` 结构：
+  - `id`: UUID 字符串（SAA 内部生成）。
+  - `state`: `Map<String, Object>`，对应 `OverAllState` 的原始 map。
+  - `nodeId`: 当前节点 ID（如 `agent_llm`）。
+  - `nextNodeId`: 下一节点 ID（如 `agent_tool`）。
+- `RunnableConfig` 关键字段：
+  - `threadId`: 默认 `"$default"`，用于隔离不同对话/任务。
+  - `checkPointId`: 可选，指定从某个 checkpoint 恢复。
+  - 提供 `builder().threadId(...).build()` 与 `.withResume()` / `.withCheckPointId(...)`。
+- `ReactAgent.Builder` 支持两种注册方式：
+  - `.saver(BaseCheckpointSaver saver)`（直接）。
+  - `.compileConfig(CompileConfig.builder().checkpointSaver(saver).build())`（通过编译配置）。
+
+> **修正**：Phase 3+ 实施计划原称 `BaseCheckpointSaver` 为抽象类，实际为接口；下文统一按接口描述。
+
+#### 5.10.3 VesselCheckpointSaver 设计
+
+```java
+package meta.claw.core.runtime.engine.checkpoint;
+
+import com.alibaba.cloud.ai.graph.checkpoint.BaseCheckpointSaver;
+import com.alibaba.cloud.ai.graph.checkpoint.Checkpoint;
+import com.alibaba.cloud.ai.graph.RunnableConfig;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import meta.claw.core.infra.ProjectRootFinder;
+import org.springframework.stereotype.Component;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.stream.Collectors;
+
+/**
+ * 基于文件系统的 SAA checkpoint 持久化实现。
+ *
+ * <p>以 {@code vesselId + threadId} 作为命名空间，每个 checkpoint 存为一个 JSON 文件：
+ * {@code .meta-claw/vessels/<vesselId>/checkpoints/<threadId>/<checkpointId>.json}。</p>
+ *
+ * <p>threadId 通常取 {@code TaskContext.task.sessionId}，保证同一会话多次调用共享同一组 checkpoint；
+ * 若 sessionId 缺失，则回退到 taskId。</p>
+ */
+@Component
+public class VesselCheckpointSaver implements BaseCheckpointSaver {
+
+    private static final String DEFAULT_THREAD_ID = "$default";
+
+    private final ObjectMapper objectMapper;
+    private final ConcurrentHashMap<String, ReentrantReadWriteLock> lockMap = new ConcurrentHashMap<>();
+
+    public VesselCheckpointSaver() {
+        this.objectMapper = new ObjectMapper();
+    }
+
+    @Override
+    public Collection<Checkpoint> list(RunnableConfig config) {
+        Path dir = resolveThreadDir(config);
+        if (!Files.exists(dir)) {
+            return List.of();
+        }
+        String threadKey = threadKey(config);
+        ReentrantReadWriteLock lock = getLock(threadKey);
+        lock.readLock().lock();
+        try (var files = Files.list(dir)) {
+            return files
+                .filter(Files::isRegularFile)
+                .filter(p -> p.toString().endsWith(".json"))
+                .sorted(Comparator.comparing(this::extractSequence).reversed())
+                .map(this::readCheckpoint)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to list checkpoints for " + threadKey, e);
+        } finally {
+            lock.readLock().unlock();
+        }
+    }
+
+    @Override
+    public Optional<Checkpoint> get(RunnableConfig config) {
+        Path dir = resolveThreadDir(config);
+        if (!Files.exists(dir)) {
+            return Optional.empty();
+        }
+        // 默认取最新 checkpoint；若 config.checkPointId() 存在则按 ID 精确匹配
+        return list(config).stream()
+            .filter(cp -> config.checkPointId().isEmpty()
+                || config.checkPointId().get().equals(cp.getId()))
+            .findFirst();
+    }
+
+    @Override
+    public RunnableConfig put(RunnableConfig config, Checkpoint checkpoint) throws Exception {
+        Path dir = resolveThreadDir(config);
+        String threadKey = threadKey(config);
+        ReentrantReadWriteLock lock = getLock(threadKey);
+        lock.writeLock().lock();
+        try {
+            Files.createDirectories(dir);
+            Path file = dir.resolve(checkpoint.getId() + ".json");
+            objectMapper.writerWithDefaultPrettyPrinter().writeValue(file.toFile(), checkpoint);
+            return config;
+        } finally {
+            lock.writeLock().unlock();
+        }
+    }
+
+    @Override
+    public Tag release(RunnableConfig config) throws Exception {
+        // 文件实现无需显式释放资源；返回空 Tag
+        return new Tag(null, null);
+    }
+
+    /** 删除某个 threadId 下的所有 checkpoint。 */
+    public void clear(String vesselId, String threadId) {
+        Path dir = resolveThreadDir(vesselId, threadId);
+        String threadKey = vesselId + "/" + threadId;
+        ReentrantReadWriteLock lock = getLock(threadKey);
+        lock.writeLock().lock();
+        try {
+            if (Files.exists(dir)) {
+                try (var files = Files.list(dir)) {
+                    files.forEach(p -> {
+                        try {
+                            Files.deleteIfExists(p);
+                        } catch (IOException ignored) {
+                        }
+                    });
+                }
+                Files.deleteIfExists(dir);
+            }
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to clear checkpoints for " + threadKey, e);
+        } finally {
+            lock.writeLock().unlock();
+        }
+    }
+
+    private Path resolveThreadDir(RunnableConfig config) {
+        String vesselId = extractVesselId(config);
+        String threadId = config.threadId().orElse(DEFAULT_THREAD_ID);
+        return resolveThreadDir(vesselId, threadId);
+    }
+
+    private Path resolveThreadDir(String vesselId, String threadId) {
+        return ProjectRootFinder.getMetaClawDir()
+            .resolve("vessels")
+            .resolve(vesselId)
+            .resolve("checkpoints")
+            .resolve(threadId);
+    }
+
+    private String extractVesselId(RunnableConfig config) {
+        return config.metadata()
+            .getOrDefault("vesselId", "default")
+            .toString();
+    }
+
+    private String threadKey(RunnableConfig config) {
+        return extractVesselId(config) + "/" + config.threadId().orElse(DEFAULT_THREAD_ID);
+    }
+
+    private ReentrantReadWriteLock getLock(String threadKey) {
+        return lockMap.computeIfAbsent(threadKey, k -> new ReentrantReadWriteLock());
+    }
+
+    private Long extractSequence(Path path) {
+        String name = path.getFileName().toString();
+        int dot = name.lastIndexOf('.');
+        if (dot > 0) {
+            name = name.substring(0, dot);
+        }
+        try {
+            return Long.parseUnsignedLong(name.replace("-", ""), 16);
+        } catch (NumberFormatException e) {
+            return 0L;
+        }
+    }
+
+    private Checkpoint readCheckpoint(Path path) {
+        try {
+            return objectMapper.readValue(path.toFile(), Checkpoint.class);
+        } catch (IOException e) {
+            return null;
+        }
+    }
+}
+```
+
+> **存储格式说明**：
+> - 每个 checkpoint 独立成文件，避免单文件过大；按 checkpoint ID（UUID）字典序近似时间序，读取时按 UUID 时间戳降序取最新。
+> - 不保存 `ApprovalTicket` 本身；ticket 仍由 `HitlSubSystem` / `InMemoryHitlGate` 管理。checkpoint 只保存 SAA 图状态，resume 时由外部把 `ApprovalResolution` 与 ticket 重新传入。
+> - `vesselId` 通过 `RunnableConfig.metadata` 传入，避免 saver 与 `TaskContext` 耦合。
+
+#### 5.10.4 ReactAgentFactory 改造
+
+在 `buildReactAgent(...)` 中注入 `VesselCheckpointSaver`：
+
+```java
+@Component
+public class ReactAgentFactory {
+
+    @Autowired
+    private VesselCheckpointSaver checkpointSaver;
+
+    // ... 现有注入
+
+    private ReactAgent buildReactAgent(TaskContext ctx, String name, String description,
+                                       ChatModel chatModel, String systemPrompt,
+                                       List<ToolCallback> toolCallbacks) {
+        // ... 现有 Hook 创建
+
+        return ReactAgent.builder()
+                .name(name)
+                .description(description)
+                .model(chatModel)
+                .systemPrompt(systemPrompt)
+                .tools(toolCallbacks.toArray(new ToolCallback[0]))
+                .hooks(agentMetricsHook, modelMetricsHook, hitlHook)
+                .saver(checkpointSaver)
+                .build();
+    }
+}
+```
+
+多 Agent 场景下，子 Agent 通常作为 `Agent` 传入 FlowAgent。若 FlowAgent 内部也编译子图并支持 saver，则子 Agent 同样通过 `ReactAgentFactory.buildSubAgent(...)` 获得 checkpoint 能力。主 FlowAgent 本身是否需要 saver 取决于 SAA 实现；Phase 6 先保证单 Agent / 子 Agent 的 checkpoint，FlowAgent 级 checkpoint 作为后续增强。
+
+#### 5.10.5 SpringAiAlibabaAgentEngine 改造
+
+核心变化：在调用 `agent.call(...)` / `agent.streamMessages(...)` / `agent.invoke(...)` 时传入带 `threadId` 与 `vesselId` 的 `RunnableConfig`。
+
+新增辅助方法：
+
+```java
+private RunnableConfig buildRunnableConfig(TaskContext ctx, boolean resume) {
+    String threadId = defaultIfBlank(ctx.getTask().getSessionId(), ctx.getTask().getTaskId());
+    RunnableConfig.Builder builder = RunnableConfig.builder()
+            .threadId(threadId)
+            .addMetadata("vesselId", ctx.getProfile().getBundle().getVesselId());
+    if (resume) {
+        builder = builder.withResume(); // 或 withCheckPointId(...)
+    }
+    return builder.build();
+}
+```
+
+`execute()` 改造：
+
+```java
+@Override
+public Reply execute(TaskContext ctx, SpiChatRequest request) {
+    List<Message> messages = SpiMessageConverter.toSpringMessages(request.getMessages());
+    RunnableConfig config = buildRunnableConfig(ctx, false);
+
+    if (ctx.getProfile().getBundle().hasAgents()) {
+        Agent flowAgent = multiAgentFactory.get(ctx);
+        try {
+            Optional<OverAllState> state = flowAgent.invoke(messages, config);
+            String text = state.map(this::extractTextFromState).orElse("");
+            return new Reply(ReplyType.TEXT, text);
+        } catch (GraphRunnerException e) {
+            throw new RuntimeException("Alibaba multi-agent execution failed: " + e.getMessage(), e);
+        }
+    }
+
+    ReactAgent agent = reactAgentFactory.get(ctx);
+    try {
+        AssistantMessage result = agent.call(messages, config);
+        return new Reply(ReplyType.TEXT, result.getText());
+    } catch (GraphRunnerException e) {
+        throw new RuntimeException("Alibaba agent execution failed: " + e.getMessage(), e);
+    }
+}
+```
+
+`executeStream()` 与 `resume()` 同理传入 `config`。注意 `Agent` 接口的 `invoke` / `streamMessages` 重载签名需以实际 JAR 为准；若接口只接受 `List<Message>`，则保留无 config 版本，saver 仍会通过 `ReactAgent.Builder.saver(...)` 生效，但 thread 隔离会退化到默认 `"$default"`。
+
+#### 5.10.6 resume() 路径
+
+当前 `SpringAiAlibabaAgentEngine.resume()` 手动执行被批准/拒绝的 tool，然后把 tool result 注入 messages 再 `agent.call(messages)`。Phase 6 提供两条可选路径：
+
+1. **手动路径（默认兼容）**：保持现有逻辑，仅把 `RunnableConfig` 传入 `agent.call(springMessages, config)`，让 SAA 在循环中继续写入新 checkpoint。
+2. **Checkpoint 恢复路径（增强）**：在 `resume()` 中构造 `config.withResume()`，让 SAA 自动从最新 checkpoint 恢复图状态。此时外部仍需提供 `ApprovalResolution`，SAA 恢复后会重新进入 `AFTER_MODEL` Hook，但 Hook 中可识别到该 tool 已被决议而不再挂起。
+
+推荐实现：先完成路径 1（低风险、与现有测试兼容），路径 2 作为可选开关，通过 `AlibabaAgentConfig.checkpointResume` 控制。
+
+#### 5.10.7 配置扩展
+
+在 `AlibabaAgentConfig` 中增加 checkpoint 开关：
+
+```java
+public class AlibabaAgentConfig {
+    // 已有字段 ...
+
+    private boolean checkpointEnabled = true;
+    private boolean checkpointResume = false; // true 时 resume() 使用 SAA checkpoint 恢复
+    private int maxCheckpointsPerThread = 100;
+}
+```
+
+YAML 示例：
+
+```yaml
+agent_engine: alibaba
+alibaba_agent:
+  parallel_tool_execution: true
+  max_parallel_tools: 5
+  return_reasoning_contents: true
+  checkpoint_enabled: true
+  checkpoint_resume: false
+  max_checkpoints_per_thread: 100
+```
+
+`ReactAgentFactory` 中根据 `bundle.getAlibabaAgentConfig().isCheckpointEnabled()` 决定是否注册 saver。
+
+#### 5.10.8 测试策略
+
+| 测试类 | 覆盖点 |
+|--------|--------|
+| `VesselCheckpointSaverTest` | `put/get/list/release/clear` 基本 IO；多 threadId 隔离；损坏文件容错。 |
+| `SpringAiAlibabaAgentEngineCheckpointTest` | mock `ReactAgentFactory` + `ReactAgent`，验证 `execute()` 传入的 `RunnableConfig` 包含正确 `threadId` 与 `vesselId`；验证 resume 时传入 `withResume()`（若开启）。 |
+| `ReactAgentFactoryCheckpointTest` | 验证 `ReactAgent.builder().saver(...)` 被调用（可 mock Builder 或验证构造结果）。 |
+| 真实 LLM 集成测试（P1） | 配置有效 API Key，跑一次带工具的 Alibaba 引擎对话，手动触发 HITL，确认 checkpoint 文件生成；进程重启后 resume。 |
+
+#### 5.10.9 风险与缓解
+
+| 风险 | 影响 | 缓解 |
+|------|------|------|
+| SAA `Agent.invoke(..., RunnableConfig)` 重载不存在 | 编译失败 | 先确认实际 API；若不存在则只给 `ReactAgent.call(..., config)` 传 config，FlowAgent 暂不支持。 |
+| Checkpoint 文件无限增长 | 磁盘占用 | `maxCheckpointsPerThread` + 定期清理旧 checkpoint（可在 `put` 时保留最近 N 个）。 |
+| Checkpoint 与现有手动 resume 行为冲突 | HITL 恢复异常 | 默认 `checkpointResume=false`，保持原路径；开启后补充集成测试。 |
+| `Checkpoint.state` 含不可序列化对象 | JSON 写入失败 | Jackson 配置 `FAIL_ON_EMPTY_BEANS=false`；遇到无法序列化的状态键时记录 warn 并跳过。 |
+| 多 Agent FlowAgent 不支持 saver | 多 Agent 场景无法恢复 | Phase 6 先覆盖单 Agent / 子 Agent；FlowAgent 级持久化列为后续增强。 |
+
 ---
 
 ## 6. 配置模型扩展
@@ -767,7 +1120,7 @@ memory:
 | **Phase 3** | 接入流式 `streamMessages`；实现 `MetaClawAgentMetricsHook` / `MetaClawModelMetricsHook`；记录 LLM latency / token usage / tool call | ✅ 已完成 | `SpringAiAlibabaAgentEngine.executeStream()` 透传 content/reasoning/tool-call 到 `SpiStreamingCallback`；`ReactAgentFactory` 注册任务级与模型级 Metrics Hook；新增 `SpringAiAlibabaAgentEngineStreamTest`、`MetaClawAgentMetricsHookTest`、`MetaClawModelMetricsHookTest` 并纳入 P0 基线；`./init.sh` 全量通过 |
 | **Phase 4** | 实现 `MetaClawHitlHook`，支持 HITL 中断/恢复 | ✅ 已完成 | 新增 `MetaClawHitlHook` 注册到 `ReactAgentFactory`；`SpringAiAlibabaAgentEngine.resume()` 按 `ApprovalResolution` 执行被批准/拒绝的工具并注入结果后再次调用 ReactAgent；新增 `MetaClawHitlHookTest` 与 resume 测试并纳入 P0 基线；`./init.sh` 全量通过 |
 | **Phase 5** | 多 Agent 编排：在 `VesselConfig` 中支持子 Agent 配置，把 `SequentialAgent` / `ParallelAgent` / `LlmRoutingAgent` 接入 VesselRuntime | ✅ 已完成 | Step 7 配置模型与 Step 8 SAA 多 Agent 调用接入均已落地：`SaaMultiAgentFactory`、`ReactAgentFactory.buildSubAgent`、`SpringAiAlibabaAgentEngine` 多 Agent 分支、`SaaMultiAgentFactoryTest`、`SpringAiAlibabaAgentEngineMultiAgentTest` 并纳入 P0 基线；`./init.sh` 全量通过 |
-| **Phase 6**（可选） | 自定义 `VesselCheckpointSaver`：把 SAA thread 状态持久化到 meta-claw MemorySubSystem | ⬜ 未开始 | 进程重启后可从 checkpoint 恢复未完成的 Agent 任务 |
+| **Phase 6**（可选） | 自定义 `VesselCheckpointSaver`：把 SAA thread 状态持久化到 meta-claw 文件系统；`ReactAgentFactory` / `SpringAiAlibabaAgentEngine` 接入 `RunnableConfig` | 📝 设计中 | 进程重启后可从 checkpoint 恢复未完成的 Agent 任务；详见 5.10 |
 
 ---
 
@@ -1057,6 +1410,7 @@ public class AgentExecutor {
 | 新增 | `SaaMultiAgentFactory` | `meta.claw.core.runtime.engine` | ✅ 已完成 | Phase 5 Step 8 落地，按 `flow.mode` 组装 SequentialAgent / ParallelAgent / LlmRoutingAgent |
 | 修改 | `ReactAgentFactory` | `meta.claw.core.runtime.engine` | ✅ 已完成 | Phase 5 Step 8 落地，拆分 `buildSingleAgent` / `buildSubAgent`，支持子 Agent 模型覆盖与工具过滤 |
 | 修改 | `LlmClientProviderManager` | `meta.claw.core.llm` | ✅ 已完成 | Phase 2 落地，新增 `createChatModel` |
+| 新增 | `VesselCheckpointSaver` | `meta.claw.core.runtime.engine.checkpoint` | 📝 设计中 | Phase 6 设计完成，实现文件系统持久化 SAA checkpoint |
 
 ### 11.2 可选工具抽象隔离新增/修改清单
 
@@ -1076,6 +1430,7 @@ public class AgentExecutor {
 - **Spring AI Alibaba 的 ReactAgent/Graph 能补齐这些短板**，但直接替换会浪费现有投资并引入版本风险。
 - **推荐方案是通过 `AgentEngine` SPI 把执行引擎抽象出来，提供 `native` 和 `alibaba` 两种可切换实现**，底层统一使用 Spring AI。
 - **实施顺序**：先验证依赖兼容性 → 抽 SPI + 本地实现兜底 → 接入 Alibaba 同步引擎 → 流式 → HITL → 多 Agent → checkpoint 持久化。
+- **Phase 6 详细设计已完成**（第 5.10 节）：定义了 `VesselCheckpointSaver` 文件持久化方案、`ReactAgentFactory` saver 注入、`SpringAiAlibabaAgentEngine` 的 `RunnableConfig` 传递策略、配置扩展与测试计划。下一步可按 Phase 3+ 实施计划 Task 9 编码实现。
 - **每阶段都必须通过 `./init.sh` 和新增 smoke test 验证**，确保仓库始终保持可启动、可验证状态。
 
 ---

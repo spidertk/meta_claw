@@ -383,25 +383,89 @@ SAA API（已确认）：
 **Files:**
 - Create: `meta-claw-core/src/main/java/meta/claw/core/runtime/engine/checkpoint/VesselCheckpointSaver.java`
 - Modify: `meta-claw-core/src/main/java/meta/claw/core/runtime/engine/ReactAgentFactory.java`
+- Modify: `meta-claw-core/src/main/java/meta/claw/core/runtime/engine/SpringAiAlibabaAgentEngine.java`
+- Modify: `meta-claw-core/src/main/java/meta/claw/core/config/VesselConfig.java`（`AlibabaAgentConfig` 新增 checkpoint 字段）
+- Create: `meta-claw-core/src/test/java/meta/claw/core/runtime/engine/checkpoint/VesselCheckpointSaverTest.java`
+- Create: `meta-claw-core/src/test/java/meta/claw/core/runtime/engine/SpringAiAlibabaAgentEngineCheckpointTest.java`
+- Modify: `init.sh`
 
-**目标：** 把 SAA Graph 执行过程中的 checkpoint 持久化到 meta-claw 的记忆或文件系统，支持进程重启后恢复未完成的 Agent 任务。
+**目标：** 把 SAA Graph 执行过程中的 checkpoint 持久化到 meta-claw 文件系统，支持进程重启后恢复未完成的 Agent 任务。
 
 SAA API（已确认）：
-- `com.alibaba.cloud.ai.graph.checkpoint.BaseCheckpointSaver` 抽象类。
-- `ReactAgent.builder().compileConfig(CompileConfig.builder().checkpointSaver(saver).build())` 可配置 saver。
+- `com.alibaba.cloud.ai.graph.checkpoint.BaseCheckpointSaver` 是**接口**，不是抽象类。
+- 方法签名：
+  - `Collection<Checkpoint> list(RunnableConfig config)`
+  - `Optional<Checkpoint> get(RunnableConfig config)`
+  - `RunnableConfig put(RunnableConfig config, Checkpoint checkpoint)`
+  - `BaseCheckpointSaver.Tag release(RunnableConfig config)`
+- `Checkpoint` 字段：`id`（UUID）、`state`（Map<String,Object>）、`nodeId`、`nextNodeId`。
+- `RunnableConfig` 字段：`threadId`（默认 `"$default"`）、`checkPointId`；支持 `.withResume()` / `.withCheckPointId(...)`。
+- `ReactAgent.Builder` 支持 `.saver(BaseCheckpointSaver)` 与 `.compileConfig(CompileConfig.builder().checkpointSaver(saver).build())`。
 
 实现要点：
-- 调研 `BaseCheckpointSaver` 的方法签名（get/checkpoint/update/delete）。
-- `VesselCheckpointSaver` 以 `taskId` + `threadId` 为 key，把 checkpoint 序列化后写入 `.meta-claw/vessels/<vesselId>/checkpoints/`。
-- 在 `ReactAgentFactory.buildSingleAgent(ctx)` 中为 ReactAgent 配置 saver；多 Agent 场景同样可配置。
-- 新增集成测试：模拟一次被 HITL 中断的 Alibaba 引擎调用，持久化 checkpoint，然后从 checkpoint 恢复。
+- `VesselCheckpointSaver` 以 `vesselId + threadId` 为命名空间，每个 checkpoint 存为 `.meta-claw/vessels/<vesselId>/checkpoints/<threadId>/<checkpointId>.json`。
+- `threadId` 取 `TaskContext.task.sessionId`，缺失时回退到 `taskId`。
+- `vesselId` 通过 `RunnableConfig.metadata` 传入，避免 saver 与 `TaskContext` 耦合。
+- 在 `ReactAgentFactory.buildReactAgent(...)` 中根据 `AlibabaAgentConfig.checkpointEnabled` 注入 saver。
+- 在 `SpringAiAlibabaAgentEngine` 中构造带 `threadId`/`vesselId` 的 `RunnableConfig` 并传给 `agent.call(...)` / `agent.streamMessages(...)` / `flowAgent.invoke(...)`（以实际 API 为准）。
+- `resume()` 默认保持现有手动 tool-result 注入路径，仅把 `RunnableConfig` 传入；可选通过 `AlibabaAgentConfig.checkpointResume=true` 走 SAA checkpoint 恢复。
+- 配置扩展：`AlibabaAgentConfig` 新增 `checkpointEnabled`（默认 true）、`checkpointResume`（默认 false）、`maxCheckpointsPerThread`（默认 100）。
 
-- [ ] **Step 9.1: 调研 `BaseCheckpointSaver` 接口**
+- [ ] **Step 9.1: 扩展 `AlibabaAgentConfig`**
+  - 新增 `checkpointEnabled`、`checkpointResume`、`maxCheckpointsPerThread` 字段。
+  - 更新 Vessel 配置模板，补充 checkpoint 示例。
+
 - [ ] **Step 9.2: 实现 `VesselCheckpointSaver`**
+  - 实现 `BaseCheckpointSaver` 接口。
+  - 使用 Jackson 序列化 `Checkpoint`。
+  - 按 `vesselId/threadId/checkpointId.json` 落盘。
+  - 提供 `clear(String vesselId, String threadId)` 管理方法。
+  - 处理 `put` 时旧 checkpoint 清理（保留最近 N 个）。
+
 - [ ] **Step 9.3: 在 `ReactAgentFactory` 中配置 saver**
-- [ ] **Step 9.4: 新增 checkpoint 恢复测试**
-- [ ] **Step 9.5: 编译验证与 `./init.sh` 全量验证**
-- [ ] **Step 9.6: Commit**
+  - 注入 `VesselCheckpointSaver`。
+  - 在 `buildReactAgent(...)` 中根据 `AlibabaAgentConfig.checkpointEnabled` 调用 `.saver(checkpointSaver)`。
+
+- [ ] **Step 9.4: 改造 `SpringAiAlibabaAgentEngine` 传递 `RunnableConfig`**
+  - 新增 `buildRunnableConfig(TaskContext, boolean resume)`。
+  - `execute()` / `executeStream()` / `resume()` 在调用 SAA Agent 时传入 config。
+  - 注意确认 `Agent.invoke(..., RunnableConfig)` 重载是否存在；不存在时只给 `ReactAgent` 传 config。
+
+- [ ] **Step 9.5: 新增 `VesselCheckpointSaverTest`**
+  - 覆盖 `put/get/list/release/clear`。
+  - 验证多 threadId 隔离、损坏文件容错、旧 checkpoint 清理。
+
+- [ ] **Step 9.6: 新增 `SpringAiAlibabaAgentEngineCheckpointTest`**
+  - Mockito 模拟 `ReactAgentFactory` / `ReactAgent` / `SaaMultiAgentFactory`。
+  - 验证 `execute()` 调用 `agent.call(messages, config)` 时 config 的 `threadId` 等于 sessionId、`metadata` 含 vesselId。
+  - 验证 `checkpointResume=true` 时 `resume()` 调用 `agent.call(..., config.withResume())`。
+
+- [ ] **Step 9.7: 将新增测试纳入 `init.sh` P0 基线**
+  - 在 `-Dtest=` 列表追加 `VesselCheckpointSaverTest` 与 `SpringAiAlibabaAgentEngineCheckpointTest`。
+
+- [ ] **Step 9.8: 编译验证**
+  ```bash
+  mvn clean compile -pl meta-claw-core -am -q
+  ```
+  Expected: `BUILD SUCCESS`。
+
+- [ ] **Step 9.9: 全量验证**
+  ```bash
+  ./init.sh
+  ```
+  Expected: 全仓编译 SUCCESS，P0 测试全部通过（含新增 checkpoint 测试）。
+
+- [ ] **Step 9.10: Commit**
+  ```bash
+  git add meta-claw-core/src/main/java/meta/claw/core/runtime/engine/checkpoint/ \
+          meta-claw-core/src/main/java/meta/claw/core/runtime/engine/ReactAgentFactory.java \
+          meta-claw-core/src/main/java/meta/claw/core/runtime/engine/SpringAiAlibabaAgentEngine.java \
+          meta-claw-core/src/main/java/meta/claw/core/config/VesselConfig.java \
+          meta-claw-core/src/test/java/meta/claw/core/runtime/engine/checkpoint/ \
+          meta-claw-core/src/test/java/meta/claw/core/runtime/engine/SpringAiAlibabaAgentEngineCheckpointTest.java \
+          init.sh
+  git commit -m "feat(engine): add VesselCheckpointSaver for SAA checkpoint persistence (Phase 6)"
+  ```
 
 ---
 

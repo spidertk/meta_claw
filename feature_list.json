@@ -1,6 +1,6 @@
 {
   "project": "meta-claw",
-  "last_updated": "2026-06-16",
+  "last_updated": "2026-06-17",
   "package_structure": {
     "config": "meta.claw.core.config — 所有配置模型 + 加载器 + 解析器",
     "vessel": "meta.claw.core.vessel — Vessel 用户域（Profile + Initializer）",
@@ -878,9 +878,14 @@
           "date": "2026-06-16",
           "result": "passing",
           "detail": "Phase 5 Step 8 实现完成：新增 SaaMultiAgentFactory，按 flow.mode 组装 SequentialAgent / ParallelAgent / LlmRoutingAgent；重构 ReactAgentFactory 拆分 buildSingleAgent / buildSubAgent，支持子 Agent 模型覆盖与工具过滤；改造 SpringAiAlibabaAgentEngine 在 hasAgents() 时走 FlowAgent 路径；新增 SaaMultiAgentFactoryTest（4 个）与 SpringAiAlibabaAgentEngineMultiAgentTest（2 个）并纳入 init.sh P0 基线；./init.sh 全量通过，core 80 个测试全部通过。"
+        },
+        {
+          "date": "2026-06-17",
+          "result": "design_completed",
+          "detail": "Phase 6 详细设计完成：在主设计文档新增 5.10 节，定义 VesselCheckpointSaver 文件持久化方案（vesselId/threadId/checkpointId.json）、RunnableConfig metadata 透传 vesselId、ReactAgentFactory 按需注入 saver、SpringAiAlibabaAgentEngine 传递 threadId/sessionId 作为 RunnableConfig.threadId、resume 手动路径与可选 checkpoint 恢复路径、AlibabaAgentConfig checkpoint 配置扩展、测试策略与风险缓解；同步更新 Phase 3+ 实施计划 Task 9 为可执行步骤清单；设计更新后 ./init.sh 全量通过，core 80 个测试全部通过。"
         }
       ],
-      "notes": "设计文档已落地为 Phase 0+1+2+3+4 代码实现，Phase 5 Step 7 配置模型已完成。AgentEngine.executeStream 返回 Reply 以保持 VesselRuntime 落盘逻辑简单；SAA 流式通过 streamMessages() 驱动 callback，usage 信息当前由 ModelMetricsHook 从 AssistantMessage metadata 最佳 effort 读取；HITL 已在 alibaba 引擎下通过 AFTER_MODEL Hook 实现中断/恢复。下一步进入 Phase 5 Step 8：接入 SAA 多 Agent 模式。当前实现不足点详见主设计文档 1.2 节与 Phase 3+ 实施计划对应章节。"
+      "notes": "设计文档已落地为 Phase 0+1+2+3+4+5 代码实现。AgentEngine.executeStream 返回 Reply 以保持 VesselRuntime 落盘逻辑简单；SAA 流式通过 streamMessages() 驱动 callback，usage 信息当前由 ModelMetricsHook 从 AssistantMessage metadata 最佳 effort 读取；HITL 已在 alibaba 引擎下通过 AFTER_MODEL Hook 实现中断/恢复；多 Agent 编排已接入 Sequential/Parallel/Routing。Phase 6 详细设计已完成（2026-06-17），下一步可按 Phase 3+ 实施计划 Task 9 编码实现 VesselCheckpointSaver。当前实现不足点详见主设计文档 1.2 节与 Phase 3+ 实施计划对应章节。"
     }
   ]
 }

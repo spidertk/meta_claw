@@ -6,8 +6,8 @@
 - 当前架构基线：Java 21 + Maven 多模块仓库；已存在 `meta-claw-core`、`meta-claw-vessel`、`meta-claw-store`、`meta-claw-cli`、`meta-claw-gateway*`、`meta-claw-bootstrap`
 - 标准启动路径：`./init.sh`
 - 标准验证路径：`./init.sh` 先执行全仓编译，再运行初始化阶段 P0 测试集
-- 最近已通过证据：2026-06-16 在真实 Maven 环境中执行新版 `./init.sh`，完成全仓编译并通过 P0 测试集（core 80 个测试全部通过，含 Phase 3/4 Metrics/HITL Hook 测试、Phase 5 Step 7 多 Agent 配置模型测试、Phase 5 Step 8 SAA 多 Agent 调用接入测试）；基于已完成实现更新了主设计文档 `docs/superpowers/specs/2026-06-15-agent-execution-abstraction-design.md` 的进度表、接口清单与资深用户不足点；同步更新了 Phase 3+ 实施计划 `docs/superpowers/plans/2026-06-16-agent-engine-spi-phase3-plus.md`、`feature_list.json` 与本文件
-- 当前最高优先级未完成功能：agent-engine-001（Agent 执行引擎抽象：native / alibaba 双实现设计）Phase 0+1+2+3+4+5 已实现完成；下一步为 Phase 6：`VesselCheckpointSaver` 持久化 SAA thread 状态（可选）或真实 LLM 端到端验证
+- 最近已通过证据：2026-06-16 在真实 Maven 环境中执行新版 `./init.sh`，完成全仓编译并通过 P0 测试集（core 80 个测试全部通过，含 Phase 3/4 Metrics/HITL Hook 测试、Phase 5 Step 7 多 Agent 配置模型测试、Phase 5 Step 8 SAA 多 Agent 调用接入测试）；2026-06-17 完成 Phase 6 详细设计：在主设计文档新增 5.10 节，定义 `VesselCheckpointSaver` 文件持久化方案、`ReactAgentFactory` saver 注入、`SpringAiAlibabaAgentEngine` 的 `RunnableConfig` 传递策略、配置扩展与测试计划；同步更新了 Phase 3+ 实施计划 Task 9、`feature_list.json` 与本文件；设计文档更新后重新执行 `./init.sh` 通过，9 个 reactor 模块全部 SUCCESS，core 80 个测试全部通过
+- 当前最高优先级未完成功能：agent-engine-001（Agent 执行引擎抽象：native / alibaba 双实现设计）Phase 0+1+2+3+4+5 已实现完成；Phase 6 详细设计已完成，下一步为按 Phase 3+ 实施计划 Task 9 编码实现 `VesselCheckpointSaver` 持久化 SAA thread 状态
 - 当前 blocker：
   1. 当前无 blocker
 
@@ -35,6 +35,38 @@
 - `serve/start/stop/restart/status/logs`、工具引擎、MCP、Skill 系统仍未实现
 
 ## 会话记录
+
+### Session 051
+
+- 日期：2026-06-17
+- 本轮目标：完成 Phase 6 详细设计：`VesselCheckpointSaver` 持久化 SAA thread 状态
+- 已完成：
+  - 调研 SAA checkpoint API 事实：`BaseCheckpointSaver` 为接口（非抽象类），`Checkpoint` 含 id/state/nodeId/nextNodeId，`RunnableConfig` 含 threadId/checkPointId 并支持 withResume/withCheckPointId，`ReactAgent.Builder` 支持 `.saver(...)` 与 `.compileConfig(...)`
+  - 设计 `VesselCheckpointSaver`：实现 `BaseCheckpointSaver`，按 `.meta-claw/vessels/<vesselId>/checkpoints/<threadId>/<checkpointId>.json` 落盘，使用 Jackson 序列化，按 threadId 加锁，提供 `clear(vesselId, threadId)` 管理方法
+  - 设计 `RunnableConfig` 传递策略：`threadId` 取 `TaskContext.task.sessionId` 回退到 `taskId`；`vesselId` 通过 `RunnableConfig.metadata` 透传，避免 saver 与 `TaskContext` 耦合
+  - 设计 `ReactAgentFactory` 集成点：注入 `VesselCheckpointSaver`，在 `buildReactAgent(...)` 中根据 `AlibabaAgentConfig.checkpointEnabled` 注册 saver
+  - 设计 `SpringAiAlibabaAgentEngine` 改造：`execute()` / `executeStream()` / `resume()` 调用 SAA Agent 时传入带 `threadId`/`vesselId` 的 `RunnableConfig`；resume 默认保持现有手动 tool-result 注入路径，可选通过 `checkpointResume=true` 走 SAA checkpoint 恢复
+  - 设计配置扩展：`AlibabaAgentConfig` 新增 `checkpointEnabled`（默认 true）、`checkpointResume`（默认 false）、`maxCheckpointsPerThread`（默认 100）
+  - 设计测试策略：`VesselCheckpointSaverTest` 覆盖 put/get/list/release/clear/隔离/清理；`SpringAiAlibabaAgentEngineCheckpointTest` 验证 RunnableConfig threadId 与 vesselId 传递
+  - 更新主设计文档 `docs/superpowers/specs/2026-06-15-agent-execution-abstraction-design.md`：新增 5.10 节，更新 1.1/1.2/7/11/12 章状态
+  - 更新 Phase 3+ 实施计划 `docs/superpowers/plans/2026-06-16-agent-engine-spi-phase3-plus.md`：重写 Task 9 为可执行步骤清单
+  - 更新 `feature_list.json` 与 `claude-progress.md` 记录设计完成状态
+- 运行过的验证：
+  - `./init.sh`（真实环境，Java 21）→ 成功；9 个 reactor 模块全部 SUCCESS，core 80 个测试全部通过。设计阶段未改动代码，仅更新文档，仓库基线保持干净。
+- 已记录证据：
+  - `feature_list.json` 的 `agent-engine-001` 已补充 Phase 6 设计完成证据
+  - 主设计文档与 Phase 3+ 实施计划已更新
+- 更新过的文件或工件：
+  - `docs/superpowers/specs/2026-06-15-agent-execution-abstraction-design.md`
+  - `docs/superpowers/plans/2026-06-16-agent-engine-spi-phase3-plus.md`
+  - `feature_list.json`
+  - `claude-progress.md`
+- 已知风险或未解决的问题：
+  - SAA `Agent.invoke(..., RunnableConfig)` 重载是否存在需编码时确认；若不存在，FlowAgent 暂不支持 checkpoint，单 ReactAgent 仍可工作
+  - Checkpoint 恢复路径（`config.withResume()`）与现有手动 resume 的兼容性需实际集成测试验证
+- 下一步最佳动作：
+  1. 按 Phase 3+ 实施计划 Task 9 编码实现 `VesselCheckpointSaver`
+  2. 运行 `./init.sh` 全量验证
 
 ### Session 050
 
