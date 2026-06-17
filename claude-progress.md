@@ -6,8 +6,8 @@
 - 当前架构基线：Java 21 + Maven 多模块仓库；已存在 `meta-claw-core`、`meta-claw-vessel`、`meta-claw-store`、`meta-claw-cli`、`meta-claw-gateway*`、`meta-claw-bootstrap`
 - 标准启动路径：`./init.sh`
 - 标准验证路径：`./init.sh` 先执行全仓编译，再运行初始化阶段 P0 测试集
-- 最近已通过证据：2026-06-16 在真实 Maven 环境中执行新版 `./init.sh`，完成全仓编译并通过 P0 测试集（core 80 个测试全部通过，含 Phase 3/4 Metrics/HITL Hook 测试、Phase 5 Step 7 多 Agent 配置模型测试、Phase 5 Step 8 SAA 多 Agent 调用接入测试）；2026-06-17 完成 Phase 6 详细设计：在主设计文档新增 5.10 节，定义 `VesselCheckpointSaver` 文件持久化方案、`ReactAgentFactory` saver 注入、`SpringAiAlibabaAgentEngine` 的 `RunnableConfig` 传递策略、配置扩展与测试计划；同步更新了 Phase 3+ 实施计划 Task 9、`feature_list.json` 与本文件；设计文档更新后重新执行 `./init.sh` 通过，9 个 reactor 模块全部 SUCCESS，core 80 个测试全部通过
-- 当前最高优先级未完成功能：agent-engine-001（Agent 执行引擎抽象：native / alibaba 双实现设计）Phase 0+1+2+3+4+5 已实现完成；Phase 6 详细设计已完成，下一步为按 Phase 3+ 实施计划 Task 9 编码实现 `VesselCheckpointSaver` 持久化 SAA thread 状态
+- 最近已通过证据：2026-06-17 完成 Phase 6 实现：`AlibabaAgentConfig` 新增 checkpoint 字段，新增 `VesselCheckpointSaver` 实现 `BaseCheckpointSaver` 文件持久化，`ReactAgentFactory` 按需注入 saver，`SpringAiAlibabaAgentEngine` 在 execute/executeStream/resume 中传递带 `threadId`/`vesselId` 的 `RunnableConfig`；新增 `VesselCheckpointSaverTest`（11 个）与 `SpringAiAlibabaAgentEngineCheckpointTest`（5 个）并纳入 `init.sh` P0 基线；同步更新既有测试 mock 适配带 `RunnableConfig` 的方法签名；重新执行 `./init.sh` 通过，9 个 reactor 模块全部 SUCCESS，core 96 个测试全部通过
+- 当前最高优先级未完成功能：agent-engine-001（Agent 执行引擎抽象：native / alibaba 双实现设计）Phase 0+1+2+3+4+5+6 已全部实现完成；下一步为真实 LLM 端到端验证或处理其他优先级功能
 - 当前 blocker：
   1. 当前无 blocker
 
@@ -35,6 +35,47 @@
 - `serve/start/stop/restart/status/logs`、工具引擎、MCP、Skill 系统仍未实现
 
 ## 会话记录
+
+### Session 052
+
+- 日期：2026-06-17
+- 本轮目标：按 Phase 6 详细设计编码实现 `VesselCheckpointSaver` 持久化 SAA thread 状态
+- 已完成：
+  - 扩展 `AlibabaAgentConfig`：新增 `checkpointEnabled`（默认 true）、`checkpointResume`（默认 false）、`maxCheckpointsPerThread`（默认 100）
+  - 实现 `VesselCheckpointSaver`：实现 `BaseCheckpointSaver` 接口，按 `.meta-claw/vessels/<vesselId>/checkpoints/<threadId>/<checkpointId>.json` 落盘，支持 list/get/put/release/clear、thread/vessel 隔离、旧 checkpoint 清理、损坏文件容错
+  - 改造 `ReactAgentFactory`：注入 `BaseCheckpointSaver`，按 `AlibabaAgentConfig.checkpointEnabled` 注册到 `ReactAgent.builder().saver(...)`
+  - 改造 `SpringAiAlibabaAgentEngine`：新增 `buildRunnableConfig()`，在 `execute()` / `executeStream()` / `resume()` 中向 SAA Agent 传递带 `threadId` / `vesselId` / `maxCheckpointsPerThread` 的 `RunnableConfig`；`resume()` 支持 `checkpointResume=true` 时调用 `builder.resume()`
+  - 新增 `VesselCheckpointSaverTest`（11 个用例）覆盖 put/get/list/release、thread/vessel 隔离、clear、旧 checkpoint 清理、损坏文件容错
+  - 新增 `SpringAiAlibabaAgentEngineCheckpointTest`（5 个用例）验证 execute/executeStream/resume 传递的 `RunnableConfig` 包含正确 threadId、vesselId、maxCheckpointsPerThread
+  - 更新 `SpringAiAlibabaAgentEngineTest`、`SpringAiAlibabaAgentEngineStreamTest`、`SpringAiAlibabaAgentEngineMultiAgentTest` 的 mock，适配带 `RunnableConfig` 的 `call(...)` / `streamMessages(...)` / `invoke(...)` 签名
+  - 将新增测试纳入 `init.sh` P0 基线（第 13 行与第 51 行同步更新）
+  - 更新 `feature_list.json` 与 `claude-progress.md` 记录 Phase 6 实现完成
+- 运行过的验证：
+  - `mvn clean compile -pl meta-claw-core -am -q` → 成功
+  - 定向测试：`VesselCheckpointSaverTest`（11/11）、`SpringAiAlibabaAgentEngineCheckpointTest`（5/5）、`SpringAiAlibabaAgentEngineTest`、`SpringAiAlibabaAgentEngineStreamTest`、`SpringAiAlibabaAgentEngineMultiAgentTest` → 全部通过
+  - `./init.sh`（真实环境，Java 21）→ 成功；9 个 reactor 模块全部 SUCCESS，core 96 个测试全部通过
+- 已记录证据：
+  - `feature_list.json` 的 `agent-engine-001` 已补充 Phase 6 实现完成证据
+  - 主设计文档与 Phase 3+ 实施计划已在前一轮（Session 051）完成设计更新
+- 更新过的文件或工件：
+  - `meta-claw-core/src/main/java/meta/claw/core/config/VesselConfig.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/runtime/engine/checkpoint/VesselCheckpointSaver.java`（新增）
+  - `meta-claw-core/src/main/java/meta/claw/core/runtime/engine/ReactAgentFactory.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/runtime/engine/SpringAiAlibabaAgentEngine.java`
+  - `meta-claw-core/src/test/java/meta/claw/core/runtime/engine/checkpoint/VesselCheckpointSaverTest.java`（新增）
+  - `meta-claw-core/src/test/java/meta/claw/core/runtime/engine/SpringAiAlibabaAgentEngineCheckpointTest.java`（新增）
+  - `meta-claw-core/src/test/java/meta/claw/core/runtime/engine/SpringAiAlibabaAgentEngineTest.java`
+  - `meta-claw-core/src/test/java/meta/claw/core/runtime/engine/SpringAiAlibabaAgentEngineStreamTest.java`
+  - `meta-claw-core/src/test/java/meta/claw/core/runtime/engine/SpringAiAlibabaAgentEngineMultiAgentTest.java`
+  - `init.sh`
+  - `feature_list.json`
+  - `claude-progress.md`
+- 已知风险或未解决的问题：
+  - SAA checkpoint 恢复路径（`config.resume()`）尚未经真实 LLM 调用验证，当前仅通过单元测试确认 `RunnableConfig` 构造正确
+  - 多 Agent FlowAgent 级 checkpoint 行为依赖 SAA 内部实现，当前单测仅验证 `RunnableConfig` 被传入
+- 下一步最佳动作：
+  1. 提交本轮修改
+  2. 由用户决定下一项优先级（真实 LLM 端到端验证、可选深化 ExecutableTool SPI，或其他功能）
 
 ### Session 051
 

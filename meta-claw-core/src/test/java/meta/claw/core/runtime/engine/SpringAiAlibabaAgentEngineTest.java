@@ -1,5 +1,6 @@
 package meta.claw.core.runtime.engine;
 
+import com.alibaba.cloud.ai.graph.RunnableConfig;
 import com.alibaba.cloud.ai.graph.agent.ReactAgent;
 import meta.claw.core.config.ProviderConfig;
 import meta.claw.core.config.bundle.VesselConfigBundle;
@@ -26,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doReturn;
@@ -46,7 +48,7 @@ class SpringAiAlibabaAgentEngineTest {
         ReactAgentFactory factory = mock(ReactAgentFactory.class);
         ReactAgent agent = mock(ReactAgent.class);
         when(factory.get(anyTaskContext())).thenReturn(agent);
-        doReturn(new AssistantMessage("hello from alibaba")).when(agent).call(anyList());
+        doReturn(new AssistantMessage("hello from alibaba")).when(agent).call(anyList(), any(RunnableConfig.class));
         ReflectionTestUtils.setField(engine, "reactAgentFactory", factory);
 
         TaskContext ctx = dummyContext();
@@ -70,7 +72,7 @@ class SpringAiAlibabaAgentEngineTest {
         ReactAgentFactory factory = mock(ReactAgentFactory.class);
         ReactAgent agent = mock(ReactAgent.class);
         when(factory.get(anyTaskContext())).thenReturn(agent);
-        doReturn(new AssistantMessage("final answer")).when(agent).call(anyList());
+        doReturn(new AssistantMessage("final answer")).when(agent).call(anyList(), any(RunnableConfig.class));
         ReflectionTestUtils.setField(engine, "reactAgentFactory", factory);
 
         ToolCallback callback = mock(ToolCallback.class);

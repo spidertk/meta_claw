@@ -165,5 +165,11 @@ public class VesselConfig {
         private int maxParallelTools = 5;
         /** 是否返回 reasoning_content */
         private boolean returnReasoningContents = true;
+        /** 是否启用 SAA checkpoint 持久化 */
+        private boolean checkpointEnabled = true;
+        /** 是否通过 SAA checkpoint 恢复 resume */
+        private boolean checkpointResume = false;
+        /** 每个 threadId 最多保留的 checkpoint 数量 */
+        private int maxCheckpointsPerThread = 100;
     }
 }

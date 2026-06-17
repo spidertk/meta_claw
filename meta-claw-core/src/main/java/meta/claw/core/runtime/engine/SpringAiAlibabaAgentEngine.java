@@ -1,6 +1,7 @@
 package meta.claw.core.runtime.engine;
 
 import com.alibaba.cloud.ai.graph.OverAllState;
+import com.alibaba.cloud.ai.graph.RunnableConfig;
 import com.alibaba.cloud.ai.graph.agent.Agent;
 import com.alibaba.cloud.ai.graph.agent.ReactAgent;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -47,11 +48,12 @@ public class SpringAiAlibabaAgentEngine implements AgentEngine {
     @Override
     public Reply execute(TaskContext ctx, SpiChatRequest request) {
         List<Message> messages = SpiMessageConverter.toSpringMessages(request.getMessages());
+        RunnableConfig config = buildRunnableConfig(ctx, false);
 
         if (ctx.getProfile().getBundle().hasAgents()) {
             Agent flowAgent = multiAgentFactory.get(ctx);
             try {
-                Optional<OverAllState> state = flowAgent.invoke(messages);
+                Optional<OverAllState> state = flowAgent.invoke(messages, config);
                 String text = state.map(this::extractTextFromState).orElse("");
                 return new Reply(ReplyType.TEXT, text);
             } catch (com.alibaba.cloud.ai.graph.exception.GraphRunnerException e) {
@@ -61,7 +63,7 @@ public class SpringAiAlibabaAgentEngine implements AgentEngine {
 
         ReactAgent agent = reactAgentFactory.get(ctx);
         try {
-            AssistantMessage result = agent.call(messages);
+            AssistantMessage result = agent.call(messages, config);
             return new Reply(ReplyType.TEXT, result.getText());
         } catch (com.alibaba.cloud.ai.graph.exception.GraphRunnerException e) {
             throw new RuntimeException("Alibaba agent execution failed: " + e.getMessage(), e);
@@ -74,10 +76,11 @@ public class SpringAiAlibabaAgentEngine implements AgentEngine {
                 ? multiAgentFactory.get(ctx)
                 : reactAgentFactory.get(ctx);
         List<Message> messages = SpiMessageConverter.toSpringMessages(request.getMessages());
-        return streamAgentMessages(agent, messages, callback);
+        RunnableConfig config = buildRunnableConfig(ctx, false);
+        return streamAgentMessages(agent, messages, config, callback);
     }
 
-    private Reply streamAgentMessages(Agent agent, List<Message> messages, SpiStreamingCallback callback) {
+    private Reply streamAgentMessages(Agent agent, List<Message> messages, RunnableConfig config, SpiStreamingCallback callback) {
         callback.onStart();
 
         StringBuilder contentBuilder = new StringBuilder();
@@ -86,7 +89,7 @@ public class SpringAiAlibabaAgentEngine implements AgentEngine {
         ObjectMapper objectMapper = new ObjectMapper();
 
         try {
-            agent.streamMessages(messages)
+            agent.streamMessages(messages, config)
                     .doOnNext(message -> handleStreamMessage(message, callback, contentBuilder,
                             reasoningBuilder, lastAssistantRef, objectMapper))
                     .doOnError(callback::onError)
@@ -191,6 +194,7 @@ public class SpringAiAlibabaAgentEngine implements AgentEngine {
     public Reply resume(TaskContext ctx, SpiChatRequest request,
                         ApprovalTicket ticket, ApprovalResolution resolution) {
         ReactAgent agent = reactAgentFactory.get(ctx);
+        boolean checkpointResume = ctx.getProfile().getBundle().getAlibabaAgentConfig().isCheckpointResume();
 
         List<SpiMessage> messages = new ArrayList<>(request.getMessages());
         ToolSubSystem toolSubSystem = ctx.getSubSystem("tool");
@@ -204,12 +208,36 @@ public class SpringAiAlibabaAgentEngine implements AgentEngine {
         }
 
         List<Message> springMessages = SpiMessageConverter.toSpringMessages(messages);
+        RunnableConfig config = buildRunnableConfig(ctx, checkpointResume);
         try {
-            AssistantMessage result = agent.call(springMessages);
+            AssistantMessage result = agent.call(springMessages, config);
             return new Reply(ReplyType.TEXT, result.getText());
         } catch (com.alibaba.cloud.ai.graph.exception.GraphRunnerException e) {
             throw new RuntimeException("Alibaba agent resume failed: " + e.getMessage(), e);
         }
+    }
+
+    private RunnableConfig buildRunnableConfig(TaskContext ctx, boolean resume) {
+        String sessionId = ctx.getTask().getSessionId();
+        String taskId = ctx.getTask().getTaskId();
+        String threadId = (sessionId != null && !sessionId.isBlank()) ? sessionId : taskId;
+        if (threadId == null || threadId.isBlank()) {
+            threadId = "$default";
+        }
+        String vesselId = ctx.getProfile().getBundle().getVesselId();
+        if (vesselId == null || vesselId.isBlank()) {
+            vesselId = "default";
+        }
+        int maxCheckpoints = ctx.getProfile().getBundle().getAlibabaAgentConfig().getMaxCheckpointsPerThread();
+
+        RunnableConfig.Builder builder = RunnableConfig.builder()
+                .threadId(threadId)
+                .addMetadata("vesselId", vesselId)
+                .addMetadata("maxCheckpointsPerThread", maxCheckpoints);
+        if (resume) {
+            builder.resume();
+        }
+        return builder.build();
     }
 
     private String executeToolCall(ToolSubSystem toolSubSystem, ApprovalItem item) {

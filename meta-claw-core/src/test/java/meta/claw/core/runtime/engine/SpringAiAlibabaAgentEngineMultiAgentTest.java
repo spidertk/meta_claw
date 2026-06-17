@@ -1,6 +1,7 @@
 package meta.claw.core.runtime.engine;
 
 import com.alibaba.cloud.ai.graph.OverAllState;
+import com.alibaba.cloud.ai.graph.RunnableConfig;
 import com.alibaba.cloud.ai.graph.agent.Agent;
 import com.alibaba.cloud.ai.graph.exception.GraphRunnerException;
 import meta.claw.core.config.AgentFlowConfig;
@@ -29,6 +30,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -47,7 +49,7 @@ class SpringAiAlibabaAgentEngineMultiAgentTest {
         Map<String, Object> stateData = new HashMap<>();
         stateData.put("messages", List.of(new AssistantMessage("multi agent result")));
         OverAllState state = new OverAllState(stateData);
-        when(flowAgent.invoke(anyList())).thenReturn(Optional.of(state));
+        when(flowAgent.invoke(anyList(), any(RunnableConfig.class))).thenReturn(Optional.of(state));
 
         TaskContext ctx = dummyContextWithAgents();
         SpiChatRequest request = SpiChatRequest.builder()
@@ -70,7 +72,7 @@ class SpringAiAlibabaAgentEngineMultiAgentTest {
         when(multiAgentFactory.get(anyTaskContext())).thenReturn(flowAgent);
         ReflectionTestUtils.setField(engine, "multiAgentFactory", multiAgentFactory);
 
-        when(flowAgent.streamMessages(anyList())).thenReturn(Flux.just(
+        when(flowAgent.streamMessages(anyList(), any(RunnableConfig.class))).thenReturn(Flux.just(
                 new AssistantMessage("multi "),
                 new AssistantMessage("stream")
         ));

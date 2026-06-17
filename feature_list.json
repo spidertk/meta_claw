@@ -882,10 +882,15 @@
         {
           "date": "2026-06-17",
           "result": "design_completed",
-          "detail": "Phase 6 详细设计完成：在主设计文档新增 5.10 节，定义 VesselCheckpointSaver 文件持久化方案（vesselId/threadId/checkpointId.json）、RunnableConfig metadata 透传 vesselId、ReactAgentFactory 按需注入 saver、SpringAiAlibabaAgentEngine 传递 threadId/sessionId 作为 RunnableConfig.threadId、resume 手动路径与可选 checkpoint 恢复路径、AlibabaAgentConfig checkpoint 配置扩展、测试策略与风险缓解；同步更新 Phase 3+ 实施计划 Task 9 为可执行步骤清单；设计更新后 ./init.sh 全量通过，core 80 个测试全部通过。"
+          "detail": "Phase 6 详细设计完成：在主设计文档新增 5.10 节，定义 VesselCheckpointSaver 文件持久化方案（vesselId/threadId/checkpointId.json）、RunnableConfig metadata 透传 vesselId、ReactAgentFactory 按需注入 saver、SpringAiAlibabaAgentEngine 传递 threadId/sessionId 作为 RunnableConfig.threadId、resume 手动路径与可选 checkpoint 恢复路径、AlibabaAgentConfig checkpoint 配置扩展、测试策略与风险缓解；同步更新 Phase 3+ 实施计划 Task 9 为可执行步骤清单。"
+        },
+        {
+          "date": "2026-06-17",
+          "result": "passing",
+          "detail": "Phase 6 实现完成：AlibabaAgentConfig 新增 checkpointEnabled / checkpointResume / maxCheckpointsPerThread；新增 VesselCheckpointSaver 实现 BaseCheckpointSaver，按 vesselId/threadId/checkpointId.json 落盘，支持 list/get/put/release/clear 与旧 checkpoint 清理；ReactAgentFactory 按 checkpointEnabled 注入 saver；SpringAiAlibabaAgentEngine 在 execute/executeStream/resume 中传递带 threadId/vesselId/maxCheckpointsPerThread 的 RunnableConfig，resume 支持 checkpointResume=true 走 SAA checkpoint 恢复；新增 VesselCheckpointSaverTest（11 个）与 SpringAiAlibabaAgentEngineCheckpointTest（5 个）；同步更新 SpringAiAlibabaAgentEngineTest / StreamTest / MultiAgentTest mock 以适配带 RunnableConfig 的方法签名；将新增测试纳入 init.sh P0 基线；./init.sh 全量通过，core 96 个测试全部通过。"
         }
       ],
-      "notes": "设计文档已落地为 Phase 0+1+2+3+4+5 代码实现。AgentEngine.executeStream 返回 Reply 以保持 VesselRuntime 落盘逻辑简单；SAA 流式通过 streamMessages() 驱动 callback，usage 信息当前由 ModelMetricsHook 从 AssistantMessage metadata 最佳 effort 读取；HITL 已在 alibaba 引擎下通过 AFTER_MODEL Hook 实现中断/恢复；多 Agent 编排已接入 Sequential/Parallel/Routing。Phase 6 详细设计已完成（2026-06-17），下一步可按 Phase 3+ 实施计划 Task 9 编码实现 VesselCheckpointSaver。当前实现不足点详见主设计文档 1.2 节与 Phase 3+ 实施计划对应章节。"
+      "notes": "AgentEngine SPI Phase 0+1+2+3+4+5+6 已全部实现完成。AgentEngine.executeStream 返回 Reply 以保持 VesselRuntime 落盘逻辑简单；SAA 流式通过 streamMessages() 驱动 callback，usage 信息当前由 ModelMetricsHook 从 AssistantMessage metadata 最佳 effort 读取；HITL 已在 alibaba 引擎下通过 AFTER_MODEL Hook 实现中断/恢复；多 Agent 编排已接入 Sequential/Parallel/Routing；SAA checkpoint 已通过 VesselCheckpointSaver 持久化到文件系统，进程重启后可从 checkpoint 恢复。当前实现不足点详见主设计文档 1.2 节与 Phase 3+ 实施计划对应章节。"
     }
   ]
 }

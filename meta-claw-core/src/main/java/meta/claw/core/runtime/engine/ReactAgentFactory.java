@@ -1,6 +1,7 @@
 package meta.claw.core.runtime.engine;
 
 import com.alibaba.cloud.ai.graph.agent.ReactAgent;
+import com.alibaba.cloud.ai.graph.checkpoint.BaseCheckpointSaver;
 import meta.claw.core.config.ProviderConfig;
 import meta.claw.core.config.VesselAgentConfig;
 import meta.claw.core.config.bundle.VesselConfigBundle;
@@ -34,6 +35,9 @@ public class ReactAgentFactory {
 
     @Autowired(required = false)
     private MetricsRecorder metricsRecorder;
+
+    @Autowired(required = false)
+    private BaseCheckpointSaver checkpointSaver;
 
     public ReactAgent get(TaskContext ctx) {
         return buildSingleAgent(ctx);
@@ -79,14 +83,22 @@ public class ReactAgentFactory {
         MetaClawModelMetricsHook modelMetricsHook = new MetaClawModelMetricsHook(ctx, metricsRecorder);
         MetaClawHitlHook hitlHook = new MetaClawHitlHook(ctx);
 
-        return ReactAgent.builder()
+        var bundle = ctx.getProfile().getBundle();
+        boolean checkpointEnabled = bundle.getAlibabaAgentConfig().isCheckpointEnabled();
+
+        var builder = ReactAgent.builder()
                 .name(name)
                 .description(description)
                 .model(chatModel)
                 .systemPrompt(systemPrompt)
                 .tools(toolCallbacks.toArray(new ToolCallback[0]))
-                .hooks(agentMetricsHook, modelMetricsHook, hitlHook)
-                .build();
+                .hooks(agentMetricsHook, modelMetricsHook, hitlHook);
+
+        if (checkpointEnabled && checkpointSaver != null) {
+            builder.saver(checkpointSaver);
+        }
+
+        return builder.build();
     }
 
     private ProviderConfig resolveProviderConfig(VesselConfigBundle bundle, String subAgentModel) {

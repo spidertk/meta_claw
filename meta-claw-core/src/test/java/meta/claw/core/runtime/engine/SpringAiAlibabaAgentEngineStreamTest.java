@@ -21,8 +21,10 @@ import reactor.core.publisher.Flux;
 import java.util.List;
 import java.util.Map;
 
+import com.alibaba.cloud.ai.graph.RunnableConfig;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.mock;
@@ -37,7 +39,7 @@ class SpringAiAlibabaAgentEngineStreamTest {
         ReactAgentFactory factory = mock(ReactAgentFactory.class);
         ReactAgent agent = mock(ReactAgent.class);
         when(factory.get(anyTaskContext())).thenReturn(agent);
-        when(agent.streamMessages(anyList())).thenReturn(Flux.just(
+        when(agent.streamMessages(anyList(), any(RunnableConfig.class))).thenReturn(Flux.just(
                 new AssistantMessage("Hello "),
                 new AssistantMessage("world!")
         ));
@@ -74,7 +76,7 @@ class SpringAiAlibabaAgentEngineStreamTest {
                 .content("")
                 .toolCalls(List.of(toolCall))
                 .build();
-        when(agent.streamMessages(anyList())).thenReturn(Flux.just(assistantWithTool));
+        when(agent.streamMessages(anyList(), any(RunnableConfig.class))).thenReturn(Flux.just(assistantWithTool));
         ReflectionTestUtils.setField(engine, "reactAgentFactory", factory);
 
         TaskContext ctx = dummyContext();
@@ -103,7 +105,7 @@ class SpringAiAlibabaAgentEngineStreamTest {
                 .content("2")
                 .properties(Map.of("reasoningContent", "1 + 1 = 2"))
                 .build();
-        when(agent.streamMessages(anyList())).thenReturn(Flux.just(reasoningMessage));
+        when(agent.streamMessages(anyList(), any(RunnableConfig.class))).thenReturn(Flux.just(reasoningMessage));
         ReflectionTestUtils.setField(engine, "reactAgentFactory", factory);
 
         TaskContext ctx = dummyContext();
