@@ -43,7 +43,7 @@ identity:
 llm:
   # 使用的 provider 名称，必须对应全局 config.yaml 中 providers 下的某个 key
   # → 映射到 VesselConfig.LlmConfig.provider
-  provider: openapi
+  provider: openai
   # 模型名称（~ 表示使用全局配置的默认模型）
   # → 映射到 VesselConfig.LlmConfig.model
   model: ~

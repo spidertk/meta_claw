@@ -73,27 +73,31 @@ public class VesselConfigBundle {
     // ── Profile 便捷访问 ──
 
     public String getIdentity() {
-        return vesselProfile != null ? vesselProfile.getIdentity() : "";
+        return stringValue(vesselProfile != null ? vesselProfile.getIdentity() : null);
     }
 
     public String getSoul() {
-        return vesselProfile != null ? vesselProfile.getSoul() : "";
+        return stringValue(vesselProfile != null ? vesselProfile.getSoul() : null);
     }
 
     public String getCapabilities() {
-        return vesselProfile != null ? vesselProfile.getCapabilities() : "";
+        return stringValue(vesselProfile != null ? vesselProfile.getCapabilities() : null);
     }
 
     public String getGuidelines() {
-        return vesselProfile != null ? vesselProfile.getGuidelines() : "";
+        return stringValue(vesselProfile != null ? vesselProfile.getGuidelines() : null);
     }
 
     public String getDomainKnowledge() {
-        return vesselProfile != null ? vesselProfile.getDomainKnowledge() : "";
+        return stringValue(vesselProfile != null ? vesselProfile.getDomainKnowledge() : null);
     }
 
     public String getPreferences() {
-        return vesselProfile != null ? vesselProfile.getPreferences() : "";
+        return stringValue(vesselProfile != null ? vesselProfile.getPreferences() : null);
+    }
+
+    private String stringValue(String value) {
+        return value != null ? value : "";
     }
 
     // ── Runtime 便捷访问 ──

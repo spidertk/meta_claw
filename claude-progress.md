@@ -6,7 +6,7 @@
 - 当前架构基线：Java 21 + Maven 多模块仓库；已存在 `meta-claw-core`、`meta-claw-vessel`、`meta-claw-store`、`meta-claw-cli`、`meta-claw-gateway*`、`meta-claw-bootstrap`
 - 标准启动路径：`./init.sh`
 - 标准验证路径：`./init.sh` 先执行全仓编译，再运行初始化阶段 P0 测试集
-- 最近已通过证据：2026-06-17 完成 Phase 6 实现：`AlibabaAgentConfig` 新增 checkpoint 字段，新增 `VesselCheckpointSaver` 实现 `BaseCheckpointSaver` 文件持久化，`ReactAgentFactory` 按需注入 saver，`SpringAiAlibabaAgentEngine` 在 execute/executeStream/resume 中传递带 `threadId`/`vesselId` 的 `RunnableConfig`；新增 `VesselCheckpointSaverTest`（11 个）与 `SpringAiAlibabaAgentEngineCheckpointTest`（5 个）并纳入 `init.sh` P0 基线；同步更新既有测试 mock 适配带 `RunnableConfig` 的方法签名；重新执行 `./init.sh` 通过，9 个 reactor 模块全部 SUCCESS，core 96 个测试全部通过
+- 最近已通过证据：2026-06-19 修复 `VesselProfile.promptVars()` NPE：`VesselConfigBundle` 的 profile 字段访问方法（getIdentity / getSoul / getCapabilities / getGuidelines / getDomainKnowledge / getPreferences）未处理 `VesselProfile.getSection()` 返回 null 的情况，导致 `Map.of(...)` 因含 null 值抛出 NullPointerException；已统一将 null 转换为空字符串；重新执行 `./init.sh` 通过，9 个 reactor 模块全部 SUCCESS，core 96 个测试全部通过
 - 当前最高优先级未完成功能：agent-engine-001（Agent 执行引擎抽象：native / alibaba 双实现设计）Phase 0+1+2+3+4+5+6 已全部实现完成；下一步为真实 LLM 端到端验证或处理其他优先级功能
 - 当前 blocker：
   1. 当前无 blocker
@@ -35,6 +35,34 @@
 - `serve/start/stop/restart/status/logs`、工具引擎、MCP、Skill 系统仍未实现
 
 ## 会话记录
+
+### Session 053
+
+- 日期：2026-06-19
+- 本轮目标：修复启动与运行中的两个阻塞问题
+- 问题 1：Spring Boot 启动失败：`HitlSubSystem` 中 `HitlGate` 注入歧义
+  - 触发场景：启动应用时 Spring 发现两个 `HitlGate` 实现 bean：`cliHitlGate`（`meta-claw-cli`）与 `inMemoryHitlGate`（`meta-claw-core`），导致 `Field hitlGate in HitlSubSystem required a single bean, but 2 were found`
+  - 根因：`InMemoryHitlGate` 无条件 `@Component`，与 `CliHitlGate`（`@ConditionalOnProperty(name = "meta.claw.channel", havingValue = "cli", matchIfMissing = true)`）在 CLI 场景同时满足条件。
+  - 修复：为 `InMemoryHitlGate` 增加 `@ConditionalOnMissingBean(HitlGate.class)`，使其作为默认兜底实现；当存在更具体的 `CliHitlGate` 时自动退让。
+- 问题 2：CLI chat 运行时报 `NullPointerException`
+  - 触发场景：`VesselProfile.promptVars()` 调用 `Map.of(...)` 构建 prompt 变量，但 `VesselConfigBundle.getIdentity()` 等方法会返回 null（当 `VesselProfile` 的 sections 中不存在对应 key 时）。
+  - 根因：`VesselConfigBundle` 的 profile 字段访问方法只检查了 `vesselProfile != null`，未处理 `vesselProfile.getSection(...)` 返回 null 的情况。
+  - 修复：在 `VesselConfigBundle` 中新增 `stringValue(String)` 辅助方法，将 `getIdentity()` / `getSoul()` / `getCapabilities()` / `getGuidelines()` / `getDomainKnowledge()` / `getPreferences()` 的返回值统一从 null 转换为空字符串。
+- 运行过的验证：
+  - `./init.sh`（真实环境，Java 21）→ 成功；9 个 reactor 模块全部 SUCCESS，core 96 个测试全部通过
+- 已记录证据：
+  - 本文件已更新修复记录
+  - `feature_list.json` 的 `hitl-001` 已补充 `InMemoryHitlGate` 修复记录
+- 更新过的文件或工件：
+  - `meta-claw-core/src/main/java/meta/claw/core/runtime/hitl/InMemoryHitlGate.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/config/bundle/VesselConfigBundle.java`
+  - `claude-progress.md`
+  - `feature_list.json`
+- 已知风险或未解决的问题：
+  - `init.sh` 当前不直接启动 Spring Boot 应用，建议用户再手动启动一次 CLI / Bootstrap 确认两个问题都已消除
+- 下一步最佳动作：
+  1. 提交本轮修复
+  2. 由用户确认真实 CLI chat 是否恢复正常
 
 ### Session 052
 

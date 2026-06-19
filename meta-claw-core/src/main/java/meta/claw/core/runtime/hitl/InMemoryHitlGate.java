@@ -1,5 +1,6 @@
 package meta.claw.core.runtime.hitl;
 
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
@@ -12,6 +13,7 @@ import java.util.concurrent.ConcurrentHashMap;
      * 后，通过其他线程调用 {@link #resolve(String, ApprovalResolution)} 完成审批。</p>
  */
 @Component
+@ConditionalOnMissingBean(HitlGate.class)
 public class InMemoryHitlGate implements HitlGate {
 
     private final Map<String, CompletableFuture<ApprovalResolution>> pending = new ConcurrentHashMap<>();

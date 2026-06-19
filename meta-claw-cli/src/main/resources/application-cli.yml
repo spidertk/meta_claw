@@ -48,3 +48,7 @@ logging:
     org.springframework.ai.chat.observation: WARN
     # meta.claw 包日志由 ~/.meta-claw/config.yaml 中的 log.debug 控制
     meta.claw: ${META_CLAW_LOG_LEVEL:INFO}
+
+meta:
+  claw:
+    channel: cli

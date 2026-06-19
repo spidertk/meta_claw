@@ -1,6 +1,6 @@
 {
   "project": "meta-claw",
-  "last_updated": "2026-06-17",
+  "last_updated": "2026-06-19",
   "package_structure": {
     "config": "meta.claw.core.config — 所有配置模型 + 加载器 + 解析器",
     "vessel": "meta.claw.core.vessel — Vessel 用户域（Profile + Initializer）",
@@ -83,9 +83,14 @@
           "date": "2026-05-15",
           "result": "historical_test_report",
           "detail": "target/surefire-reports 显示 VesselManagerTest 4/4、VesselConfigLoaderTest 2/2 通过。"
+        },
+        {
+          "date": "2026-06-19",
+          "result": "passing",
+          "detail": "修复 VesselConfigBundle 中 profile 字段访问方法返回 null 导致 VesselProfile.promptVars() 在 Map.of(...) 中抛 NullPointerException 的问题；统一将 null 转换为空字符串；./init.sh 全量通过。"
         }
       ],
-      "notes": "该能力按当前代码可视为已实现；但本轮没有重新执行 Maven 测试。"
+      "notes": "该能力按当前代码可视为已实现；但本轮没有重新执行 Maven 测试。2026-06-19 修复 VesselConfigBundle profile 访问方法的 null 安全问题。"
     },
     {
       "id": "prompt-001",
@@ -688,9 +693,14 @@
           "date": "2026-06-12",
           "result": "passing",
           "detail": "新增 HITL 值对象、策略、Gate、HitlSubSystem、HitlSuspendedException；AgentExecutor 与 VesselRuntime 支持 resume；新增 StreamingAgentExecutor 与 LlmClientManager.streamWithTools()，将 HITL 集成到流式路径；ChatCommand 处理 onHitlSuspend；新增 ConfigurableHitlPolicyTest、HitlSubSystemTest、AgentExecutorHitlTest、StreamingAgentExecutorTest；./init.sh 9 个 reactor 模块全部 SUCCESS。"
+        },
+        {
+          "date": "2026-06-19",
+          "result": "passing",
+          "detail": "修复启动失败：HitlSubSystem 按类型注入 HitlGate 时同时发现 InMemoryHitlGate 与 CliHitlGate 两个 bean。为 InMemoryHitlGate 增加 @ConditionalOnMissingBean(HitlGate.class)，使其在 CLI 场景自动退让给 CliHitlGate；./init.sh 全量通过。"
         }
       ],
-      "notes": "Phase 3 完成。非流式与流式执行路径均已集成 HITL。InMemoryHitlGate 为内存实现，不支持进程重启恢复；Gateway 等渠道需自定义 onHitlSuspend 行为。"
+      "notes": "Phase 3 完成。非流式与流式执行路径均已集成 HITL。InMemoryHitlGate 为内存实现，不支持进程重启恢复；Gateway 等渠道需自定义 onHitlSuspend 行为。2026-06-19 修复 InMemoryHitlGate 与 CliHitlGate 的注入歧义。"
     },
     {
       "id": "skill-001",
