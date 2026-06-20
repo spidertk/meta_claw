@@ -1,6 +1,6 @@
 {
   "project": "meta-claw",
-  "last_updated": "2026-06-19",
+  "last_updated": "2026-06-20",
   "package_structure": {
     "config": "meta.claw.core.config — 所有配置模型 + 加载器 + 解析器",
     "vessel": "meta.claw.core.vessel — Vessel 用户域（Profile + Initializer）",
@@ -673,9 +673,14 @@
           "date": "2026-06-20",
           "result": "passing",
           "detail": "修复 LlmClientManager 错误地把 ToolCallback 传给 ChatClient.tools(Object...)，改为 .toolCallbacks(ToolCallback...)；开启 maven.compiler.parameters=true 保留 @Tool 方法参数名；./init.sh 全量通过。"
+        },
+        {
+          "date": "2026-06-20",
+          "result": "passing",
+          "detail": "修复 CLI 流式工具调用回调未触发问题：移除 LlmClientManager.streamWithTools()/chatStream() 中 finishReason == \"tool_calls\" 的 guard，改为只要 AssistantMessage.hasToolCalls() 就立即调用 callback.onToolCall()，并用 toolCallId Set 去重；./init.sh 全量通过。"
         }
       ],
-      "notes": "Phase 2 完成。当前仅支持本地 @Tool 工具循环；Phase 3 将接入 HITL 子系统。2026-06-20 修正 ChatClient 工具 API 调用方式并开启 -parameters。"
+      "notes": "Phase 2 完成。当前仅支持本地 @Tool 工具循环；Phase 3 将接入 HITL 子系统。2026-06-20 修正 ChatClient 工具 API 调用方式并开启 -parameters；同日修复流式 tool-call 回调因 finishReason guard 被跳过的问题。"
     },
     {
       "id": "hitl-001",

@@ -135,6 +135,7 @@ public class LlmClientManager implements SpiLlmClient {
         StringBuilder reasoningBuilder = new StringBuilder();
         AtomicReference<SpiUsage> usageRef = new AtomicReference<>();
         AtomicReference<List<SpiToolCall>> toolCallsRef = new AtomicReference<>(List.of());
+        java.util.Set<String> notifiedToolCallIds = new java.util.HashSet<>();
         ObjectMapper objectMapper = new ObjectMapper();
 
         try {
@@ -159,24 +160,27 @@ public class LlmClientManager implements SpiLlmClient {
                             }
 
                             if (gen.getOutput() instanceof AssistantMessage am && am.hasToolCalls()) {
+                                List<SpiToolCall> calls = new ArrayList<>();
+                                am.getToolCalls().forEach(tc -> {
+                                    try {
+                                        Map<String, Object> args = objectMapper.readValue(
+                                                tc.arguments(), new TypeReference<>() {});
+                                        SpiToolCall spiToolCall = SpiToolCall.builder()
+                                                .id(tc.id())
+                                                .name(tc.name())
+                                                .arguments(args)
+                                                .build();
+                                        calls.add(spiToolCall);
+                                        // 尽早通知 UI，避免依赖 finishReason
+                                        if (notifiedToolCallIds.add(tc.id())) {
+                                            callback.onToolCall(spiToolCall);
+                                        }
+                                    } catch (Exception e) {
+                                        log.warn("Failed to parse tool call arguments: {}", tc.arguments(), e);
+                                    }
+                                });
                                 String finishReason = gen.getMetadata() != null ? gen.getMetadata().getFinishReason() : null;
                                 if ("tool_calls".equals(finishReason)) {
-                                    List<SpiToolCall> calls = new ArrayList<>();
-                                    am.getToolCalls().forEach(tc -> {
-                                        try {
-                                            Map<String, Object> args = objectMapper.readValue(
-                                                    tc.arguments(), new TypeReference<>() {});
-                                            SpiToolCall spiToolCall = SpiToolCall.builder()
-                                                    .id(tc.id())
-                                                    .name(tc.name())
-                                                    .arguments(args)
-                                                    .build();
-                                            calls.add(spiToolCall);
-                                            callback.onToolCall(spiToolCall);
-                                        } catch (Exception e) {
-                                            log.warn("Failed to parse tool call arguments: {}", tc.arguments(), e);
-                                        }
-                                    });
                                     toolCallsRef.set(calls);
                                 }
                             }
@@ -236,6 +240,7 @@ public class LlmClientManager implements SpiLlmClient {
         int[] chunkCount = {0};
         long[] lastChunkTime = {startTime};
         AtomicReference<SpiUsage> usageRef = new AtomicReference<>();
+        java.util.Set<String> notifiedToolCallIds = new java.util.HashSet<>();
         ObjectMapper objectMapper = new ObjectMapper();
 
         List<Object> toolInstances = toolRegistry.getToolInstances();
@@ -278,23 +283,22 @@ public class LlmClientManager implements SpiLlmClient {
 
                             // 检测 tool calls
                             if (gen.getOutput() instanceof AssistantMessage am && am.hasToolCalls()) {
-                                String finishReason = gen.getMetadata() != null ? gen.getMetadata().getFinishReason() : null;
-                                if ("tool_calls".equals(finishReason)) {
-                                    am.getToolCalls().forEach(tc -> {
-                                        try {
-                                            Map<String, Object> args = objectMapper.readValue(
-                                                    tc.arguments(), new TypeReference<>() {});
-                                            SpiToolCall spiToolCall = SpiToolCall.builder()
-                                                    .id(tc.id())
-                                                    .name(tc.name())
-                                                    .arguments(args)
-                                                    .build();
+                                am.getToolCalls().forEach(tc -> {
+                                    try {
+                                        Map<String, Object> args = objectMapper.readValue(
+                                                tc.arguments(), new TypeReference<>() {});
+                                        SpiToolCall spiToolCall = SpiToolCall.builder()
+                                                .id(tc.id())
+                                                .name(tc.name())
+                                                .arguments(args)
+                                                .build();
+                                        if (notifiedToolCallIds.add(tc.id())) {
                                             callback.onToolCall(spiToolCall);
-                                        } catch (Exception e) {
-                                            log.warn("Failed to parse tool call arguments: {}", tc.arguments(), e);
                                         }
-                                    });
-                                }
+                                    } catch (Exception e) {
+                                        log.warn("Failed to parse tool call arguments: {}", tc.arguments(), e);
+                                    }
+                                });
                             }
                         }
 
