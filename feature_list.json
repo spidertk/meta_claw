@@ -682,10 +682,10 @@
         {
           "date": "2026-06-20",
           "result": "passing",
-          "detail": "根据真实 CLI 日志进一步修复：Moonshot 流式工具调用的 arguments 分段到达，原代码在每个 chunk 中立即解析 JSON 导致永远失败，改为累积 arguments 并在 finishReason == \"tool_calls\" 时解析完整 JSON 后通知 callback.onToolCall()；同时修复 assistant 消息的 reasoningContent 在 LlmClientManager.toSpringMessage() 与 SpiMessageConverter.toSpringMessage() 中丢失的问题，并在 StreamingAgentExecutor / AgentExecutor 保存 assistant 消息时保留 reasoningContent；./init.sh 全量通过。"
+          "detail": "根据真实 CLI 日志进一步修复：Moonshot 流式工具调用的 arguments 分段到达，原代码在每个 chunk 中立即解析 JSON 导致永远失败，改为累积 arguments；又发现 finishReason == \"tool_calls\" 的最终 chunk delta 为空、am.hasToolCalls() 为 false，已将 finishReason 判断移到 hasToolCalls 之外，确保累积的 tool calls 必然被解析并通知 callback.onToolCall()；同时修复 assistant 消息的 reasoningContent 在 LlmClientManager.toSpringMessage() 与 SpiMessageConverter.toSpringMessage() 中丢失的问题，并在 StreamingAgentExecutor / AgentExecutor 保存 assistant 消息时保留 reasoningContent；./init.sh 全量通过。"
         }
       ],
-      "notes": "Phase 2 完成。当前仅支持本地 @Tool 工具循环；Phase 3 将接入 HITL 子系统。2026-06-20 修正 ChatClient 工具 API 调用方式并开启 -parameters；同日先移除流式 tool-call 回调的 finishReason guard，后根据真实日志改为累积分段 arguments 的完整方案，并修复 reasoningContent 透传。"
+      "notes": "Phase 2 完成。当前仅支持本地 @Tool 工具循环；Phase 3 将接入 HITL 子系统。2026-06-20 修正 ChatClient 工具 API 调用方式并开启 -parameters；同日先移除流式 tool-call 回调的 finishReason guard，后根据真实日志改为累积分段 arguments 并把 finishReason 判断外移的完整方案，并修复 reasoningContent 透传（受 Spring AI 1.1.8 OpenAiChatModel 不读取 AssistantMessage.properties 限制，第二次请求仍只能带空 reasoning_content，由 MoonshotSerializerModule 补字段）。"
     },
     {
       "id": "hitl-001",

@@ -163,29 +163,29 @@ public class LlmClientManager implements SpiLlmClient {
 
                             if (gen.getOutput() instanceof AssistantMessage am && am.hasToolCalls()) {
                                 accumulateToolCalls(am, accumulatingToolCalls, accumulatingToolArgs);
-                                String finishReason = gen.getMetadata() != null ? gen.getMetadata().getFinishReason() : null;
-                                if ("tool_calls".equals(finishReason)) {
-                                    List<SpiToolCall> calls = new ArrayList<>();
-                                    for (AssistantMessage.ToolCall tc : accumulatingToolCalls.values()) {
-                                        if (notifiedToolCallIds.add(tc.id())) {
-                                            try {
-                                                String fullArgs = accumulatingToolArgs.get(tc.id()).toString();
-                                                Map<String, Object> args = objectMapper.readValue(
-                                                        fullArgs, new TypeReference<>() {});
-                                                SpiToolCall spiToolCall = SpiToolCall.builder()
-                                                        .id(tc.id())
-                                                        .name(tc.name())
-                                                        .arguments(args)
-                                                        .build();
-                                                calls.add(spiToolCall);
-                                                callback.onToolCall(spiToolCall);
-                                            } catch (Exception e) {
-                                                log.warn("Failed to parse tool call arguments: {}", accumulatingToolArgs.get(tc.id()), e);
-                                            }
+                            }
+                            String finishReason = gen.getMetadata() != null ? gen.getMetadata().getFinishReason() : null;
+                            if ("tool_calls".equals(finishReason) && !accumulatingToolCalls.isEmpty()) {
+                                List<SpiToolCall> calls = new ArrayList<>();
+                                for (AssistantMessage.ToolCall tc : accumulatingToolCalls.values()) {
+                                    if (notifiedToolCallIds.add(tc.id())) {
+                                        try {
+                                            String fullArgs = accumulatingToolArgs.get(tc.id()).toString();
+                                            Map<String, Object> args = objectMapper.readValue(
+                                                    fullArgs, new TypeReference<>() {});
+                                            SpiToolCall spiToolCall = SpiToolCall.builder()
+                                                    .id(tc.id())
+                                                    .name(tc.name())
+                                                    .arguments(args)
+                                                    .build();
+                                            calls.add(spiToolCall);
+                                            callback.onToolCall(spiToolCall);
+                                        } catch (Exception e) {
+                                            log.warn("Failed to parse tool call arguments: {}", accumulatingToolArgs.get(tc.id()), e);
                                         }
                                     }
-                                    toolCallsRef.set(calls);
                                 }
+                                toolCallsRef.set(calls);
                             }
                         }
 
@@ -289,23 +289,23 @@ public class LlmClientManager implements SpiLlmClient {
                             // 检测 tool calls（流式参数分段到达，需累积后解析）
                             if (gen.getOutput() instanceof AssistantMessage am && am.hasToolCalls()) {
                                 accumulateToolCalls(am, accumulatingToolCalls, accumulatingToolArgs);
-                                String finishReason = gen.getMetadata() != null ? gen.getMetadata().getFinishReason() : null;
-                                if ("tool_calls".equals(finishReason)) {
-                                    for (AssistantMessage.ToolCall tc : accumulatingToolCalls.values()) {
-                                        if (notifiedToolCallIds.add(tc.id())) {
-                                            try {
-                                                String fullArgs = accumulatingToolArgs.get(tc.id()).toString();
-                                                Map<String, Object> args = objectMapper.readValue(
-                                                        fullArgs, new TypeReference<>() {});
-                                                SpiToolCall spiToolCall = SpiToolCall.builder()
-                                                        .id(tc.id())
-                                                        .name(tc.name())
-                                                        .arguments(args)
-                                                        .build();
-                                                callback.onToolCall(spiToolCall);
-                                            } catch (Exception e) {
-                                                log.warn("Failed to parse tool call arguments: {}", accumulatingToolArgs.get(tc.id()), e);
-                                            }
+                            }
+                            String finishReason = gen.getMetadata() != null ? gen.getMetadata().getFinishReason() : null;
+                            if ("tool_calls".equals(finishReason) && !accumulatingToolCalls.isEmpty()) {
+                                for (AssistantMessage.ToolCall tc : accumulatingToolCalls.values()) {
+                                    if (notifiedToolCallIds.add(tc.id())) {
+                                        try {
+                                            String fullArgs = accumulatingToolArgs.get(tc.id()).toString();
+                                            Map<String, Object> args = objectMapper.readValue(
+                                                    fullArgs, new TypeReference<>() {});
+                                            SpiToolCall spiToolCall = SpiToolCall.builder()
+                                                    .id(tc.id())
+                                                    .name(tc.name())
+                                                    .arguments(args)
+                                                    .build();
+                                            callback.onToolCall(spiToolCall);
+                                        } catch (Exception e) {
+                                            log.warn("Failed to parse tool call arguments: {}", accumulatingToolArgs.get(tc.id()), e);
                                         }
                                     }
                                 }

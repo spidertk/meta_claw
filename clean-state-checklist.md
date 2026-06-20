@@ -1,7 +1,7 @@
 # 干净状态检查清单
 
 > 最后核对：2026-06-20
-> 结论：已修复两个真实 CLI 问题。问题 1：CLI 流式工具调用时 `SpiStreamingCallback.onToolCall()` 未触发——Moonshot 将 `tool_calls[].function.arguments` 分段发送，原代码在每个 chunk 中立即解析 JSON 导致永远失败，已改为累积 arguments 并在 `finishReason == "tool_calls"` 时解析完整 JSON 后通知 UI。问题 2：第二轮 LLM 请求丢失 assistant 的 reasoning_content——`LlmClientManager.toSpringMessage()` 与 `SpiMessageConverter.toSpringMessage()` 未把 `SpiMessage.reasoningContent` 写入 `AssistantMessage.properties`，且 `StreamingAgentExecutor` / `AgentExecutor` 保存 assistant 消息时未保留 reasoningContent，已一并修复。`./init.sh` 全量通过，core 96 个测试全部通过，tool 18 个测试全部通过。
+> 结论：已修复真实 CLI 流式工具调用回调未触发的问题。根因是 Moonshot 把 `tool_calls[].function.arguments` 分段发送，且 `finishReason == "tool_calls"` 的最终 chunk 本身 `delta` 为空，导致原解析逻辑永远失败。已改为累积 arguments 并把 finishReason 判断移到 `am.hasToolCalls()` 之外，确保 tool call 完成时必然解析并通知 UI。同时把 assistant 的 `reasoningContent` 在 `toSpringMessage` 与执行器中保留；但受 Spring AI 1.1.8 `OpenAiChatModel` 不读取 `AssistantMessage.properties` 的限制，第二次请求仍只能由 `MoonshotSerializerModule` 补上空的 `reasoning_content` 字段。`./init.sh` 全量通过，core 96 个测试全部通过，tool 18 个测试全部通过。
 
 - [x] 标准启动路径仍然可用
   证据：2026-06-20 执行 `./init.sh` 成功，内部 `mvn clean compile` + P0 测试完成，9 个 reactor 模块全部 SUCCESS；脚本自动使用 `~/.local/jdks/jdk-21.0.10+7/Contents/Home` 与 `~/.local/tools/apache-maven-3.9.15/bin/mvn`

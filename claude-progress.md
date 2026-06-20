@@ -8,7 +8,7 @@
 - 标准验证路径：`./init.sh` 先执行全仓编译，再运行初始化阶段 P0 测试集
 - 最近已通过证据：2026-06-20 修复 native 引擎流式工具调用失败：`LlmClientManager.chatWithTools()` 与 `streamWithTools()` 把 `ToolCallback` 误传给 Spring AI ChatClient 的 `.tools(Object...)` 方法，应使用 `.toolCallbacks(ToolCallback...)`；同时开启 `maven.compiler.parameters=true`，使 `@Tool` 方法参数名不再退化为 `arg0`；重新执行 `./init.sh` 通过，9 个 reactor 模块全部 SUCCESS，core 96 个测试全部通过
 - 最近已通过证据 2：2026-06-20 修复 CLI 流式工具调用回调未触发问题：`LlmClientManager.streamWithTools()` 与 `chatStream()` 仅在流式 chunk 的 `finishReason == "tool_calls"` 时才调用 `callback.onToolCall()`，而 Spring AI 经常在工具调用 chunk 到达时还没有设置 finishReason，导致 UI 永远收不到 "🔧 Calling tool" 提示；已移除该 guard，改为只要 `AssistantMessage.hasToolCalls()` 就立即通知，并用 `Set<String>` 对 toolCallId 去重避免重复通知；重新执行 `./init.sh` 通过，core 96 个测试全部通过
-- 最近已通过证据 3：2026-06-20 根据真实 CLI 日志进一步修复：Moonshot 流式工具调用的 arguments 是分段到达的，原代码在每个 chunk 中立即解析 JSON 导致永远失败，已改为累积 arguments 并在 `finishReason == "tool_calls"` 时解析；同时修复 assistant 消息的 `reasoningContent` 在 `toSpringMessage` 转换中丢失的问题，使第二轮请求能携带 reasoning_content；重新执行 `./init.sh` 通过，core 96 个测试全部通过
+- 最近已通过证据 3：2026-06-20 根据真实 CLI 日志进一步修复：Moonshot 流式工具调用的 arguments 是分段到达的，原代码在每个 chunk 中立即解析 JSON 导致永远失败，已改为累积 arguments；又发现 `finishReason == "tool_calls"` 的 chunk 本身 `delta` 为空、`am.hasToolCalls()` 为 false，导致仍无法触发回调，已把 finishReason 判断移到 hasToolCalls 之外；同时把 assistant 消息的 `reasoningContent` 在 `toSpringMessage` 转换中写入 `AssistantMessage.properties`，并在 `StreamingAgentExecutor` / `AgentExecutor` 保存 assistant 消息时保留 reasoningContent；重新执行 `./init.sh` 通过，core 96 个测试全部通过
 - 当前最高优先级未完成功能：agent-engine-001（Agent 执行引擎抽象：native / alibaba 双实现设计）Phase 0+1+2+3+4+5+6 已全部实现完成；下一步为真实 LLM 端到端验证或处理其他优先级功能
 - 当前 blocker：
   1. 当前无 blocker
@@ -44,8 +44,8 @@
 - 本轮目标：修复 `SpiStreamingCallback.onToolCall()` 在 native 引擎流式工具调用时未被调用的问题，以及 reasoning_content 未随 assistant 消息传递到下一轮请求的问题
 - 问题 1：用户输入 `1+1` 触发 calculator 工具调用，但 CLI 没有显示 "🔧 Calling tool" 行
   - 触发场景：`StreamingAgentExecutor` 调用 `LlmClientManager.streamWithTools()` 后，模型返回带有 `tool_calls` 的流式 chunk，但 `callback.onToolCall()` 没有被触发。
-  - 根因：Moonshot 等模型在流式输出工具调用时，会把 `tool_calls[].function.arguments` 分段发送（例如 `{"` → `expression` → `\":"` → ... → `"}`），每个 chunk 中的 `AssistantMessage` 只包含当前 delta 片段。原代码在收到每个 chunk 时立即尝试用 `ObjectMapper.readValue(tc.arguments())` 解析参数；由于没有任何一个 chunk 携带完整 JSON，解析永远失败，`callback.onToolCall()` 从未被调用。
-  - 修复：引入 `Map<String, StringBuilder>` 与 `Map<String, AssistantMessage.ToolCall>` 在流式回调中累积每个 tool call 的 id、name、type 与 arguments；当 `finishReason == "tool_calls"` 时，用累积后的完整 arguments JSON 解析并调用 `callback.onToolCall()`，同时用 `Set<String> notifiedToolCallIds` 去重。`streamWithTools()` 仍在此刻把解析出的完整 tool calls 写入 `toolCallsRef`，供后续 ReAct 循环执行。
+  - 根因：Moonshot 等模型在流式输出工具调用时，会把 `tool_calls[].function.arguments` 分段发送（例如 `{"` → `expression` → `\":"` → ... → `"}`），每个 chunk 中的 `AssistantMessage` 只包含当前 delta 片段。原代码在收到每个 chunk 时立即尝试用 `ObjectMapper.readValue(tc.arguments())` 解析参数；由于没有任何一个 chunk 携带完整 JSON，解析永远失败，`callback.onToolCall()` 从未被调用。进一步发现，携带 `finishReason == "tool_calls"` 的最终 chunk 其 `delta` 为空、`am.hasToolCalls()` 为 false，因此即便移除 guard，若把解析逻辑放在 `hasToolCalls()` 条件内，仍会错过触发时机。
+  - 修复：引入 `Map<String, StringBuilder>` 与 `Map<String, AssistantMessage.ToolCall>` 在流式回调中累积每个 tool call 的 id、name、type 与 arguments；将 `finishReason == "tool_calls"` 的判断从 `am.hasToolCalls()` 条件内移出，确保只要此前累积了 tool calls 就必然在 finishReason 到达时解析完整 JSON 并调用 `callback.onToolCall()`；同时用 `Set<String> notifiedToolCallIds` 去重。`streamWithTools()` 仍在此刻把解析出的完整 tool calls 写入 `toolCallsRef`，供后续 ReAct 循环执行。
   - 影响范围：`LlmClientManager.java` 中的 `streamWithTools()` 与 `chatStream()` 两个方法。
 - 问题 2：第二次 LLM 请求中的 assistant tool-call 消息丢失了 reasoning_content
   - 触发场景：在 ReAct 循环中，第一次 LLM 调用产生了 reasoning_content 并随后输出 tool_calls；当把该 assistant 消息回注到 messages 并发起第二次请求时，`reasoning_content` 为空。
@@ -53,6 +53,7 @@
   - 修复：
     - `LlmClientManager.toSpringMessage()` 与 `SpiMessageConverter.toSpringMessage()` 在构造 `AssistantMessage` 时，把非空的 `reasoningContent` 放入 `properties` 的 `reasoningContent` 键；并把 `SpiMessage` 的 tool calls 也正确映射到 `AssistantMessage.ToolCall`。
     - `StreamingAgentExecutor` 与 `AgentExecutor` 在添加 assistant 消息时，使用 `SpiMessage.assistant(content, reasoningContent, toolCalls)` 三参数版本，保留 reasoningContent。
+  - 限制说明：反编译 Spring AI OpenAiChatModel 1.1.8 确认，它在把 `AssistantMessage` 转成 `OpenAiApi.ChatCompletionMessage` 时，最后一个 `reasoningContent` 字段直接传 `null`，不读取 `AssistantMessage.properties`。因此当前版本无法让第二次请求携带非空的 `reasoning_content`；`MoonshotSerializerModule` 会在序列化时给带 tool_calls 的 assistant 消息补上空的 `reasoning_content`，以满足 Moonshot API 的字段存在性要求。
 - 运行过的验证：
   - `./init.sh`（真实环境，Java 21）→ 成功；9 个 reactor 模块全部 SUCCESS，core 96 个测试全部通过，tool 模块 18 个测试全部通过
 - 已记录证据：
