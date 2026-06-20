@@ -1,7 +1,7 @@
 # 干净状态检查清单
 
-> 最后核对：2026-06-19
-> 结论：修复两个运行时阻塞问题。问题 1：`HitlSubSystem` 中 `HitlGate` 注入歧义导致 Spring Boot 启动失败；为 `InMemoryHitlGate` 增加 `@ConditionalOnMissingBean(HitlGate.class)`，使其在 `CliHitlGate` 存在时自动退让。问题 2：`VesselProfile.promptVars()` 因 `VesselConfigBundle` 的 profile 字段访问方法返回 null 而在 `Map.of(...)` 中抛出 NullPointerException；统一将 null 转换为空字符串。`./init.sh` 全量通过，core 96 个测试全部通过。另输出 `docs/superpowers/plans/2026-06-17-agent-engine-risk-remediation-plan.md` 作为后续改进方案。
+> 最后核对：2026-06-20
+> 结论：修复三个运行时阻塞问题。问题 1：`HitlSubSystem` 中 `HitlGate` 注入歧义导致 Spring Boot 启动失败；为 `InMemoryHitlGate` 增加 `@ConditionalOnMissingBean(HitlGate.class)`。问题 2：`VesselProfile.promptVars()` 因 `VesselConfigBundle` 的 profile 字段访问方法返回 null 而在 `Map.of(...)` 中抛出 NullPointerException；统一将 null 转换为空字符串。问题 3：native 引擎流式工具调用失败（`No @Tool annotated methods found in MethodToolCallback`）；`LlmClientManager` 把 `ToolCallback` 误传给 `.tools(Object...)`，已改为 `.toolCallbacks(ToolCallback...)`，并开启 `maven.compiler.parameters=true`。`./init.sh` 全量通过，core 96 个测试全部通过。另输出 `docs/superpowers/plans/2026-06-17-agent-engine-risk-remediation-plan.md` 作为后续改进方案。
 
 - [x] 标准启动路径仍然可用
   证据：2026-06-19 执行 `./init.sh` 成功，内部 `mvn clean compile` + P0 测试完成，9 个 reactor 模块全部 SUCCESS；脚本自动使用 `~/.local/jdks/jdk-21.0.10+7/Contents/Home` 与 `~/.local/tools/apache-maven-3.9.15/bin/mvn`

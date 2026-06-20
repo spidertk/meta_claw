@@ -6,7 +6,7 @@
 - 当前架构基线：Java 21 + Maven 多模块仓库；已存在 `meta-claw-core`、`meta-claw-vessel`、`meta-claw-store`、`meta-claw-cli`、`meta-claw-gateway*`、`meta-claw-bootstrap`
 - 标准启动路径：`./init.sh`
 - 标准验证路径：`./init.sh` 先执行全仓编译，再运行初始化阶段 P0 测试集
-- 最近已通过证据：2026-06-19 修复 `VesselProfile.promptVars()` NPE：`VesselConfigBundle` 的 profile 字段访问方法（getIdentity / getSoul / getCapabilities / getGuidelines / getDomainKnowledge / getPreferences）未处理 `VesselProfile.getSection()` 返回 null 的情况，导致 `Map.of(...)` 因含 null 值抛出 NullPointerException；已统一将 null 转换为空字符串；重新执行 `./init.sh` 通过，9 个 reactor 模块全部 SUCCESS，core 96 个测试全部通过
+- 最近已通过证据：2026-06-20 修复 native 引擎流式工具调用失败：`LlmClientManager.chatWithTools()` 与 `streamWithTools()` 把 `ToolCallback` 误传给 Spring AI ChatClient 的 `.tools(Object...)` 方法，应使用 `.toolCallbacks(ToolCallback...)`；同时开启 `maven.compiler.parameters=true`，使 `@Tool` 方法参数名不再退化为 `arg0`；重新执行 `./init.sh` 通过，9 个 reactor 模块全部 SUCCESS，core 96 个测试全部通过
 - 当前最高优先级未完成功能：agent-engine-001（Agent 执行引擎抽象：native / alibaba 双实现设计）Phase 0+1+2+3+4+5+6 已全部实现完成；下一步为真实 LLM 端到端验证或处理其他优先级功能
 - 当前 blocker：
   1. 当前无 blocker
@@ -48,6 +48,10 @@
   - 触发场景：`VesselProfile.promptVars()` 调用 `Map.of(...)` 构建 prompt 变量，但 `VesselConfigBundle.getIdentity()` 等方法会返回 null（当 `VesselProfile` 的 sections 中不存在对应 key 时）。
   - 根因：`VesselConfigBundle` 的 profile 字段访问方法只检查了 `vesselProfile != null`，未处理 `vesselProfile.getSection(...)` 返回 null 的情况。
   - 修复：在 `VesselConfigBundle` 中新增 `stringValue(String)` 辅助方法，将 `getIdentity()` / `getSoul()` / `getCapabilities()` / `getGuidelines()` / `getDomainKnowledge()` / `getPreferences()` 的返回值统一从 null 转换为空字符串。
+- 问题 3：native 引擎流式工具调用失败（`No @Tool annotated methods found in MethodToolCallback`）
+  - 触发场景：用户输入 `1+1` 触发 calculator 工具调用时，`StreamingAgentExecutor` 调用 `LlmClientManager.streamWithTools()`，后者把 `ToolCallback[]` 传给 `ChatClient.tools(Object...)`。
+  - 根因：Spring AI ChatClient 中，`.tools(Object...)` 只接受带 `@Tool` 注解的方法对象；传入 `ToolCallback` 必须使用 `.toolCallbacks(ToolCallback...)`。同时仓库未开启 `-parameters`，导致参数名退化为 `arg0`。
+  - 修复：把 `LlmClientManager.chatWithTools()` 与 `streamWithTools()` 中的 `.tools(toolCallbacks)` 改为 `.toolCallbacks(toolCallbacks)`；在根 `pom.xml` 中设置 `maven.compiler.parameters=true`。
 - 运行过的验证：
   - `./init.sh`（真实环境，Java 21）→ 成功；9 个 reactor 模块全部 SUCCESS，core 96 个测试全部通过
 - 已记录证据：
@@ -56,8 +60,11 @@
 - 更新过的文件或工件：
   - `meta-claw-core/src/main/java/meta/claw/core/runtime/hitl/InMemoryHitlGate.java`
   - `meta-claw-core/src/main/java/meta/claw/core/config/bundle/VesselConfigBundle.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/runtime/LlmClientManager.java`
+  - `pom.xml`
   - `claude-progress.md`
   - `feature_list.json`
+  - `clean-state-checklist.md`
 - 已知风险或未解决的问题：
   - `init.sh` 当前不直接启动 Spring Boot 应用，建议用户再手动启动一次 CLI / Bootstrap 确认两个问题都已消除
 - 下一步最佳动作：

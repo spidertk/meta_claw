@@ -140,7 +140,7 @@ public class LlmClientManager implements SpiLlmClient {
         try {
             buildRawChatClient(request.getVesselId())
                     .prompt(new Prompt(messages))
-                    .tools(toolCallbacks)
+                    .toolCallbacks(toolCallbacks)
                     .stream()
                     .chatResponse()
                     .doOnNext(response -> {
@@ -390,7 +390,7 @@ public class LlmClientManager implements SpiLlmClient {
         long startTime = System.currentTimeMillis();
         ChatResponse chatResponse = buildRawChatClient(request.getVesselId())
                 .prompt(new Prompt(messages))
-                .tools(toolCallbacks)
+                .toolCallbacks(toolCallbacks)
                 .call()
                 .chatResponse();
         long latency = System.currentTimeMillis() - startTime;

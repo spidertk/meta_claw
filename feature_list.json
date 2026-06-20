@@ -657,7 +657,7 @@
       "status": "passing",
       "verification": [
         "确认 ToolSubSystem 作为 VesselSubSystem 实现存在（priority=20），并收集 ToolRegistry 中的本地 @Tool 工具。",
-        "确认 LlmClientManager 使用 ChatClient.tools(Object...) 调用 Spring AI 1.1.7 ToolCallback。",
+        "确认 LlmClientManager 使用 ChatClient.toolCallbacks(ToolCallback...) 调用 Spring AI ToolCallback。",
         "确认 ReActLoop / AgentExecutor 实现多轮 tool-call 循环，包括工具执行、结果回注、HITL 检查点、maxSteps 限制。",
         "确认 VesselRuntime.execute() 委托给 agentExecutor.execute(ctx, request)。",
         "运行 mvn test 全仓通过",
@@ -668,9 +668,14 @@
           "date": "2026-06-06",
           "result": "passing",
           "detail": "新增 ToolSubSystem、AgentExecutor（ReActLoop）；LlmClientManager 适配 Spring AI 1.1.7 ChatClient.tools(Object...) API；VesselRuntime 委托执行给 agentExecutor；新增 ToolSubSystemTest、AgentExecutorTest；mvn test 全仓通过；./init.sh 9 个 reactor 模块全部 SUCCESS。"
+        },
+        {
+          "date": "2026-06-20",
+          "result": "passing",
+          "detail": "修复 LlmClientManager 错误地把 ToolCallback 传给 ChatClient.tools(Object...)，改为 .toolCallbacks(ToolCallback...)；开启 maven.compiler.parameters=true 保留 @Tool 方法参数名；./init.sh 全量通过。"
         }
       ],
-      "notes": "Phase 2 完成。当前仅支持本地 @Tool 工具循环；Phase 3 将接入 HITL 子系统。"
+      "notes": "Phase 2 完成。当前仅支持本地 @Tool 工具循环；Phase 3 将接入 HITL 子系统。2026-06-20 修正 ChatClient 工具 API 调用方式并开启 -parameters。"
     },
     {
       "id": "hitl-001",
