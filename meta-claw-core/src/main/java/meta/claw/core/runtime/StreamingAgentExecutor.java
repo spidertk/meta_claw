@@ -100,9 +100,9 @@ public class StreamingAgentExecutor {
                 }
             }
 
-            // 添加 assistant 消息（含 tool calls）
-            messages.add(SpiMessage.assistant(response.content(), response.toolCalls()));
-            ctx.getMessages().add(SpiMessage.assistant(response.content(), response.toolCalls()));
+            // 添加 assistant 消息（含 reasoning + tool calls）
+            messages.add(SpiMessage.assistant(response.content(), response.reasoningContent(), response.toolCalls()));
+            ctx.getMessages().add(SpiMessage.assistant(response.content(), response.reasoningContent(), response.toolCalls()));
 
             // 执行 tool calls 并将结果回注到消息列表
             for (SpiToolCall tc : response.toolCalls()) {
@@ -128,8 +128,8 @@ public class StreamingAgentExecutor {
                         .arguments(parseArguments(item.getArgumentsJson()))
                         .build())
                 .toList();
-        messages.add(SpiMessage.assistant(null, toolCalls));
-        ctx.getMessages().add(SpiMessage.assistant(null, toolCalls));
+        messages.add(SpiMessage.assistant(null, null, toolCalls));
+        ctx.getMessages().add(SpiMessage.assistant(null, null, toolCalls));
 
         for (ApprovalItem item : ticket.getItems()) {
             ApprovalStatus status = resolution.getDecisions().get(item.getToolCallId());

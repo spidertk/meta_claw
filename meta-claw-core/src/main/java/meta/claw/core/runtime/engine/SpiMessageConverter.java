@@ -40,10 +40,17 @@ public final class SpiMessageConverter {
         return switch (role) {
             case "system" -> new SystemMessage(m.getContent());
             case "user" -> new UserMessage(m.getContent());
-            case "assistant" -> AssistantMessage.builder()
-                    .content(m.getContent() != null ? m.getContent() : "")
-                    .toolCalls(toSpringToolCalls(m.getToolCalls()))
-                    .build();
+            case "assistant" -> {
+                java.util.Map<String, Object> properties = new java.util.HashMap<>();
+                if (m.getReasoningContent() != null && !m.getReasoningContent().isEmpty()) {
+                    properties.put("reasoningContent", m.getReasoningContent());
+                }
+                yield AssistantMessage.builder()
+                        .content(m.getContent() != null ? m.getContent() : "")
+                        .properties(properties)
+                        .toolCalls(toSpringToolCalls(m.getToolCalls()))
+                        .build();
+            }
             case "tool" -> {
                 ToolResult tr = parseToolResultJson(m.getContent());
                 yield ToolResponseMessage.builder()

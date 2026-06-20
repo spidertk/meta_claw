@@ -136,6 +136,8 @@ public class LlmClientManager implements SpiLlmClient {
         AtomicReference<SpiUsage> usageRef = new AtomicReference<>();
         AtomicReference<List<SpiToolCall>> toolCallsRef = new AtomicReference<>(List.of());
         java.util.Set<String> notifiedToolCallIds = new java.util.HashSet<>();
+        java.util.Map<String, StringBuilder> accumulatingToolArgs = new java.util.LinkedHashMap<>();
+        java.util.Map<String, AssistantMessage.ToolCall> accumulatingToolCalls = new java.util.LinkedHashMap<>();
         ObjectMapper objectMapper = new ObjectMapper();
 
         try {
@@ -160,27 +162,28 @@ public class LlmClientManager implements SpiLlmClient {
                             }
 
                             if (gen.getOutput() instanceof AssistantMessage am && am.hasToolCalls()) {
-                                List<SpiToolCall> calls = new ArrayList<>();
-                                am.getToolCalls().forEach(tc -> {
-                                    try {
-                                        Map<String, Object> args = objectMapper.readValue(
-                                                tc.arguments(), new TypeReference<>() {});
-                                        SpiToolCall spiToolCall = SpiToolCall.builder()
-                                                .id(tc.id())
-                                                .name(tc.name())
-                                                .arguments(args)
-                                                .build();
-                                        calls.add(spiToolCall);
-                                        // 尽早通知 UI，避免依赖 finishReason
-                                        if (notifiedToolCallIds.add(tc.id())) {
-                                            callback.onToolCall(spiToolCall);
-                                        }
-                                    } catch (Exception e) {
-                                        log.warn("Failed to parse tool call arguments: {}", tc.arguments(), e);
-                                    }
-                                });
+                                accumulateToolCalls(am, accumulatingToolCalls, accumulatingToolArgs);
                                 String finishReason = gen.getMetadata() != null ? gen.getMetadata().getFinishReason() : null;
                                 if ("tool_calls".equals(finishReason)) {
+                                    List<SpiToolCall> calls = new ArrayList<>();
+                                    for (AssistantMessage.ToolCall tc : accumulatingToolCalls.values()) {
+                                        if (notifiedToolCallIds.add(tc.id())) {
+                                            try {
+                                                String fullArgs = accumulatingToolArgs.get(tc.id()).toString();
+                                                Map<String, Object> args = objectMapper.readValue(
+                                                        fullArgs, new TypeReference<>() {});
+                                                SpiToolCall spiToolCall = SpiToolCall.builder()
+                                                        .id(tc.id())
+                                                        .name(tc.name())
+                                                        .arguments(args)
+                                                        .build();
+                                                calls.add(spiToolCall);
+                                                callback.onToolCall(spiToolCall);
+                                            } catch (Exception e) {
+                                                log.warn("Failed to parse tool call arguments: {}", accumulatingToolArgs.get(tc.id()), e);
+                                            }
+                                        }
+                                    }
                                     toolCallsRef.set(calls);
                                 }
                             }
@@ -241,6 +244,8 @@ public class LlmClientManager implements SpiLlmClient {
         long[] lastChunkTime = {startTime};
         AtomicReference<SpiUsage> usageRef = new AtomicReference<>();
         java.util.Set<String> notifiedToolCallIds = new java.util.HashSet<>();
+        java.util.Map<String, StringBuilder> accumulatingToolArgs = new java.util.LinkedHashMap<>();
+        java.util.Map<String, AssistantMessage.ToolCall> accumulatingToolCalls = new java.util.LinkedHashMap<>();
         ObjectMapper objectMapper = new ObjectMapper();
 
         List<Object> toolInstances = toolRegistry.getToolInstances();
@@ -281,24 +286,29 @@ public class LlmClientManager implements SpiLlmClient {
                                 callback.onChunk(content);
                             }
 
-                            // 检测 tool calls
+                            // 检测 tool calls（流式参数分段到达，需累积后解析）
                             if (gen.getOutput() instanceof AssistantMessage am && am.hasToolCalls()) {
-                                am.getToolCalls().forEach(tc -> {
-                                    try {
-                                        Map<String, Object> args = objectMapper.readValue(
-                                                tc.arguments(), new TypeReference<>() {});
-                                        SpiToolCall spiToolCall = SpiToolCall.builder()
-                                                .id(tc.id())
-                                                .name(tc.name())
-                                                .arguments(args)
-                                                .build();
+                                accumulateToolCalls(am, accumulatingToolCalls, accumulatingToolArgs);
+                                String finishReason = gen.getMetadata() != null ? gen.getMetadata().getFinishReason() : null;
+                                if ("tool_calls".equals(finishReason)) {
+                                    for (AssistantMessage.ToolCall tc : accumulatingToolCalls.values()) {
                                         if (notifiedToolCallIds.add(tc.id())) {
-                                            callback.onToolCall(spiToolCall);
+                                            try {
+                                                String fullArgs = accumulatingToolArgs.get(tc.id()).toString();
+                                                Map<String, Object> args = objectMapper.readValue(
+                                                        fullArgs, new TypeReference<>() {});
+                                                SpiToolCall spiToolCall = SpiToolCall.builder()
+                                                        .id(tc.id())
+                                                        .name(tc.name())
+                                                        .arguments(args)
+                                                        .build();
+                                                callback.onToolCall(spiToolCall);
+                                            } catch (Exception e) {
+                                                log.warn("Failed to parse tool call arguments: {}", accumulatingToolArgs.get(tc.id()), e);
+                                            }
                                         }
-                                    } catch (Exception e) {
-                                        log.warn("Failed to parse tool call arguments: {}", tc.arguments(), e);
                                     }
-                                });
+                                }
                             }
                         }
 
@@ -470,7 +480,17 @@ public class LlmClientManager implements SpiLlmClient {
         return switch (msg.getRole()) {
             case "system" -> new SystemMessage(msg.getContent());
             case "user" -> new UserMessage(msg.getContent());
-            case "assistant" -> new AssistantMessage(msg.getContent());
+            case "assistant" -> {
+                java.util.Map<String, Object> properties = new java.util.HashMap<>();
+                if (msg.getReasoningContent() != null && !msg.getReasoningContent().isEmpty()) {
+                    properties.put("reasoningContent", msg.getReasoningContent());
+                }
+                yield AssistantMessage.builder()
+                        .content(msg.getContent() != null ? msg.getContent() : "")
+                        .properties(properties)
+                        .toolCalls(toSpringToolCalls(msg.getToolCalls()))
+                        .build();
+            }
             case "tool" -> ToolResponseMessage.builder()
                     .responses(List.of(
                             new ToolResponseMessage.ToolResponse("tool", "tool", msg.getContent())
@@ -481,5 +501,51 @@ public class LlmClientManager implements SpiLlmClient {
                 yield new UserMessage(msg.getContent());
             }
         };
+    }
+
+    private static List<AssistantMessage.ToolCall> toSpringToolCalls(List<SpiToolCall> toolCalls) {
+        if (toolCalls == null || toolCalls.isEmpty()) {
+            return List.of();
+        }
+        ObjectMapper mapper = new ObjectMapper();
+        return toolCalls.stream()
+                .map(tc -> new AssistantMessage.ToolCall(
+                        tc.getId(),
+                        "function",
+                        tc.getName(),
+                        toArgumentsJson(mapper, tc.getArguments())))
+                .collect(Collectors.toList());
+    }
+
+    private static String toArgumentsJson(ObjectMapper mapper, Map<String, Object> arguments) {
+        if (arguments == null) {
+            return "{}";
+        }
+        try {
+            return mapper.writeValueAsString(arguments);
+        } catch (Exception e) {
+            return "{}";
+        }
+    }
+
+    private static void accumulateToolCalls(AssistantMessage am,
+                                            java.util.Map<String, AssistantMessage.ToolCall> accumulatingToolCalls,
+                                            java.util.Map<String, StringBuilder> accumulatingToolArgs) {
+        for (AssistantMessage.ToolCall tc : am.getToolCalls()) {
+            String id = tc.id();
+            if (id == null && accumulatingToolCalls.size() == 1) {
+                id = accumulatingToolCalls.keySet().iterator().next();
+            }
+            if (id == null) {
+                log.warn("Ignoring tool call chunk without id: {}", tc);
+                continue;
+            }
+            AssistantMessage.ToolCall existing = accumulatingToolCalls.get(id);
+            String name = tc.name() != null ? tc.name() : (existing != null ? existing.name() : null);
+            String type = tc.type() != null ? tc.type() : (existing != null ? existing.type() : "function");
+            String args = tc.arguments() != null ? tc.arguments() : "";
+            accumulatingToolCalls.put(id, new AssistantMessage.ToolCall(id, type, name, args));
+            accumulatingToolArgs.computeIfAbsent(id, k -> new StringBuilder()).append(args);
+        }
     }
 }

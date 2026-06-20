@@ -136,8 +136,7 @@ public class ChatCommand implements Runnable {
 
                 terminal.writer().println();
                 terminal.writer().flush();
-                StringBuilder responseBuffer = new StringBuilder();
-                StringBuilder reasoningBuffer = new StringBuilder();
+
                 long[] streamStartTime = {System.currentTimeMillis()};
                 boolean[] hasReasoning = {false};
                 boolean[] hasContent = {false};
@@ -159,7 +158,6 @@ public class ChatCommand implements Runnable {
                         }
                         terminal.writer().print(chunk);
                         terminal.writer().flush();
-                        reasoningBuffer.append(chunk);
                     }
 
                     @Override
@@ -178,7 +176,6 @@ public class ChatCommand implements Runnable {
                         }
                         terminal.writer().print(chunk);
                         terminal.writer().flush();
-                        responseBuffer.append(chunk);
                     }
 
                     @Override
