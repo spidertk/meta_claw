@@ -9,6 +9,8 @@
 - 最近已通过证据：2026-06-20 修复 native 引擎流式工具调用失败：`LlmClientManager.chatWithTools()` 与 `streamWithTools()` 把 `ToolCallback` 误传给 Spring AI ChatClient 的 `.tools(Object...)` 方法，应使用 `.toolCallbacks(ToolCallback...)`；同时开启 `maven.compiler.parameters=true`，使 `@Tool` 方法参数名不再退化为 `arg0`；重新执行 `./init.sh` 通过，9 个 reactor 模块全部 SUCCESS，core 96 个测试全部通过
 - 最近已通过证据 2：2026-06-20 修复 CLI 流式工具调用回调未触发问题：`LlmClientManager.streamWithTools()` 与 `chatStream()` 仅在流式 chunk 的 `finishReason == "tool_calls"` 时才调用 `callback.onToolCall()`，而 Spring AI 经常在工具调用 chunk 到达时还没有设置 finishReason，导致 UI 永远收不到 "🔧 Calling tool" 提示；已移除该 guard，改为只要 `AssistantMessage.hasToolCalls()` 就立即通知，并用 `Set<String>` 对 toolCallId 去重避免重复通知；重新执行 `./init.sh` 通过，core 96 个测试全部通过
 - 最近已通过证据 3：2026-06-20 根据真实 CLI 日志进一步修复：Moonshot 流式工具调用的 arguments 是分段到达的，原代码在每个 chunk 中立即解析 JSON 导致永远失败，已改为累积 arguments；又发现 `finishReason == "tool_calls"` 的 chunk 本身 `delta` 为空、`am.hasToolCalls()` 为 false，导致仍无法触发回调，已把 finishReason 判断移到 hasToolCalls 之外；同时把 assistant 消息的 `reasoningContent` 在 `toSpringMessage` 转换中写入 `AssistantMessage.properties`，并在 `StreamingAgentExecutor` / `AgentExecutor` 保存 assistant 消息时保留 reasoningContent；重新执行 `./init.sh` 通过，core 96 个测试全部通过
+- 最近已通过证据 4：2026-06-20 继续修复流式 tool-call 回调未触发问题：反编译 Spring AI OpenAiChatModel 1.1.8 确认 `ChatGenerationMetadata.getFinishReason()` 返回枚举名称 `"TOOL_CALLS"`（大写），代码此前按原始 HTTP 的 `"tool_calls"`（小写）比较导致 finishReason 永远匹配不上，已将判断改为忽略大小写并兼容 `"tool_call"`；新增 `LlmClientManagerStreamWithToolsTest` 覆盖分段 arguments + 大写 finishReason 场景；修复 `VesselCheckpointSaver` 因文件系统时间精度导致的 flaky 测试；重新执行 `./init.sh` 通过，core 97 个测试全部通过，tool 模块 18 个测试全部通过
+- 最近已通过证据 5：2026-06-22 修复禁用 Spring AI 内部 tool execution 后 Moonshot 报 `"tool_call_id is not found"` 400 错误：根因是 `SpiMessage` 未保存 `toolCallId`/`toolName`，`LlmClientManager.toSpringMessage()` 与 `VesselRuntime.toSpiMessages()` 把 tool 消息硬编码为 `"tool"`，且 `AgentExecutor`/`StreamingAgentExecutor` 把工具结果包装成 JSON 导致原始 content 丢失。已为 `SpiMessage`/`MemoryMessage` 新增 `toolCallId`/`toolName` 字段与工厂方法，所有执行器直接以原始结果和真实 id/name 构造 tool 消息，转换器优先使用字段、缺失时回退旧版 JSON 解析；新增 `LlmClientManagerToolMessageTest`；重新执行 `./init.sh` 通过，core 97 个测试全部通过，tool 模块 18 个测试全部通过
 - 当前最高优先级未完成功能：agent-engine-001（Agent 执行引擎抽象：native / alibaba 双实现设计）Phase 0+1+2+3+4+5+6 已全部实现完成；下一步为真实 LLM 端到端验证或处理其他优先级功能
 - 当前 blocker：
   1. 当前无 blocker
@@ -37,6 +39,75 @@
 - `serve/start/stop/restart/status/logs`、工具引擎、MCP、Skill 系统仍未实现
 
 ## 会话记录
+
+### Session 056
+
+- 日期：2026-06-22
+- 本轮目标：修复禁用 Spring AI 内部 tool execution 后，Moonshot 返回 400 `"tool_call_id is not found"` 的问题
+- 问题：用户输入 `1+1` 后模型正确输出 `calculate` tool_call，但执行工具并把结果回注到消息列表后，第二次请求 Moonshot 报错 `Invalid request: tool_call_id is not found`。
+  - 根因 1：`SpiMessage` 只保存 `content`，没有保存 `toolCallId` 与 `toolName`。`AgentExecutor` 与 `StreamingAgentExecutor` 用 `buildToolResultJson()` 把结果包装成 `{"toolCallId":...,"toolName":...,"result":...}` 后调用 `SpiMessage.tool(json)`，导致原始 content 变成 JSON，且 id/name 被隐藏。
+  - 根因 2：`LlmClientManager.toSpringMessage()` 与 `VesselRuntime.toSpiMessages()` 在转换 tool 消息时，把 `ToolResponseMessage.ToolResponse` 的 `id` 和 `name` 硬编码为 `"tool"`，与 assistant 消息中的 `tool_calls[].id` 无法对应，LLM 后端因此找不到匹配的 tool_call。
+  - 修复：
+    - 为 `SpiMessage` 与 `MemoryMessage` 新增 `toolCallId`、`toolName` 字段；`SpiMessage` 新增 `tool(content, toolCallId, toolName)` 工厂方法，旧 `tool(content)` 保留以兼容旧数据。
+    - `AgentExecutor`、`StreamingAgentExecutor`、`SpringAiAlibabaAgentEngine` 改为直接以工具原始结果和真实 `toolCallId`/`toolName` 构造 tool 消息，不再 JSON 包装。
+    - `LlmClientManager.toSpringMessage()`、`VesselRuntime.toSpiMessages()`、`SpiMessageConverter.toSpringMessage()` 优先使用 `SpiMessage` 的 `toolCallId`/`toolName` 字段；字段缺失时回退到旧版 JSON 解析，确保已持久化的旧历史消息仍可正确转换。
+    - `LlmClientManager.toSpringMessage()` 增加对旧版 JSON 包装格式 `{"toolCallId":...,"toolName":...,"result":...}` 的解析回退，避免修复前已写入的历史会话在恢复后仍然丢失 id/name。
+    - 移除 `AgentExecutor`、`StreamingAgentExecutor`、`SpringAiAlibabaAgentEngine` 中不再使用的 `buildToolResultJson()` 方法。
+- 运行过的验证：
+  - `./init.sh`（真实环境，Java 21）→ 成功；9 个 reactor 模块全部 SUCCESS，core 97 个测试全部通过（新增 `LlmClientManagerToolMessageTest`），tool 模块 18 个测试全部通过
+  - 定向测试 `LlmClientManagerToolMessageTest` → 通过；验证 tool 消息的 `toolCallId`/`toolName` 在 `LlmClientManager.toSpringMessage()` 中正确保留，且旧格式无 id/name 时回退为 `"tool"`
+- 已记录证据：
+  - 本文件已新增 Session 056 并在顶部"当前已验证状态"增加证据 5
+  - `feature_list.json` 的 `spi-002` 已补充 tool 消息 id/name 修复记录
+- 更新过的文件或工件：
+  - `meta-claw-core/src/main/java/meta/claw/core/llm/SpiMessage.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/memory/MemoryMessage.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/memory/MemoryMessageConverter.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/runtime/LlmClientManager.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/runtime/VesselRuntime.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/runtime/AgentExecutor.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/runtime/StreamingAgentExecutor.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/runtime/engine/SpiMessageConverter.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/runtime/engine/SpringAiAlibabaAgentEngine.java`
+  - `meta-claw-core/src/test/java/meta/claw/core/runtime/LlmClientManagerToolMessageTest.java`（新增）
+  - `init.sh`（将新测试纳入 P0 基线）
+  - `claude-progress.md`
+  - `feature_list.json`
+- 已知风险或未解决的问题：
+  - 当前修复已保证 tool 消息携带正确 `toolCallId`/`toolName`，但真实 CLI 端到端验证（用户再次输入 `1+1`）仍待执行，以确认 Moonshot 不再报 400
+- 下一步最佳动作：
+  1. 提交本轮修复
+  2. 由用户在真实 CLI 中输入 `1+1` 确认第二轮请求正常完成
+
+### Session 055
+
+- 日期：2026-06-20
+- 本轮目标：继续修复 native 引擎流式工具调用回调未触发问题，定位并解决 Spring AI 解析后的 ChatResponse 在原始 HTTP 含 tool_calls 时仍显示 toolCalls=[] 的根因
+- 问题：用户观察到 `ChatResponse[generations=[Generation[assistantMessage=AssistantMessage[toolCalls=[], ...]]]`，同时原始 HTTP 流中明显存在 `tool_calls` 增量；此前修复已将分段 arguments 累积逻辑移到 `finishReason` 判断之外，但 `callback.onToolCall()` 在真实 CLI 中仍未触发。
+  - 根因：反编译 Spring AI OpenAiChatModel 1.1.8 确认，`buildGeneration()` 中 `ChatGenerationMetadata.finishReason` 的值来自 `OpenAiApi.ChatCompletionFinishReason.name()`。Moonshot/OpenAI 原始 HTTP 发送的 `finish_reason: "tool_calls"` 被 Jackson 反序列化为枚举 `TOOL_CALLS` 后，Spring AI 向调用方暴露的字符串是 `"TOOL_CALLS"`（大写）。而 `LlmClientManager.streamWithTools()` 与 `chatStream()` 此前按原始 HTTP 的 `"tool_calls"`（小写）进行比较，导致 `finishReason` 永远匹配不上；累积的 tool calls 因此不会被解析为完整 JSON，`callback.onToolCall()` 不会触发，最终 `SpiChatResponse.toolCalls` 也一直为空。
+  - 修复：将两处 `finishReason` 判断改为忽略大小写，并同时兼容 `"tool_call"` / `"tool_calls"`；新增 DEBUG 日志在每个 chunk 打印 `hasToolCalls`、toolCall 数量、`finishReason` 与累积状态，便于后续排查。
+  - 补充说明：Spring AI 的 `chatResponse()` 流为每个 SSE 增量独立生成一个 `ChatResponse`，不会跨 chunk 聚合 tool_calls。因此单个中间 chunk 显示 `toolCalls=[]` 是正常的；真正关键的是最后一个 chunk 的 `finishReason` 必须触发累积解析。当前修复已保证这一点。
+- 附带修复（基础验证稳定性）：
+  - 在第二次运行 `./init.sh` 时，`VesselCheckpointSaverTest.getReturnsLatestWhenNoCheckpointIdSpecified` 出现 flaky 失败。根因是文件系统 `lastModifiedTime` 精度有限，两个连续写入的 checkpoint 可能得到相同时间戳，导致 `list()` 排序不稳定。
+  - 修复：在 `VesselCheckpointSaver.put()` 写入后，使用单调递增的时间戳（`max(prev+1, System.currentTimeMillis())`）设置文件最后修改时间，确保同一毫秒内的多次写入仍有明确先后顺序。
+  - 验证：`VesselCheckpointSaverTest` 11 个用例全部通过，且 `./init.sh` 多次运行均稳定通过。
+- 运行过的验证：
+  - `./init.sh`（真实环境，Java 21）→ 成功；9 个 reactor 模块全部 SUCCESS，core 97 个测试全部通过（新增 `LlmClientManagerStreamWithToolsTest`），tool 模块 18 个测试全部通过
+  - 定向测试 `LlmClientManagerStreamWithToolsTest` → 通过；验证在 `finishReason="TOOL_CALLS"`（大写）且 arguments 分两段到达时，callback.onToolCall 被触发且返回完整参数
+- 已记录证据：
+  - 本文件已新增 Session 055
+  - `feature_list.json` 的 `spi-002` 已补充 finishReason 大小写不匹配修复记录
+- 更新过的文件或工件：
+  - `meta-claw-core/src/main/java/meta/claw/core/runtime/LlmClientManager.java`
+  - `meta-claw-core/src/test/java/meta/claw/core/runtime/LlmClientManagerStreamWithToolsTest.java`（新增）
+  - `init.sh`（将新测试纳入 P0 基线）
+  - `claude-progress.md`
+  - `feature_list.json`
+- 已知风险或未解决的问题：
+  - 已根据 Spring AI 源码与真实日志定位根因，但仍待用户在真实 CLI 中输入 `1+1` 确认 "🔧 Calling tool" 行正常出现，且第二轮请求不再因缺失 tool calls 而失败
+- 下一步最佳动作：
+  1. 提交本轮修复
+  2. 由用户在真实 CLI 中输入 `1+1` 确认修复效果
 
 ### Session 054
 

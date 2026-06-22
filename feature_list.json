@@ -1,6 +1,6 @@
 {
   "project": "meta-claw",
-  "last_updated": "2026-06-20",
+  "last_updated": "2026-06-22",
   "package_structure": {
     "config": "meta.claw.core.config — 所有配置模型 + 加载器 + 解析器",
     "vessel": "meta.claw.core.vessel — Vessel 用户域（Profile + Initializer）",
@@ -683,9 +683,19 @@
           "date": "2026-06-20",
           "result": "passing",
           "detail": "根据真实 CLI 日志进一步修复：Moonshot 流式工具调用的 arguments 分段到达，原代码在每个 chunk 中立即解析 JSON 导致永远失败，改为累积 arguments；又发现 finishReason == \"tool_calls\" 的最终 chunk delta 为空、am.hasToolCalls() 为 false，已将 finishReason 判断移到 hasToolCalls 之外，确保累积的 tool calls 必然被解析并通知 callback.onToolCall()；同时修复 assistant 消息的 reasoningContent 在 LlmClientManager.toSpringMessage() 与 SpiMessageConverter.toSpringMessage() 中丢失的问题，并在 StreamingAgentExecutor / AgentExecutor 保存 assistant 消息时保留 reasoningContent；./init.sh 全量通过。"
+        },
+        {
+          "date": "2026-06-20",
+          "result": "passing",
+          "detail": "继续修复流式 tool-call 回调未触发问题：反编译 Spring AI OpenAiChatModel 1.1.8 确认 ChatGenerationMetadata.getFinishReason() 返回的是 OpenAiApi.ChatCompletionFinishReason 枚举名称 \"TOOL_CALLS\"（大写），而此前代码按原始 HTTP 的 snake_case \"tool_calls\" 比较，导致 finishReason 永远匹配不上，累积的 tool calls 不会被解析也不会通知 callback。将 LlmClientManager.streamWithTools() 与 chatStream() 中的 finishReason 判断改为忽略大小写并同时兼容 \"tool_call\"，增加 DEBUG 日志记录每个 chunk 的 hasToolCalls/finishReason/累积数量；新增 LlmClientManagerStreamWithToolsTest 覆盖分段 arguments + 大写 finishReason 场景；将新测试纳入 init.sh P0 基线；./init.sh 全量通过，core 97 个测试全部通过。"
+        },
+        {
+          "date": "2026-06-22",
+          "result": "passing",
+          "detail": "修复禁用 Spring AI 内部 tool execution（internalToolExecutionEnabled=false）后，第二轮请求因 tool 消息丢失 toolCallId/toolName 导致 Moonshot 报 \"tool_call_id is not found\" 400 错误。根因：SpiMessage 仅保存 content，AgentExecutor/StreamingAgentExecutor 把结果包装为 JSON 并丢失 id/name，LlmClientManager.toSpringMessage() 与 VesselRuntime.toSpiMessages() 把 tool 消息的 toolCallId/toolName 硬编码为 \"tool\"。修复：为 SpiMessage 与 MemoryMessage 新增 toolCallId/toolName 字段及 SpiMessage.tool(content, toolCallId, toolName) 工厂方法；AgentExecutor/StreamingAgentExecutor/SpringAiAlibabaAgentEngine 直接以原始结果和真实 id/name 构造 tool 消息；LlmClientManager/VesselRuntime/SpiMessageConverter 在转换时优先使用 SpiMessage 字段，缺失时回退到旧版 JSON 解析，使修复前已持久化的历史消息仍可正确映射；新增 LlmClientManagerToolMessageTest 覆盖显式字段与旧版 JSON 包装两种转换路径；将新测试纳入 init.sh P0 基线；./init.sh 全量通过，core 97 个测试全部通过，tool 18 个测试全部通过。"
         }
       ],
-      "notes": "Phase 2 完成。当前仅支持本地 @Tool 工具循环；Phase 3 将接入 HITL 子系统。2026-06-20 修正 ChatClient 工具 API 调用方式并开启 -parameters；同日先移除流式 tool-call 回调的 finishReason guard，后根据真实日志改为累积分段 arguments 并把 finishReason 判断外移的完整方案，并修复 reasoningContent 透传（受 Spring AI 1.1.8 OpenAiChatModel 不读取 AssistantMessage.properties 限制，第二次请求仍只能带空 reasoning_content，由 MoonshotSerializerModule 补字段）。"
+      "notes": "Phase 2 完成。当前仅支持本地 @Tool 工具循环；Phase 3 将接入 HITL 子系统。2026-06-20 修正 ChatClient 工具 API 调用方式并开启 -parameters；同日先移除流式 tool-call 回调的 finishReason guard，后根据真实日志改为累积分段 arguments 并把 finishReason 判断外移的完整方案，并修复 reasoningContent 透传（受 Spring AI 1.1.8 OpenAiChatModel 不读取 AssistantMessage.properties 限制，第二次请求仍只能带空 reasoning_content，由 MoonshotSerializerModule 补字段）。2026-06-20 进一步发现 finishReason 大小写不匹配（Spring AI 返回 \"TOOL_CALLS\"），已改为忽略大小写匹配，并新增 LlmClientManagerStreamWithToolsTest 覆盖该场景。2026-06-22 修复禁用 Spring AI 内部 tool execution 后 tool 消息丢失 toolCallId/toolName 导致的 400 错误，新增 LlmClientManagerToolMessageTest。"
     },
     {
       "id": "hitl-001",
@@ -913,6 +923,11 @@
           "date": "2026-06-17",
           "result": "passing",
           "detail": "Phase 6 实现完成：AlibabaAgentConfig 新增 checkpointEnabled / checkpointResume / maxCheckpointsPerThread；新增 VesselCheckpointSaver 实现 BaseCheckpointSaver，按 vesselId/threadId/checkpointId.json 落盘，支持 list/get/put/release/clear 与旧 checkpoint 清理；ReactAgentFactory 按 checkpointEnabled 注入 saver；SpringAiAlibabaAgentEngine 在 execute/executeStream/resume 中传递带 threadId/vesselId/maxCheckpointsPerThread 的 RunnableConfig，resume 支持 checkpointResume=true 走 SAA checkpoint 恢复；新增 VesselCheckpointSaverTest（11 个）与 SpringAiAlibabaAgentEngineCheckpointTest（5 个）；同步更新 SpringAiAlibabaAgentEngineTest / StreamTest / MultiAgentTest mock 以适配带 RunnableConfig 的方法签名；将新增测试纳入 init.sh P0 基线；./init.sh 全量通过，core 96 个测试全部通过。"
+        },
+        {
+          "date": "2026-06-20",
+          "result": "passing",
+          "detail": "修复 VesselCheckpointSaver 的 flaky 测试：当两个 checkpoint 在同一毫秒写入时，文件系统 lastModifiedTime 精度不足导致 list/get(latest) 顺序不稳定。在 VesselCheckpointSaver.put() 写入后使用单调递增时间戳（max(prev+1, System.currentTimeMillis())）设置文件最后修改时间，保证连续写入的 checkpoint 有确定先后顺序；VesselCheckpointSaverTest 11 个用例稳定通过，./init.sh 全量通过。"
         }
       ],
       "notes": "AgentEngine SPI Phase 0+1+2+3+4+5+6 已全部实现完成。AgentEngine.executeStream 返回 Reply 以保持 VesselRuntime 落盘逻辑简单；SAA 流式通过 streamMessages() 驱动 callback，usage 信息当前由 ModelMetricsHook 从 AssistantMessage metadata 最佳 effort 读取；HITL 已在 alibaba 引擎下通过 AFTER_MODEL Hook 实现中断/恢复；多 Agent 编排已接入 Sequential/Parallel/Routing；SAA checkpoint 已通过 VesselCheckpointSaver 持久化到文件系统，进程重启后可从 checkpoint 恢复。当前实现不足点详见主设计文档 1.2 节与 Phase 3+ 实施计划对应章节。"

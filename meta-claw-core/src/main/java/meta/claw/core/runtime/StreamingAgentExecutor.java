@@ -108,9 +108,8 @@ public class StreamingAgentExecutor {
             for (SpiToolCall tc : response.toolCalls()) {
                 String result = executeToolCall(toolMap.get(tc.getName()), tc);
                 recordToolCall(ctx, tc.getName());
-                String toolResultJson = buildToolResultJson(tc.getId(), tc.getName(), result);
-                messages.add(SpiMessage.tool(toolResultJson));
-                ctx.getMessages().add(SpiMessage.tool(toolResultJson));
+                messages.add(SpiMessage.tool(result, tc.getId(), tc.getName()));
+                ctx.getMessages().add(SpiMessage.tool(result, tc.getId(), tc.getName()));
             }
         }
 
@@ -137,9 +136,8 @@ public class StreamingAgentExecutor {
                     ? executeToolCall(toolMap.get(item.getToolName()), item)
                     : "REJECTED by operator";
             recordToolCall(ctx, item.getToolName());
-            String toolResultJson = buildToolResultJson(item.getToolCallId(), item.getToolName(), result);
-            messages.add(SpiMessage.tool(toolResultJson));
-            ctx.getMessages().add(SpiMessage.tool(toolResultJson));
+            messages.add(SpiMessage.tool(result, item.getToolCallId(), item.getToolName()));
+            ctx.getMessages().add(SpiMessage.tool(result, item.getToolCallId(), item.getToolName()));
         }
     }
 
@@ -189,18 +187,6 @@ public class StreamingAgentExecutor {
         }
     }
 
-    private String buildToolResultJson(String toolCallId, String toolName, String result) {
-        try {
-            return objectMapper.writeValueAsString(Map.of(
-                    "toolCallId", toolCallId,
-                    "toolName", toolName,
-                    "result", result
-            ));
-        } catch (Exception e) {
-            return "{\"toolCallId\":\"" + toolCallId + "\",\"toolName\":\"" + toolName
-                    + "\",\"result\":\"" + result.replace("\"", "\\\"") + "\"}";
-        }
-    }
 
     private Map<String, Object> parseArguments(String argumentsJson) {
         try {

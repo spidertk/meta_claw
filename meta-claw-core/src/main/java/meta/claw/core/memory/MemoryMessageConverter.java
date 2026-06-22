@@ -19,6 +19,8 @@ public final class MemoryMessageConverter {
                 .content(message.getContent())
                 .reasoningContent(message.getReasoningContent())
                 .toolCalls(message.getToolCalls())
+                .toolCallId(message.getToolCallId())
+                .toolName(message.getToolName())
                 .build();
     }
 
@@ -28,6 +30,8 @@ public final class MemoryMessageConverter {
                 .content(message.getContent())
                 .reasoningContent(message.getReasoningContent())
                 .toolCalls(message.getToolCalls())
+                .toolCallId(message.getToolCallId())
+                .toolName(message.getToolName())
                 .build();
     }
 

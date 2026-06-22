@@ -204,7 +204,7 @@ public class SpringAiAlibabaAgentEngine implements AgentEngine {
             String result = (status == ApprovalStatus.APPROVED)
                     ? executeToolCall(toolSubSystem, item)
                     : "REJECTED by operator";
-            messages.add(SpiMessage.tool(buildToolResultJson(item.getToolCallId(), item.getToolName(), result)));
+            messages.add(SpiMessage.tool(result, item.getToolCallId(), item.getToolName()));
         }
 
         List<Message> springMessages = SpiMessageConverter.toSpringMessages(messages);
@@ -255,19 +255,6 @@ public class SpringAiAlibabaAgentEngine implements AgentEngine {
                     }
                 })
                 .orElse("Error: tool not found: " + item.getToolName());
-    }
-
-    private String buildToolResultJson(String toolCallId, String toolName, String result) {
-        try {
-            return new ObjectMapper().writeValueAsString(Map.of(
-                    "toolCallId", toolCallId,
-                    "toolName", toolName,
-                    "result", result
-            ));
-        } catch (Exception e) {
-            return "{\"toolCallId\":\"" + toolCallId + "\",\"toolName\":\"" + toolName
-                    + "\",\"result\":\"" + result.replace("\"", "\\\"") + "\"}";
-        }
     }
 
     @Override

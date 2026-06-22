@@ -24,4 +24,6 @@ public class MemoryMessage {
     private String content;
     private String reasoningContent;
     private List<SpiToolCall> toolCalls;
+    private String toolCallId;
+    private String toolName;
 }

@@ -269,7 +269,8 @@ public class VesselRuntime implements InitializingBean {
                 case "user" -> restored.add(SpiMessage.user(message.getContent()));
                 case "assistant" -> restored.add(
                         SpiMessage.assistant(message.getContent(), message.getReasoningContent(), message.getToolCalls()));
-                case "tool" -> restored.add(SpiMessage.tool(message.getContent()));
+                case "tool" -> restored.add(
+                        SpiMessage.tool(message.getContent(), message.getToolCallId(), message.getToolName()));
                 default -> {
                     // System prompts are rebuilt from current vessel config when resuming.
                 }

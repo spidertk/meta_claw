@@ -52,10 +52,20 @@ public final class SpiMessageConverter {
                         .build();
             }
             case "tool" -> {
-                ToolResult tr = parseToolResultJson(m.getContent());
+                String toolCallId = m.getToolCallId();
+                String toolName = m.getToolName();
+                String result = m.getContent();
+                if (toolCallId == null || toolName == null) {
+                    ToolResult tr = parseToolResultJson(m.getContent());
+                    toolCallId = tr.toolCallId();
+                    toolName = tr.toolName();
+                    result = tr.result();
+                }
                 yield ToolResponseMessage.builder()
                         .responses(List.of(new ToolResponseMessage.ToolResponse(
-                                tr.toolCallId(), tr.toolName(), tr.result())))
+                                toolCallId != null ? toolCallId : "unknown",
+                                toolName != null ? toolName : "unknown",
+                                result)))
                         .build();
             }
             default -> new UserMessage(m.getContent());

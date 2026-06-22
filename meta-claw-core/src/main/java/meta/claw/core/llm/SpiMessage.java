@@ -19,6 +19,8 @@ public class SpiMessage {
     private String content;
     private String reasoningContent;
     private List<SpiToolCall> toolCalls;
+    private String toolCallId;
+    private String toolName;
 
     public static SpiMessage system(String content) {
         return SpiMessage.builder().role("system").content(content).build();
@@ -47,5 +49,14 @@ public class SpiMessage {
 
     public static SpiMessage tool(String content) {
         return SpiMessage.builder().role("tool").content(content).build();
+    }
+
+    public static SpiMessage tool(String content, String toolCallId, String toolName) {
+        return SpiMessage.builder()
+                .role("tool")
+                .content(content)
+                .toolCallId(toolCallId)
+                .toolName(toolName)
+                .build();
     }
 }

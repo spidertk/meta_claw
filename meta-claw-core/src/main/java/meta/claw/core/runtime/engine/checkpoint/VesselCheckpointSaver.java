@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -43,6 +44,7 @@ public class VesselCheckpointSaver implements BaseCheckpointSaver {
 
     private final ObjectMapper objectMapper;
     private final ConcurrentHashMap<String, ReentrantReadWriteLock> lockMap = new ConcurrentHashMap<>();
+    private final AtomicLong lastTimestamp = new AtomicLong(0);
     private int defaultMaxCheckpoints = 100;
 
     public VesselCheckpointSaver() {
@@ -100,6 +102,8 @@ public class VesselCheckpointSaver implements BaseCheckpointSaver {
             Files.createDirectories(dir);
             Path file = dir.resolve(checkpoint.getId() + CHECKPOINT_FILE_SUFFIX);
             objectMapper.writerWithDefaultPrettyPrinter().writeValue(file.toFile(), checkpoint);
+            // 保证同一毫秒内的多次写入仍有单调递增的修改时间，使 list/get(latest) 顺序稳定
+            Files.setLastModifiedTime(file, java.nio.file.attribute.FileTime.fromMillis(nextTimestamp()));
             cleanupOldCheckpoints(dir, resolveMaxCheckpoints(config));
             return config;
         } finally {
@@ -166,6 +170,10 @@ public class VesselCheckpointSaver implements BaseCheckpointSaver {
         } catch (IOException e) {
             log.warn("Failed to cleanup old checkpoints in {}: {}", dir, e.getMessage());
         }
+    }
+
+    private long nextTimestamp() {
+        return lastTimestamp.updateAndGet(prev -> Math.max(prev + 1, System.currentTimeMillis()));
     }
 
     private int resolveMaxCheckpoints(RunnableConfig config) {

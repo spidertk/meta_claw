@@ -79,9 +79,8 @@ public class AgentExecutor {
                     : "REJECTED by operator";
             recordToolCall(ctx, item.getToolName());
 
-            String toolResultJson = buildToolResultJson(item.getToolCallId(), item.getToolName(), result);
-            messages.add(SpiMessage.tool(toolResultJson));
-            ctx.getMessages().add(SpiMessage.tool(toolResultJson));
+            messages.add(SpiMessage.tool(result, item.getToolCallId(), item.getToolName()));
+            ctx.getMessages().add(SpiMessage.tool(result, item.getToolCallId(), item.getToolName()));
         }
 
         // 继续 ReAct 循环（从第 2 步开始，因为第 1 步已生成 tool_calls）
@@ -129,9 +128,8 @@ public class AgentExecutor {
             for (SpiToolCall tc : response.toolCalls()) {
                 String result = executeToolCall(toolMap.get(tc.getName()), tc);
                 recordToolCall(ctx, tc.getName());
-                String toolResultJson = buildToolResultJson(tc.getId(), tc.getName(), result);
-                messages.add(SpiMessage.tool(toolResultJson));
-                ctx.getMessages().add(SpiMessage.tool(toolResultJson));
+                messages.add(SpiMessage.tool(result, tc.getId(), tc.getName()));
+                ctx.getMessages().add(SpiMessage.tool(result, tc.getId(), tc.getName()));
             }
         }
 
@@ -184,16 +182,4 @@ public class AgentExecutor {
         }
     }
 
-    private String buildToolResultJson(String toolCallId, String toolName, String result) {
-        try {
-            return objectMapper.writeValueAsString(Map.of(
-                    "toolCallId", toolCallId,
-                    "toolName", toolName,
-                    "result", result
-            ));
-        } catch (Exception e) {
-            return "{\"toolCallId\":\"" + toolCallId + "\",\"toolName\":\"" + toolName
-                    + "\",\"result\":\"" + result.replace("\"", "\\\"") + "\"}";
-        }
-    }
 }

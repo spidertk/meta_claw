@@ -27,11 +27,14 @@ import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.ai.model.tool.ToolCallingChatOptions;
+import org.springframework.ai.support.ToolCallbacks;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -72,7 +75,8 @@ public class LlmClientManager implements SpiLlmClient {
                 case "user" -> restored.add(SpiMessage.user(message.getContent()));
                 case "assistant" -> restored.add(
                         SpiMessage.assistant(message.getContent(), message.getReasoningContent(), message.getToolCalls()));
-                case "tool" -> restored.add(SpiMessage.tool(message.getContent()));
+                case "tool" -> restored.add(
+                        SpiMessage.tool(message.getContent(), message.getToolCallId(), message.getToolName()));
                 default -> {
                     // System prompts are rebuilt from current vessel config when resuming.
                 }
@@ -94,10 +98,11 @@ public class LlmClientManager implements SpiLlmClient {
         List<Object> toolInstances = toolRegistry.getToolInstances();
         logRequestParams(messages, toolInstances);
 
+        ToolCallingChatOptions toolOptions = buildToolOptions(toolInstances);
+
         long startTime = System.currentTimeMillis();
         ChatResponse chatResponse = buildChatClient(request.getVesselId())
-                .prompt(new Prompt(messages))
-                .tools(toolInstances.toArray())
+                .prompt(new Prompt(messages, toolOptions))
                 .call()
                 .chatResponse();
         long latency = System.currentTimeMillis() - startTime;
@@ -140,10 +145,14 @@ public class LlmClientManager implements SpiLlmClient {
         java.util.Map<String, AssistantMessage.ToolCall> accumulatingToolCalls = new java.util.LinkedHashMap<>();
         ObjectMapper objectMapper = new ObjectMapper();
 
+        ToolCallingChatOptions toolOptions = ToolCallingChatOptions.builder()
+                .toolCallbacks(Arrays.asList(toolCallbacks))
+                .internalToolExecutionEnabled(false)
+                .build();
+
         try {
             buildRawChatClient(request.getVesselId())
-                    .prompt(new Prompt(messages))
-                    .toolCallbacks(toolCallbacks)
+                    .prompt(new Prompt(messages, toolOptions))
                     .stream()
                     .chatResponse()
                     .doOnNext(response -> {
@@ -162,10 +171,16 @@ public class LlmClientManager implements SpiLlmClient {
                             }
 
                             if (gen.getOutput() instanceof AssistantMessage am && am.hasToolCalls()) {
+                                log.debug("[STREAM-WITH-TOOLS] chunk hasToolCalls=true, count={}, content={}",
+                                        am.getToolCalls().size(), abbreviate(am.getText(), 80));
                                 accumulateToolCalls(am, accumulatingToolCalls, accumulatingToolArgs);
                             }
                             String finishReason = gen.getMetadata() != null ? gen.getMetadata().getFinishReason() : null;
-                            if ("tool_calls".equals(finishReason) && !accumulatingToolCalls.isEmpty()) {
+                            boolean isToolCallFinish = finishReason != null
+                                    && (finishReason.equalsIgnoreCase("tool_calls") || finishReason.equalsIgnoreCase("tool_call"));
+                            if (isToolCallFinish && !accumulatingToolCalls.isEmpty()) {
+                                log.debug("[STREAM-WITH-TOOLS] finishReason={}, accumulated {} tool call(s)",
+                                        finishReason, accumulatingToolCalls.size());
                                 List<SpiToolCall> calls = new ArrayList<>();
                                 for (AssistantMessage.ToolCall tc : accumulatingToolCalls.values()) {
                                     if (notifiedToolCallIds.add(tc.id())) {
@@ -252,9 +267,10 @@ public class LlmClientManager implements SpiLlmClient {
         logRequestParams(messages, toolInstances);
 
         try {
+            ToolCallingChatOptions toolOptions = buildToolOptions(toolInstances);
+
             buildChatClient(request.getVesselId())
-                    .prompt(new Prompt(messages))
-                    .tools(toolInstances.toArray())
+                    .prompt(new Prompt(messages, toolOptions))
                     .advisors(spec -> spec
                             .param("vesselName", request.getVesselId())
                             .param("sessionId", request.getSessionId()))
@@ -288,10 +304,16 @@ public class LlmClientManager implements SpiLlmClient {
 
                             // 检测 tool calls（流式参数分段到达，需累积后解析）
                             if (gen.getOutput() instanceof AssistantMessage am && am.hasToolCalls()) {
+                                log.debug("[STREAM] chunk hasToolCalls=true, count={}, content={}",
+                                        am.getToolCalls().size(), abbreviate(am.getText(), 80));
                                 accumulateToolCalls(am, accumulatingToolCalls, accumulatingToolArgs);
                             }
                             String finishReason = gen.getMetadata() != null ? gen.getMetadata().getFinishReason() : null;
-                            if ("tool_calls".equals(finishReason) && !accumulatingToolCalls.isEmpty()) {
+                            boolean isToolCallFinish = finishReason != null
+                                    && (finishReason.equalsIgnoreCase("tool_calls") || finishReason.equalsIgnoreCase("tool_call"));
+                            if (isToolCallFinish && !accumulatingToolCalls.isEmpty()) {
+                                log.debug("[STREAM] finishReason={}, accumulated {} tool call(s)",
+                                        finishReason, accumulatingToolCalls.size());
                                 for (AssistantMessage.ToolCall tc : accumulatingToolCalls.values()) {
                                     if (notifiedToolCallIds.add(tc.id())) {
                                         try {
@@ -402,9 +424,13 @@ public class LlmClientManager implements SpiLlmClient {
                 .collect(Collectors.toCollection(ArrayList::new));
 
         long startTime = System.currentTimeMillis();
+        ToolCallingChatOptions toolOptions = ToolCallingChatOptions.builder()
+                .toolCallbacks(Arrays.asList(toolCallbacks))
+                .internalToolExecutionEnabled(false)
+                .build();
+
         ChatResponse chatResponse = buildRawChatClient(request.getVesselId())
-                .prompt(new Prompt(messages))
-                .toolCallbacks(toolCallbacks)
+                .prompt(new Prompt(messages, toolOptions))
                 .call()
                 .chatResponse();
         long latency = System.currentTimeMillis() - startTime;
@@ -436,6 +462,16 @@ public class LlmClientManager implements SpiLlmClient {
     private ChatClient buildRawChatClient(String vesselId) {
         ProviderConfig providerConfig = runtimeConfigResolver.resolve(vesselId).getProviderConfig();
         return llmClientProviderManager.createRaw(providerConfig);
+    }
+
+    private ToolCallingChatOptions buildToolOptions(List<Object> toolInstances) {
+        List<ToolCallback> callbacks = toolInstances.isEmpty()
+                ? List.of()
+                : Arrays.asList(ToolCallbacks.from(toolInstances.toArray()));
+        return ToolCallingChatOptions.builder()
+                .toolCallbacks(callbacks)
+                .internalToolExecutionEnabled(false)
+                .build();
     }
 
     private static List<SpiToolCall> extractToolCalls(Generation gen) {
@@ -491,11 +527,25 @@ public class LlmClientManager implements SpiLlmClient {
                         .toolCalls(toSpringToolCalls(msg.getToolCalls()))
                         .build();
             }
-            case "tool" -> ToolResponseMessage.builder()
-                    .responses(List.of(
-                            new ToolResponseMessage.ToolResponse("tool", "tool", msg.getContent())
-                    ))
-                    .build();
+            case "tool" -> {
+                String toolCallId = msg.getToolCallId();
+                String toolName = msg.getToolName();
+                String content = msg.getContent();
+                if (toolCallId == null || toolName == null) {
+                    LegacyToolResult legacy = parseLegacyToolResultJson(content);
+                    toolCallId = legacy.toolCallId;
+                    toolName = legacy.toolName;
+                    content = legacy.result;
+                }
+                yield ToolResponseMessage.builder()
+                        .responses(List.of(
+                                new ToolResponseMessage.ToolResponse(
+                                        toolCallId != null ? toolCallId : "tool",
+                                        toolName != null ? toolName : "tool",
+                                        content)
+                        ))
+                        .build();
+            }
             default -> {
                 log.warn("Unknown message role '{}', defaulting to user message", msg.getRole());
                 yield new UserMessage(msg.getContent());
@@ -546,6 +596,30 @@ public class LlmClientManager implements SpiLlmClient {
             String args = tc.arguments() != null ? tc.arguments() : "";
             accumulatingToolCalls.put(id, new AssistantMessage.ToolCall(id, type, name, args));
             accumulatingToolArgs.computeIfAbsent(id, k -> new StringBuilder()).append(args);
+        }
+    }
+
+    private static String abbreviate(String s, int maxLen) {
+        if (s == null) {
+            return "";
+        }
+        return s.length() <= maxLen ? s : s.substring(0, maxLen) + "...";
+    }
+
+    private record LegacyToolResult(String toolCallId, String toolName, String result) {}
+
+    private static LegacyToolResult parseLegacyToolResultJson(String json) {
+        if (json == null || json.isBlank()) {
+            return new LegacyToolResult(null, null, "");
+        }
+        try {
+            Map<String, Object> map = new ObjectMapper().readValue(json, new TypeReference<>() {});
+            return new LegacyToolResult(
+                    String.valueOf(map.getOrDefault("toolCallId", "tool")),
+                    String.valueOf(map.getOrDefault("toolName", "tool")),
+                    String.valueOf(map.getOrDefault("result", json)));
+        } catch (Exception e) {
+            return new LegacyToolResult(null, null, json);
         }
     }
 }
