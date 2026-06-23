@@ -1,7 +1,7 @@
 # 干净状态检查清单
 
 > 最后核对：2026-06-23
-> 结论：已补全 HITL 全局配置加载与模板示例。`GlobalConfig` 与 `VesselConfig` 共用独立类 `HitlConfig`；`HitlSubSystem` 在 `@PostConstruct` 中读取 `~/.meta-claw/config.yaml` 的全局 hitl 配置并注入 `ConfigurableHitlPolicy`；`global-config.tmpl.yaml` 与 `vessel.meta.tmpl.yaml` 均包含 HITL 配置示例与继承/覆盖规则说明。`./init.sh` 全量通过，core 104 个测试全部通过，tool 18 个测试全部通过。
+> 结论：已补全 HITL 全局配置加载与模板示例，并修复由此引入的 Spring 循环依赖。`GlobalConfig` 与 `VesselConfig` 共用独立类 `HitlConfig`；`HitlSubSystem` 在 `@PostConstruct` 中读取 `~/.meta-claw/config.yaml` 的全局 hitl 配置并注入 `ConfigurableHitlPolicy`；对 `VesselManager` 使用 `@Lazy` 注入以切断 `vesselManager -> vesselRuntime -> hitlSubSystem -> vesselManager` 循环；`global-config.tmpl.yaml` 与 `vessel.meta.tmpl.yaml` 均包含 HITL 配置示例与继承/覆盖规则说明。`./init.sh` 全量通过，core 104 个测试全部通过，tool 18 个测试全部通过。
 
 - [x] 标准启动路径仍然可用
   证据：2026-06-23 执行 `./init.sh` 成功，内部 `mvn clean compile` + P0 测试完成，9 个 reactor 模块全部 SUCCESS；脚本自动使用 `~/.local/jdks/jdk-21.0.10+7/Contents/Home` 与 `~/.local/tools/apache-maven-3.9.15/bin/mvn`
@@ -12,7 +12,7 @@
 - [x] 功能状态真实反映了 passing 和未验证的边界
   证据：`feature_list.json` 的 `hitl-001` 已补充全局 HITL 配置加载与模板示例记录；CLI 真实端到端验证仍待用户执行
 - [x] 没有任何半成品步骤处于未记录状态
-  证据：`HitlConfig` 提取、`GlobalConfig`/`VesselConfig` 复用、`HitlSubSystem` 全局加载、模板示例更新、测试与状态文件更新均已完成
+  证据：`HitlConfig` 提取、`GlobalConfig`/`VesselConfig` 复用、`HitlSubSystem` 全局加载、`@Lazy` 修复循环依赖、模板示例更新、测试与状态文件更新均已完成
 - [x] 下一轮会话无需人工修复即可继续
   证据：下一轮可直接运行 `./init.sh`，再进入 CLI 真实 HITL 端到端验证
 

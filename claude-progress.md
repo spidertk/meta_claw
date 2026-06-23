@@ -13,6 +13,7 @@
 - 最近已通过证据 5：2026-06-22 修复禁用 Spring AI 内部 tool execution 后 Moonshot 报 `"tool_call_id is not found"` 400 错误：根因是 `SpiMessage` 未保存 `toolCallId`/`toolName`，`LlmClientManager.toSpringMessage()` 与 `VesselRuntime.toSpiMessages()` 把 tool 消息硬编码为 `"tool"`，且 `AgentExecutor`/`StreamingAgentExecutor` 把工具结果包装成 JSON 导致原始 content 丢失。已为 `SpiMessage`/`MemoryMessage` 新增 `toolCallId`/`toolName` 字段与工厂方法，所有执行器直接以原始结果和真实 id/name 构造 tool 消息，转换器优先使用字段、缺失时回退旧版 JSON 解析；新增 `LlmClientManagerToolMessageTest`；重新执行 `./init.sh` 通过，core 97 个测试全部通过，tool 模块 18 个测试全部通过
 - 最近已通过证据 6：2026-06-23 实现 Vessel 级 HITL 配置：在 `VesselConfig` 中新增 `HitlConfig`（`defaultRequireApproval` / `require` / `skip`），改造 `ConfigurableHitlPolicy` 为 `Map<vesselId, config>` 的按 Vessel 隔离策略，`HitlSubSystem` 实现 `VesselAwareSubSystem` 在 `loadForVessel` 时读取 vessel 配置并注入策略，未配置 vessel 回退到全局 `hitl.default-require-approval`；保留旧 `configure(require, skip)` API 兼容现有测试；更新 `default`/`alibaba` `vessel.meta.yaml` 示例加入 HITL 配置注释；扩展 `ConfigurableHitlPolicyTest` 与 `HitlSubSystemTest` 覆盖 per-vessel 配置与回退逻辑；重新执行 `./init.sh` 通过，core 101 个测试全部通过，tool 模块 18 个测试全部通过
 - 最近已通过证据 7：2026-06-23 补全全局 HITL 配置加载与模板示例：将 `HitlConfig` 提取为独立类 `meta.claw.core.config.HitlConfig` 供 `GlobalConfig` 与 `VesselConfig` 复用；`GlobalConfig` 新增 `hitl` 字段，`HitlSubSystem` 在 `@PostConstruct` 中通过 `GlobalConfigLoader` 读取 `~/.meta-claw/config.yaml` 的全局 hitl 配置并注入 `ConfigurableHitlPolicy`；更新 `global-config.tmpl.yaml` 与 `vessel.meta.tmpl.yaml` 的 HITL 示例和覆盖规则说明；新增 `HitlSubSystemTest#loadGlobalHitlConfigAppliesGlobalDefaults` 验证全局配置生效；重新执行 `./init.sh` 通过，core 104 个测试全部通过，tool 模块 18 个测试全部通过
+- 最近已通过证据 8：2026-06-23 修复 HITL 改动引入的 Spring 循环依赖：`HitlSubSystem` 注入 `VesselManager`，而 `VesselManager` 创建 `VesselRuntime` 时又会收集 `HitlSubSystem`，形成 `vesselManager -> vesselRuntime -> hitlSubSystem -> vesselManager` 循环；通过在 `HitlSubSystem.vesselManager` 上添加 `@Lazy` 注入代理，在运行时才解析真正的 `VesselManager`；重新执行 `./init.sh` 通过，core 104 个测试全部通过，tool 模块 18 个测试全部通过
 - 当前最高优先级未完成功能：agent-engine-001（Agent 执行引擎抽象：native / alibaba 双实现设计）Phase 0+1+2+3+4+5+6 已全部实现完成；下一步为真实 LLM 端到端验证或处理其他优先级功能
 - 当前 blocker：
   1. 当前无 blocker
@@ -72,8 +73,7 @@
 - 已知风险或未解决的问题：
   - 当前 CLI 真实端到端验证仍待用户执行；可在某个 vessel 的 `vessel.meta.yaml` 中配置 `hitl.require: [calculate]` 后运行 `chat`，输入 `1+1` 观察是否出现审批提示
 - 下一步最佳动作：
-  1. 提交本轮修改
-  2. 由用户在真实 CLI 中验证 HITL 审批交互
+  1. 由用户在真实 CLI 中验证 HITL 审批交互
 
 ### Session 057
 
