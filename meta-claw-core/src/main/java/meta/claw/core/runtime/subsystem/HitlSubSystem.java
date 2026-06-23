@@ -6,16 +6,13 @@ import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import meta.claw.core.config.GlobalConfig;
 import meta.claw.core.config.HitlConfig;
-import meta.claw.core.config.VesselConfig;
 import meta.claw.core.config.loader.GlobalConfigLoader;
 import meta.claw.core.infra.ProjectRootFinder;
 import meta.claw.core.prompt.PromptVars;
 import meta.claw.core.runtime.TaskContext;
-import meta.claw.core.runtime.VesselManager;
 import meta.claw.core.runtime.hitl.*;
 import meta.claw.core.tool.SpiToolCall;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 
 import java.nio.file.Path;
@@ -32,17 +29,13 @@ import java.util.UUID;
  */
 @Slf4j
 @Component
-public class HitlSubSystem implements VesselSubSystem, VesselAwareSubSystem {
+public class HitlSubSystem implements VesselSubSystem {
 
     @Autowired
     private HitlPolicy hitlPolicy;
 
     @Autowired
     private HitlGate hitlGate;
-
-    @Autowired
-    @Lazy
-    private VesselManager vesselManager;
 
     @Autowired
     private GlobalConfigLoader globalConfigLoader;
@@ -100,33 +93,6 @@ public class HitlSubSystem implements VesselSubSystem, VesselAwareSubSystem {
             log.warn("HITL policy is not configurable, cannot apply global HITL settings");
         }
         globalHitlLoaded = true;
-    }
-
-    @Override
-    public void loadForVessel(String vesselId) {
-        if (vesselManager == null) {
-            log.warn("VesselManager not available, skipping per-vessel HITL configuration");
-            return;
-        }
-        VesselConfig config = vesselManager.getConfig(vesselId);
-        if (config == null || config.getHitl() == null) {
-            log.debug("No HITL config found for vessel {}", vesselId);
-            return;
-        }
-        HitlConfig hitlConfig = config.getHitl();
-        Set<String> require = hitlConfig.getRequire() != null
-                ? Set.copyOf(hitlConfig.getRequire())
-                : null;
-        Set<String> skip = hitlConfig.getSkip() != null
-                ? Set.copyOf(hitlConfig.getSkip())
-                : null;
-        if (hitlPolicy instanceof ConfigurableHitlPolicy configurable) {
-            configurable.configure(vesselId, require, skip, hitlConfig.getDefaultRequireApproval());
-            log.info("Loaded HITL config for vessel {}: require={}, skip={}, defaultRequireApproval={}",
-                    vesselId, require, skip, hitlConfig.getDefaultRequireApproval());
-        } else {
-            log.warn("HITL policy is not configurable, cannot apply per-vessel HITL settings");
-        }
     }
 
     /**

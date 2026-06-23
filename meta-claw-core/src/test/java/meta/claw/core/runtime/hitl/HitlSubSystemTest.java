@@ -2,10 +2,8 @@ package meta.claw.core.runtime.hitl;
 
 import meta.claw.core.config.GlobalConfig;
 import meta.claw.core.config.HitlConfig;
-import meta.claw.core.config.VesselConfig;
 import meta.claw.core.config.loader.GlobalConfigLoader;
 import meta.claw.core.runtime.TaskContext;
-import meta.claw.core.runtime.VesselManager;
 import meta.claw.core.runtime.VesselTask;
 import meta.claw.core.runtime.subsystem.HitlSubSystem;
 import meta.claw.core.runtime.subsystem.SubSystemRegistry;
@@ -59,38 +57,6 @@ class HitlSubSystemTest {
         assertTrue(eval.hasSuspensions());
         assertEquals(1, eval.getTicket().getItems().size());
         assertEquals("dangerous", eval.getTicket().getItems().get(0).getToolName());
-    }
-
-    @Test
-    void loadForVesselConfiguresPerVesselPolicy() {
-        HitlSubSystem hitl = new HitlSubSystem();
-        hitl.configure(new SubSystemRegistry());
-        ConfigurableHitlPolicy policy = new ConfigurableHitlPolicy();
-        ReflectionTestUtils.setField(hitl, "hitlPolicy", policy);
-        ReflectionTestUtils.setField(hitl, "hitlGate", new InMemoryHitlGate());
-
-        HitlConfig hitlConfig = new HitlConfig();
-        hitlConfig.setRequire(List.of("execute"));
-        hitlConfig.setSkip(List.of("readFile"));
-        hitlConfig.setDefaultRequireApproval(false);
-
-        VesselConfig vesselConfig = new VesselConfig();
-        vesselConfig.setHitl(hitlConfig);
-
-        VesselManager vesselManager = mock(VesselManager.class);
-        when(vesselManager.getConfig("v1")).thenReturn(vesselConfig);
-        ReflectionTestUtils.setField(hitl, "vesselManager", vesselManager);
-
-        hitl.loadForVessel("v1");
-
-        TaskContext ctx = new TaskContext(
-                VesselTask.builder().taskId("t1").vesselId("v1").build(),
-                null,
-                new SubSystemRegistry()
-        );
-        assertTrue(hitl.evaluate(List.of(SpiToolCall.builder().id("c1").name("execute").arguments(Map.of()).build()), ctx).hasSuspensions());
-        assertFalse(hitl.evaluate(List.of(SpiToolCall.builder().id("c2").name("readFile").arguments(Map.of()).build()), ctx).hasSuspensions());
-        assertFalse(hitl.evaluate(List.of(SpiToolCall.builder().id("c3").name("calculate").arguments(Map.of()).build()), ctx).hasSuspensions());
     }
 
     @Test

@@ -1,9 +1,12 @@
 package meta.claw.core.runtime;
 
 import lombok.extern.slf4j.Slf4j;
+import meta.claw.core.config.HitlConfig;
 import meta.claw.core.config.loader.VesselConfigLoader;
 import meta.claw.core.config.VesselConfig;
 import meta.claw.core.infra.ProjectRootFinder;
+import meta.claw.core.runtime.hitl.ConfigurableHitlPolicy;
+import meta.claw.core.runtime.hitl.HitlPolicy;
 import meta.claw.core.vessel.VesselInitializer;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.ObjectProvider;
@@ -16,6 +19,7 @@ import java.nio.file.Path;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
 
@@ -38,6 +42,9 @@ public class VesselManager implements InitializingBean {
 
     @Autowired
     private VesselInitializer vesselInitializer;
+
+    @Autowired
+    private HitlPolicy hitlPolicy;
 
     /**
      * 存储已加载的 Vessel 配置，key 为 vesselId
@@ -68,6 +75,7 @@ public class VesselManager implements InitializingBean {
         for (VesselConfig meta : loaded) {
             if (meta.getIdentity().getId() != null && !meta.getIdentity().getId().isEmpty()) {
                 vessels.put(meta.getIdentity().getId(), meta);
+                configureHitlPolicy(meta);
                 log.info("Loaded vessel config: {} ({})", meta.getIdentity().getId(), meta.getIdentity().getName());
             }
         }
@@ -144,6 +152,7 @@ public class VesselManager implements InitializingBean {
 
         VesselConfig config = vesselConfigLoader.load(vesselsDir.resolve(name));
         vessels.put(name, config);
+        configureHitlPolicy(config);
         log.info("Loaded vessel config into memory: {}", name);
 
         registerRuntime(name);
@@ -201,6 +210,25 @@ public class VesselManager implements InitializingBean {
                 registerRuntime(id);
             }
         }
+    }
+
+    private void configureHitlPolicy(VesselConfig config) {
+        if (config == null || config.getHitl() == null) {
+            return;
+        }
+        if (!(hitlPolicy instanceof ConfigurableHitlPolicy policy)) {
+            return;
+        }
+        HitlConfig hitl = config.getHitl();
+        Set<String> require = hitl.getRequire() != null ? Set.copyOf(hitl.getRequire()) : null;
+        Set<String> skip = hitl.getSkip() != null ? Set.copyOf(hitl.getSkip()) : null;
+        String vesselId = config.getIdentity() != null ? config.getIdentity().getId() : null;
+        if (vesselId == null || vesselId.isBlank()) {
+            return;
+        }
+        policy.configure(vesselId, require, skip, hitl.getDefaultRequireApproval());
+        log.info("Loaded HITL config for vessel {}: require={}, skip={}, defaultRequireApproval={}",
+                vesselId, require, skip, hitl.getDefaultRequireApproval());
     }
 
     private void deleteDirectory(Path dir) throws IOException {
