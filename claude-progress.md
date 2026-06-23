@@ -14,6 +14,7 @@
 - 最近已通过证据 6：2026-06-23 实现 Vessel 级 HITL 配置：在 `VesselConfig` 中新增 `HitlConfig`（`defaultRequireApproval` / `require` / `skip`），改造 `ConfigurableHitlPolicy` 为 `Map<vesselId, config>` 的按 Vessel 隔离策略，`HitlSubSystem` 实现 `VesselAwareSubSystem` 在 `loadForVessel` 时读取 vessel 配置并注入策略，未配置 vessel 回退到全局 `hitl.default-require-approval`；保留旧 `configure(require, skip)` API 兼容现有测试；更新 `default`/`alibaba` `vessel.meta.yaml` 示例加入 HITL 配置注释；扩展 `ConfigurableHitlPolicyTest` 与 `HitlSubSystemTest` 覆盖 per-vessel 配置与回退逻辑；重新执行 `./init.sh` 通过，core 101 个测试全部通过，tool 模块 18 个测试全部通过
 - 最近已通过证据 7：2026-06-23 补全全局 HITL 配置加载与模板示例：将 `HitlConfig` 提取为独立类 `meta.claw.core.config.HitlConfig` 供 `GlobalConfig` 与 `VesselConfig` 复用；`GlobalConfig` 新增 `hitl` 字段，`HitlSubSystem` 在 `@PostConstruct` 中通过 `GlobalConfigLoader` 读取 `~/.meta-claw/config.yaml` 的全局 hitl 配置并注入 `ConfigurableHitlPolicy`；更新 `global-config.tmpl.yaml` 与 `vessel.meta.tmpl.yaml` 的 HITL 示例和覆盖规则说明；新增 `HitlSubSystemTest#loadGlobalHitlConfigAppliesGlobalDefaults` 验证全局配置生效；重新执行 `./init.sh` 通过，core 104 个测试全部通过，tool 模块 18 个测试全部通过
 - 最近已通过证据 8：2026-06-23 修复 HITL 改动引入的 Spring 循环依赖：`HitlSubSystem` 注入 `VesselManager`，而 `VesselManager` 创建 `VesselRuntime` 时又会收集 `HitlSubSystem`，形成 `vesselManager -> vesselRuntime -> hitlSubSystem -> vesselManager` 循环；通过在 `HitlSubSystem.vesselManager` 上添加 `@Lazy` 注入代理，在运行时才解析真正的 `VesselManager`；重新执行 `./init.sh` 通过，core 104 个测试全部通过，tool 模块 18 个测试全部通过
+- 最近已通过证据 9：2026-06-23 彻底解决 HITL 循环依赖：`@Lazy` 未能实际消除启动失败，根因是 `HitlSubSystem` 仍然反向依赖 `VesselManager`；将按 Vessel 配置 HITL 策略的职责上移到 `VesselManager`（它本来就负责加载 VesselConfig），`HitlSubSystem` 只保留全局 HITL 配置加载与工具调用审批评估；新增 `VesselManagerTest` 覆盖 per-vessel HITL 配置加载；重新执行 `./init.sh` 通过，core 105 个测试全部通过，tool 模块 18 个测试全部通过
 - 当前最高优先级未完成功能：agent-engine-001（Agent 执行引擎抽象：native / alibaba 双实现设计）Phase 0+1+2+3+4+5+6 已全部实现完成；下一步为真实 LLM 端到端验证或处理其他优先级功能
 - 当前 blocker：
   1. 当前无 blocker
@@ -64,10 +65,12 @@
   - `meta-claw-core/src/main/java/meta/claw/core/config/HitlConfig.java`（新增）
   - `meta-claw-core/src/main/java/meta/claw/core/config/VesselConfig.java`
   - `meta-claw-core/src/main/java/meta/claw/core/config/GlobalConfig.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/runtime/VesselManager.java`
   - `meta-claw-core/src/main/java/meta/claw/core/runtime/subsystem/HitlSubSystem.java`
   - `meta-claw-core/src/main/resources/templates/global-config.tmpl.yaml`
   - `meta-claw-core/src/main/resources/templates/user/vessel.meta.tmpl.yaml`
   - `meta-claw-core/src/test/java/meta/claw/core/runtime/hitl/HitlSubSystemTest.java`
+  - `meta-claw-core/src/test/java/meta/claw/core/runtime/VesselManagerTest.java`（新增）
   - `claude-progress.md`
   - `feature_list.json`
 - 已知风险或未解决的问题：

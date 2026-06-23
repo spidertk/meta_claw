@@ -739,9 +739,14 @@
           "date": "2026-06-23",
           "result": "passing",
           "detail": "补全全局 HITL 配置加载与模板示例：把 HitlConfig 提取为独立类 meta.claw.core.config.HitlConfig，供 GlobalConfig 与 VesselConfig 复用；GlobalConfig 新增 hitl 字段（defaultRequireApproval / require / skip）；HitlSubSystem 在 @PostConstruct 中通过 GlobalConfigLoader 读取 ~/.meta-claw/config.yaml 的全局 hitl 配置并注入 ConfigurableHitlPolicy；更新 global-config.tmpl.yaml 加入 HITL 全局默认配置示例与规则说明；更新 vessel.meta.tmpl.yaml 的 HITL 注释，明确继承/覆盖语义与 YAML key 规范；新增 HitlSubSystemTest#loadGlobalHitlConfigAppliesGlobalDefaults 验证全局配置生效；./init.sh 全量通过，core 104 个测试全部通过，tool 18 个测试全部通过。"
+        },
+        {
+          "date": "2026-06-23",
+          "result": "passing",
+          "detail": "彻底解决 HITL 循环依赖：@Lazy 未能消除 vesselManager -> vesselRuntime -> hitlSubSystem -> vesselManager 启动失败，将 per-vessel HITL 配置职责从 HitlSubSystem 上移到 VesselManager，HitlSubSystem 不再依赖 VesselManager，仅保留全局 HITL 加载与工具调用审批；新增 VesselManagerTest 覆盖 per-vessel HITL 配置；./init.sh 全量通过，core 105 个测试全部通过，tool 18 个测试全部通过。"
         }
       ],
-      "notes": "Phase 3 完成。非流式与流式执行路径均已集成 HITL。InMemoryHitlGate 为内存实现，不支持进程重启恢复；Gateway 等渠道需自定义 onHitlSuspend 行为。2026-06-19 修复 InMemoryHitlGate 与 CliHitlGate 的注入歧义。2026-06-23 新增 Vessel 级 HITL 配置，支持按 vessel 设置 default_require_approval / require / skip，不同 Vessel 策略隔离。2026-06-23 补全全局 HITL 配置加载：global-config.tmpl.yaml 与 vessel.meta.tmpl.yaml 均包含 HITL 示例，GlobalConfig 支持 hitl 字段并由 HitlSubSystem 在启动时加载；同日在 HitlSubSystem 的 VesselManager 注入上增加 @Lazy，切断 vesselManager -> vesselRuntime -> hitlSubSystem -> vesselManager 循环依赖。"
+      "notes": "Phase 3 完成。非流式与流式执行路径均已集成 HITL。InMemoryHitlGate 为内存实现，不支持进程重启恢复；Gateway 等渠道需自定义 onHitlSuspend 行为。2026-06-19 修复 InMemoryHitlGate 与 CliHitlGate 的注入歧义。2026-06-23 新增 Vessel 级 HITL 配置，支持按 vessel 设置 default_require_approval / require / skip，不同 Vessel 策略隔离。2026-06-23 补全全局 HITL 配置加载：global-config.tmpl.yaml 与 vessel.meta.tmpl.yaml 均包含 HITL 示例，GlobalConfig 支持 hitl 字段并由 HitlSubSystem 在启动时加载。2026-06-23 彻底解决 HITL 循环依赖：将 per-vessel HITL 配置职责从 HitlSubSystem 上移到 VesselManager，HitlSubSystem 不再依赖 VesselManager；新增 VesselManagerTest。"
     },
     {
       "id": "skill-001",
