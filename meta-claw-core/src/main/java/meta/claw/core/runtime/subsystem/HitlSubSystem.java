@@ -15,6 +15,7 @@ import meta.claw.core.runtime.VesselManager;
 import meta.claw.core.runtime.hitl.*;
 import meta.claw.core.tool.SpiToolCall;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 
 import java.nio.file.Path;
@@ -40,6 +41,7 @@ public class HitlSubSystem implements VesselSubSystem, VesselAwareSubSystem {
     private HitlGate hitlGate;
 
     @Autowired
+    @Lazy
     private VesselManager vesselManager;
 
     @Autowired
