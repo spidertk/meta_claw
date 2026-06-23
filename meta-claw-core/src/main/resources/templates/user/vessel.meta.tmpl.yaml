@@ -10,6 +10,7 @@
 #   behavior  → VesselConfig.Behavior    — 运行时行为模式（角色、自动服务等）
 #   memory    → VesselConfig.MemoryConfig — 记忆存储后端配置
 #   tools     → VesselConfig.ToolConfig  — 工具系统配置
+#   hitl      → HitlConfig               — 人工审批策略（按 Vessel 覆盖全局）
 #
 # 旧版 key 兼容：
 #   旧版 YAML 使用 meta: 和 runtime:，加载时通过 VesselConfigLoader
@@ -75,6 +76,18 @@ tools:
   # 要排除的工具列表（按名称排除，空列表表示不排除任何工具）
   # → 映射到 VesselConfig.ToolConfig.exclude
   exclude: []
+
+# HITL 人工审批配置（按 Vessel 隔离，可选）
+# → 映射到 hitl（类型 HitlConfig）
+# 规则：
+#   - 未在本文指定的字段继承 ~/.meta-claw/config.yaml 中的全局 hitl 配置
+#   - 显式设置（包括空列表 []）则覆盖全局对应字段
+#   - 优先级：skip > require > default_require_approval
+#   - YAML key 必须是小写 + 下划线：default_require_approval / require / skip
+# hitl:
+#   default_require_approval: false   # true=所有工具都需审批；false=仅 require 名单中的工具需审批
+#   require: [execute, writeFile]     # 需要审批的工具名
+#   skip: [calculate, readFile]       # 自动跳过审批的工具名
 
 # Agent 执行引擎：native（自研 ReAct）或 alibaba（Spring AI Alibaba ReactAgent）
 # → 映射到 VesselConfig.agentEngine

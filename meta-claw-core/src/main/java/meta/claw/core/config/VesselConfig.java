@@ -62,6 +62,9 @@ public class VesselConfig {
     /** Spring AI Alibaba 引擎专属配置（仅 agentEngine=alibaba 时生效） */
     private AlibabaAgentConfig alibabaAgent = new AlibabaAgentConfig();
 
+    /** HITL 审批策略配置（按 Vessel 隔离） */
+    private HitlConfig hitl = new HitlConfig();
+
     /** 子 Agent 列表（仅 agentEngine=alibaba 且启用多 Agent 编排时生效） */
     private List<VesselAgentConfig> agents = new ArrayList<>();
 

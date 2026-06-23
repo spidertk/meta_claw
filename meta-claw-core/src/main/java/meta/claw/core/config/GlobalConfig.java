@@ -36,4 +36,11 @@ public class GlobalConfig {
      * <p>true 时输出详细内部调用链路，生产环境建议保持 false。</p>
      */
     private Boolean logDebug;
+
+    /**
+     * 全局 HITL 审批策略默认配置。
+     * <p>Vessel 级 vessel.meta.yaml 中的 hitl 字段可覆盖此处任意字段；
+     * 未覆盖字段由本全局配置提供。</p>
+     */
+    private HitlConfig hitl = new HitlConfig();
 }

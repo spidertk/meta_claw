@@ -11,6 +11,8 @@
 - 最近已通过证据 3：2026-06-20 根据真实 CLI 日志进一步修复：Moonshot 流式工具调用的 arguments 是分段到达的，原代码在每个 chunk 中立即解析 JSON 导致永远失败，已改为累积 arguments；又发现 `finishReason == "tool_calls"` 的 chunk 本身 `delta` 为空、`am.hasToolCalls()` 为 false，导致仍无法触发回调，已把 finishReason 判断移到 hasToolCalls 之外；同时把 assistant 消息的 `reasoningContent` 在 `toSpringMessage` 转换中写入 `AssistantMessage.properties`，并在 `StreamingAgentExecutor` / `AgentExecutor` 保存 assistant 消息时保留 reasoningContent；重新执行 `./init.sh` 通过，core 96 个测试全部通过
 - 最近已通过证据 4：2026-06-20 继续修复流式 tool-call 回调未触发问题：反编译 Spring AI OpenAiChatModel 1.1.8 确认 `ChatGenerationMetadata.getFinishReason()` 返回枚举名称 `"TOOL_CALLS"`（大写），代码此前按原始 HTTP 的 `"tool_calls"`（小写）比较导致 finishReason 永远匹配不上，已将判断改为忽略大小写并兼容 `"tool_call"`；新增 `LlmClientManagerStreamWithToolsTest` 覆盖分段 arguments + 大写 finishReason 场景；修复 `VesselCheckpointSaver` 因文件系统时间精度导致的 flaky 测试；重新执行 `./init.sh` 通过，core 97 个测试全部通过，tool 模块 18 个测试全部通过
 - 最近已通过证据 5：2026-06-22 修复禁用 Spring AI 内部 tool execution 后 Moonshot 报 `"tool_call_id is not found"` 400 错误：根因是 `SpiMessage` 未保存 `toolCallId`/`toolName`，`LlmClientManager.toSpringMessage()` 与 `VesselRuntime.toSpiMessages()` 把 tool 消息硬编码为 `"tool"`，且 `AgentExecutor`/`StreamingAgentExecutor` 把工具结果包装成 JSON 导致原始 content 丢失。已为 `SpiMessage`/`MemoryMessage` 新增 `toolCallId`/`toolName` 字段与工厂方法，所有执行器直接以原始结果和真实 id/name 构造 tool 消息，转换器优先使用字段、缺失时回退旧版 JSON 解析；新增 `LlmClientManagerToolMessageTest`；重新执行 `./init.sh` 通过，core 97 个测试全部通过，tool 模块 18 个测试全部通过
+- 最近已通过证据 6：2026-06-23 实现 Vessel 级 HITL 配置：在 `VesselConfig` 中新增 `HitlConfig`（`defaultRequireApproval` / `require` / `skip`），改造 `ConfigurableHitlPolicy` 为 `Map<vesselId, config>` 的按 Vessel 隔离策略，`HitlSubSystem` 实现 `VesselAwareSubSystem` 在 `loadForVessel` 时读取 vessel 配置并注入策略，未配置 vessel 回退到全局 `hitl.default-require-approval`；保留旧 `configure(require, skip)` API 兼容现有测试；更新 `default`/`alibaba` `vessel.meta.yaml` 示例加入 HITL 配置注释；扩展 `ConfigurableHitlPolicyTest` 与 `HitlSubSystemTest` 覆盖 per-vessel 配置与回退逻辑；重新执行 `./init.sh` 通过，core 101 个测试全部通过，tool 模块 18 个测试全部通过
+- 最近已通过证据 7：2026-06-23 补全全局 HITL 配置加载与模板示例：将 `HitlConfig` 提取为独立类 `meta.claw.core.config.HitlConfig` 供 `GlobalConfig` 与 `VesselConfig` 复用；`GlobalConfig` 新增 `hitl` 字段，`HitlSubSystem` 在 `@PostConstruct` 中通过 `GlobalConfigLoader` 读取 `~/.meta-claw/config.yaml` 的全局 hitl 配置并注入 `ConfigurableHitlPolicy`；更新 `global-config.tmpl.yaml` 与 `vessel.meta.tmpl.yaml` 的 HITL 示例和覆盖规则说明；新增 `HitlSubSystemTest#loadGlobalHitlConfigAppliesGlobalDefaults` 验证全局配置生效；重新执行 `./init.sh` 通过，core 104 个测试全部通过，tool 模块 18 个测试全部通过
 - 当前最高优先级未完成功能：agent-engine-001（Agent 执行引擎抽象：native / alibaba 双实现设计）Phase 0+1+2+3+4+5+6 已全部实现完成；下一步为真实 LLM 端到端验证或处理其他优先级功能
 - 当前 blocker：
   1. 当前无 blocker
@@ -39,6 +41,82 @@
 - `serve/start/stop/restart/status/logs`、工具引擎、MCP、Skill 系统仍未实现
 
 ## 会话记录
+
+### Session 058
+
+- 日期：2026-06-23
+- 本轮目标：补全 HITL 配置模板与全局配置加载，解决用户反馈的「模板缺少 hitl 示例 / 总报错」问题
+- 背景：用户发现 `vessel.meta.tmpl.yaml` 与 `global-config.tmpl.yaml` 缺少 HITL 配置示例，且运行时「总报错」。排查后确认 Vessel 级 HITL 已正常工作，但全局 HITL 的 `require`/`skip` 名单没有从 `~/.meta-claw/config.yaml` 加载的路径，模板也未说明配置位置。
+- 实现：
+  - 将 `VesselConfig.HitlConfig` 提取为独立类 `meta.claw.core.config.HitlConfig`，保持字段 `defaultRequireApproval` / `require` / `skip` 不变。
+  - `GlobalConfig` 新增 `HitlConfig hitl` 字段，使全局 `config.yaml` 可以配置 HITL 默认策略。
+  - `HitlSubSystem` 新增 `@PostConstruct loadGlobalHitlConfig()`：在 Spring bean 初始化时通过 `GlobalConfigLoader` 读取 `~/.meta-claw/config.yaml`，若存在 `hitl` 配置则调用 `ConfigurableHitlPolicy.configure(null, require, skip, defaultRequireApproval)` 注入全局默认策略。
+  - 更新 `global-config.tmpl.yaml`：在 `log.debug` 下方新增 `hitl:` 全局默认配置示例，包含 `default_require_approval` / `require` / `skip` 与优先级/覆盖规则说明。
+  - 更新 `vessel.meta.tmpl.yaml`：细化 HITL 注释，明确「未指定字段继承全局 config.yaml」「显式设置（含空列表）覆盖全局」「skip > require > default_require_approval」「YAML key 必须是小写+下划线」等规则。
+  - 更新 `HitlSubSystemTest`：将 `VesselConfig.HitlConfig` 引用改为 `HitlConfig`；新增 `loadGlobalHitlConfigAppliesGlobalDefaults` 验证全局 `require`/`skip` 正确生效。
+- 运行过的验证：
+  - `./init.sh`（真实环境，Java 21）→ 成功；9 个 reactor 模块全部 SUCCESS，core 104 个测试全部通过（新增 1 个全局 HITL 加载测试），tool 模块 18 个测试全部通过
+- 已记录证据：
+  - 本文件已在顶部「当前已验证状态」增加证据 7
+  - `feature_list.json` 的 `hitl-001` 已补充全局 HITL 配置加载与模板示例记录
+- 更新过的文件或工件：
+  - `meta-claw-core/src/main/java/meta/claw/core/config/HitlConfig.java`（新增）
+  - `meta-claw-core/src/main/java/meta/claw/core/config/VesselConfig.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/config/GlobalConfig.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/runtime/subsystem/HitlSubSystem.java`
+  - `meta-claw-core/src/main/resources/templates/global-config.tmpl.yaml`
+  - `meta-claw-core/src/main/resources/templates/user/vessel.meta.tmpl.yaml`
+  - `meta-claw-core/src/test/java/meta/claw/core/runtime/hitl/HitlSubSystemTest.java`
+  - `claude-progress.md`
+  - `feature_list.json`
+- 已知风险或未解决的问题：
+  - 当前 CLI 真实端到端验证仍待用户执行；可在某个 vessel 的 `vessel.meta.yaml` 中配置 `hitl.require: [calculate]` 后运行 `chat`，输入 `1+1` 观察是否出现审批提示
+- 下一步最佳动作：
+  1. 提交本轮修改
+  2. 由用户在真实 CLI 中验证 HITL 审批交互
+
+### Session 057
+
+- 日期：2026-06-23
+- 本轮目标：实现 Vessel 级 HITL 工具审批配置，使用户可以按 Vessel 设置哪些工具需要人工审批
+- 背景：用户此前询问如何验证 HITL，发现当前只能依赖全局 Spring 属性 `hitl.default-require-approval=true` 开启「所有工具都审批」，无法按工具名或按 Vessel 灵活配置。
+- 实现：
+  - 在 `VesselConfig` 中新增 `HitlConfig` 内部类，字段为 `Boolean defaultRequireApproval`、`List<String> require`、`List<String> skip`；SnakeYAML CamelCasePropertyUtils 可把 YAML 的 `default_require_approval` / `require` / `skip` 自动映射。
+  - 改造 `ConfigurableHitlPolicy`：
+    - 新增内部记录 `HitlPolicyConfig`。
+    - 用 `ConcurrentHashMap<String, HitlPolicyConfig>` 按 `vesselId` 保存配置。
+    - 新增 `configure(String vesselId, Set<String> require, Set<String> skip, Boolean defaultRequireApproval)`，传入 `null` 的字段表示继承全局。
+    - 保留旧的 `configure(Set<String> require, Set<String> skip)` 作为全局 fallback。
+    - `decide(ToolCallContext)` 按 `context.getVesselId()` 查找配置：Vessel 未配置的字段继承全局配置，完全未配置 vessel 时回退全局配置或 `hitl.default-require-approval`。
+  - 改造 `HitlSubSystem`：
+    - 实现 `VesselAwareSubSystem`。
+    - 注入 `VesselManager`。
+    - 在 `loadForVessel(String vesselId)` 中读取 `VesselConfig.getHitl()` 并调用 `ConfigurableHitlPolicy.configure(...)`；`HitlConfig` 中未设置的字段（`null`）会透传为 `null`，从而继承全局。
+  - 更新 `.meta-claw/vessels/default/vessel.meta.yaml` 与 `alibaba/vessel.meta.yaml`，加入 HITL 配置示例注释。
+  - 扩展测试：
+    - `ConfigurableHitlPolicyTest` 新增 per-vessel 隔离、per-vessel default 覆盖全局、skip 覆盖 default 等用例。
+    - `HitlSubSystemTest` 新增 `loadForVesselConfiguresPerVesselPolicy`，验证从 vessel 配置加载策略后 `evaluate` 行为正确。
+- 运行过的验证：
+  - `./init.sh`（真实环境，Java 21）→ 成功；9 个 reactor 模块全部 SUCCESS，core 101 个测试全部通过（`ConfigurableHitlPolicyTest` 7 个、`HitlSubSystemTest` 3 个），tool 模块 18 个测试全部通过
+  - 定向 HITL 测试 → 通过
+- 已记录证据：
+  - 本文件已新增 Session 057 并在顶部"当前已验证状态"增加证据 6
+  - `feature_list.json` 的 `hitl-001` 已补充 Vessel 级 HITL 配置记录
+- 更新过的文件或工件：
+  - `meta-claw-core/src/main/java/meta/claw/core/config/VesselConfig.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/runtime/hitl/ConfigurableHitlPolicy.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/runtime/subsystem/HitlSubSystem.java`
+  - `.meta-claw/vessels/default/vessel.meta.yaml`
+  - `.meta-claw/vessels/alibaba/vessel.meta.yaml`
+  - `meta-claw-core/src/test/java/meta/claw/core/runtime/hitl/ConfigurableHitlPolicyTest.java`
+  - `meta-claw-core/src/test/java/meta/claw/core/runtime/hitl/HitlSubSystemTest.java`
+  - `claude-progress.md`
+  - `feature_list.json`
+- 已知风险或未解决的问题：
+  - 当前 CLI 真实端到端验证仍待用户执行；可在某个 vessel 的 `vessel.meta.yaml` 中配置 `hitl.require: [calculate]` 后运行 `chat`，输入 `1+1` 观察是否出现审批提示
+- 下一步最佳动作：
+  1. 提交本轮修改
+  2. 由用户在真实 CLI 中按 Vessel 配置 HITL 并验证审批交互
 
 ### Session 056
 

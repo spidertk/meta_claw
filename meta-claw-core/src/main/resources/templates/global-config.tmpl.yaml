@@ -31,3 +31,14 @@ providers:
 # true  — 输出详细的内部调用链路、请求/响应内容（注意隐私泄露风险）
 # false — 仅输出 INFO 及以上级别（推荐生产环境使用）
 log.debug: false
+
+# HITL 人工审批全局默认配置（可选）
+# 规则：
+#   - 所有 Vessel 默认继承以下配置
+#   - 单个 Vessel 可在 vessel.meta.yaml 的 hitl 段覆盖任意字段
+#   - skip 优先级最高；require 次之；default_require_approval 最后生效
+#   - YAML key 必须是小写 + 下划线：default_require_approval / require / skip
+hitl:
+  default_require_approval: false   # true=所有工具调用都需人工审批
+  require: []                       # 全局需要审批的工具名列表，如 [execute, writeFile]
+  skip: []                          # 全局自动跳过的工具名列表，如 [calculate, readFile]

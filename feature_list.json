@@ -1,6 +1,6 @@
 {
   "project": "meta-claw",
-  "last_updated": "2026-06-22",
+  "last_updated": "2026-06-23",
   "package_structure": {
     "config": "meta.claw.core.config — 所有配置模型 + 加载器 + 解析器",
     "vessel": "meta.claw.core.vessel — Vessel 用户域（Profile + Initializer）",
@@ -707,6 +707,12 @@
       "verification": [
         "确认 HitlSubSystem 作为 VesselSubSystem 实现存在（priority=15）。",
         "确认 ConfigurableHitlPolicy 支持 default-require-approval 与 require/skip 名单。",
+        "确认 VesselConfig 支持 hitl 配置块（default_require_approval / require / skip）。",
+        "确认 HitlSubSystem 实现 VesselAwareSubSystem，在加载 Vessel 时按 vesselId 注入 HITL 策略。",
+        "确认不同 Vessel 的 HITL 策略互相隔离，未配置 vessel 回退到全局 Spring 属性。",
+        "确认 vessel.meta.yaml 示例文件包含 HITL 配置注释。",
+        "确认 global-config.tmpl.yaml 示例文件包含 HITL 全局默认配置注释。",
+        "确认 GlobalConfig 支持 hitl 配置块，HitlSubSystem 在启动时加载全局 HITL 默认策略。",
         "确认 AgentExecutor.execute() 在需要审批时抛出 HitlSuspendedException。",
         "确认 VesselRuntime.resume() 与 AgentExecutor.resume() 能从挂起状态恢复并继续循环。",
         "确认 StreamingAgentExecutor 在流式路径中集成 HITL 审批与恢复。",
@@ -723,9 +729,19 @@
           "date": "2026-06-19",
           "result": "passing",
           "detail": "修复启动失败：HitlSubSystem 按类型注入 HitlGate 时同时发现 InMemoryHitlGate 与 CliHitlGate 两个 bean。为 InMemoryHitlGate 增加 @ConditionalOnMissingBean(HitlGate.class)，使其在 CLI 场景自动退让给 CliHitlGate；./init.sh 全量通过。"
+        },
+        {
+          "date": "2026-06-23",
+          "result": "passing",
+          "detail": "实现 Vessel 级 HITL 配置：在 VesselConfig 中新增 HitlConfig（defaultRequireApproval / require / skip），未设置的字段为 null 并继承全局配置；改造 ConfigurableHitlPolicy 为 Map<vesselId, config> 的按 Vessel 隔离策略，支持 Vessel 字段级覆盖全局；HitlSubSystem 实现 VesselAwareSubSystem，在 loadForVessel 时读取 vessel 配置并注入策略；未配置 vessel 回退到全局 hitl.default-require-approval；保留旧 configure(require, skip) API 兼容现有测试；更新 default/alibaba vessel.meta.yaml 示例加入 HITL 配置注释；扩展 ConfigurableHitlPolicyTest 覆盖 per-vessel 隔离、继承全局、空集合覆盖全局等语义，HitlSubSystemTest 覆盖从 vessel 配置加载；./init.sh 全量通过，core 103 个测试全部通过，tool 18 个测试全部通过。"
+        },
+        {
+          "date": "2026-06-23",
+          "result": "passing",
+          "detail": "补全全局 HITL 配置加载与模板示例：把 HitlConfig 提取为独立类 meta.claw.core.config.HitlConfig，供 GlobalConfig 与 VesselConfig 复用；GlobalConfig 新增 hitl 字段（defaultRequireApproval / require / skip）；HitlSubSystem 在 @PostConstruct 中通过 GlobalConfigLoader 读取 ~/.meta-claw/config.yaml 的全局 hitl 配置并注入 ConfigurableHitlPolicy；更新 global-config.tmpl.yaml 加入 HITL 全局默认配置示例与规则说明；更新 vessel.meta.tmpl.yaml 的 HITL 注释，明确继承/覆盖语义与 YAML key 规范；新增 HitlSubSystemTest#loadGlobalHitlConfigAppliesGlobalDefaults 验证全局配置生效；./init.sh 全量通过，core 104 个测试全部通过，tool 18 个测试全部通过。"
         }
       ],
-      "notes": "Phase 3 完成。非流式与流式执行路径均已集成 HITL。InMemoryHitlGate 为内存实现，不支持进程重启恢复；Gateway 等渠道需自定义 onHitlSuspend 行为。2026-06-19 修复 InMemoryHitlGate 与 CliHitlGate 的注入歧义。"
+      "notes": "Phase 3 完成。非流式与流式执行路径均已集成 HITL。InMemoryHitlGate 为内存实现，不支持进程重启恢复；Gateway 等渠道需自定义 onHitlSuspend 行为。2026-06-19 修复 InMemoryHitlGate 与 CliHitlGate 的注入歧义。2026-06-23 新增 Vessel 级 HITL 配置，支持按 vessel 设置 default_require_approval / require / skip，不同 Vessel 策略隔离。2026-06-23 补全全局 HITL 配置加载：global-config.tmpl.yaml 与 vessel.meta.tmpl.yaml 均包含 HITL 示例，GlobalConfig 支持 hitl 字段并由 HitlSubSystem 在启动时加载。"
     },
     {
       "id": "skill-001",
