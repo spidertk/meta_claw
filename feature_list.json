@@ -749,9 +749,14 @@
           "date": "2026-06-24",
           "result": "passing",
           "detail": "修复 VesselManager <-> VesselRuntime 启动循环：真实环为 VesselManager -> VesselRuntime -> AgentEngine -> LlmClientManager -> OpenAiLlmClientProvider -> ShortMemoryAdvisor -> VesselManager；将 ShortMemoryAdvisor 的 VesselManager 直接注入改为 ObjectProvider<VesselManager>，只在流式响应完成时解析；./init.sh 全量通过，core 105 个测试全部通过，tool 18 个测试全部通过。"
+        },
+        {
+          "date": "2026-06-24",
+          "result": "passing",
+          "detail": "修复 HITL 运行时 NPE：全局 hitl 配置只设置 default_require_approval: true 而 require/skip 为 null 时，ConfigurableHitlPolicy.getSummary()/resolveConfig() 因直接调用 Set.isEmpty()/Set.contains() 抛空指针；修正 resolveConfig() 在 require/skip 为 null 时回退到空集合，getSummary() 增加 null 检查；新增 ConfigurableHitlPolicyTest#nullRequireAndSkipDoNotCauseNpe；./init.sh 全量通过，core 106 个测试全部通过，tool 18 个测试全部通过。"
         }
       ],
-      "notes": "Phase 3 完成。非流式与流式执行路径均已集成 HITL。InMemoryHitlGate 为内存实现，不支持进程重启恢复；Gateway 等渠道需自定义 onHitlSuspend 行为。2026-06-19 修复 InMemoryHitlGate 与 CliHitlGate 的注入歧义。2026-06-23 新增 Vessel 级 HITL 配置，支持按 vessel 设置 default_require_approval / require / skip，不同 Vessel 策略隔离。2026-06-23 补全全局 HITL 配置加载：global-config.tmpl.yaml 与 vessel.meta.tmpl.yaml 均包含 HITL 示例，GlobalConfig 支持 hitl 字段并由 HitlSubSystem 在启动时加载。2026-06-23 彻底解决 HITL 循环依赖：将 per-vessel HITL 配置职责从 HitlSubSystem 上移到 VesselManager，HitlSubSystem 不再依赖 VesselManager；新增 VesselManagerTest。2026-06-24 修复另一启动循环：VesselManager -> VesselRuntime -> AgentEngine -> LlmClientManager -> OpenAiLlmClientProvider -> ShortMemoryAdvisor -> VesselManager，通过 ObjectProvider<VesselManager> 延迟 ShortMemoryAdvisor 对 VesselManager 的解析。"
+      "notes": "Phase 3 完成。非流式与流式执行路径均已集成 HITL。InMemoryHitlGate 为内存实现，不支持进程重启恢复；Gateway 等渠道需自定义 onHitlSuspend 行为。2026-06-19 修复 InMemoryHitlGate 与 CliHitlGate 的注入歧义。2026-06-23 新增 Vessel 级 HITL 配置，支持按 vessel 设置 default_require_approval / require / skip，不同 Vessel 策略隔离。2026-06-23 补全全局 HITL 配置加载：global-config.tmpl.yaml 与 vessel.meta.tmpl.yaml 均包含 HITL 示例，GlobalConfig 支持 hitl 字段并由 HitlSubSystem 在启动时加载。2026-06-23 彻底解决 HITL 循环依赖：将 per-vessel HITL 配置职责从 HitlSubSystem 上移到 VesselManager，HitlSubSystem 不再依赖 VesselManager；新增 VesselManagerTest。2026-06-24 修复启动循环：VesselManager -> VesselRuntime -> AgentEngine -> LlmClientManager -> OpenAiLlmClientProvider -> ShortMemoryAdvisor -> VesselManager，通过 ObjectProvider<VesselManager> 延迟 ShortMemoryAdvisor 对 VesselManager 的解析。2026-06-24 修复 HITL NPE：全局 hitl 只设置 default_require_approval 时 require/skip 可能为 null，resolveConfig/getSummary 已做 null 回退。"
     },
     {
       "id": "skill-001",
