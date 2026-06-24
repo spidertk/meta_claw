@@ -15,6 +15,7 @@ import org.springframework.ai.chat.client.advisor.api.StreamAdvisor;
 import org.springframework.ai.chat.client.advisor.api.StreamAdvisorChain;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
@@ -38,7 +39,7 @@ import java.util.stream.Collectors;
 public class ShortMemoryAdvisor implements StreamAdvisor {
 
     @Autowired
-    private VesselManager vesselManager;
+    private ObjectProvider<VesselManager> vesselManagerProvider;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -110,7 +111,7 @@ public class ShortMemoryAdvisor implements StreamAdvisor {
                                 .reasoningContent(reasoningBuilder.toString())
                                 .toolCalls(spiToolCalls.isEmpty() ? null : spiToolCalls)
                                 .build();
-                        VesselRuntime vesselRuntime =    vesselManager.getRuntime(vesselName);
+                        VesselRuntime vesselRuntime = vesselManagerProvider.getObject().getRuntime(vesselName);
                         vesselRuntime.getShortMemory().appendMessage(vesselName, sessionKey, message);
                         log.debug("[ShortMemoryAdvisor] Persisted assistant message to memory: vessel={}, session={}, contentLength={}, reasoningLength={}",
                                 vesselName, sessionKey, contentBuilder.length(), reasoningBuilder.length());
