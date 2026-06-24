@@ -65,7 +65,7 @@ public class ConfigurableHitlPolicy implements HitlPolicy {
         if (global != null && Boolean.TRUE.equals(global.defaultRequireApproval())) {
             return "所有工具调用都需要人工审批。";
         }
-        if (global != null && !global.require().isEmpty()) {
+        if (global != null && global.require() != null && !global.require().isEmpty()) {
             return "需要审批的工具: " + String.join(", ", global.require());
         }
         return null;
@@ -73,20 +73,25 @@ public class ConfigurableHitlPolicy implements HitlPolicy {
 
     private HitlPolicyConfig resolveConfig(String vesselId) {
         HitlPolicyConfig global = configs.getOrDefault(GLOBAL_KEY, defaultConfig());
+        boolean effectiveDefault = global.defaultRequireApproval() != null
+                ? global.defaultRequireApproval()
+                : globalDefaultRequireApproval;
+        Set<String> effectiveRequire = global.require() != null ? global.require() : Collections.emptySet();
+        Set<String> effectiveSkip = global.skip() != null ? global.skip() : Collections.emptySet();
+
         if (vesselId == null || vesselId.isBlank()) {
-            return global;
+            return new HitlPolicyConfig(effectiveDefault, effectiveRequire, effectiveSkip);
         }
         HitlPolicyConfig vessel = configs.get(vesselId);
         if (vessel == null) {
-            return global;
+            return new HitlPolicyConfig(effectiveDefault, effectiveRequire, effectiveSkip);
         }
-        boolean effectiveDefault = vessel.defaultRequireApproval() != null
+        effectiveDefault = vessel.defaultRequireApproval() != null
                 ? vessel.defaultRequireApproval()
-                : (global.defaultRequireApproval() != null ? global.defaultRequireApproval() : globalDefaultRequireApproval);
-        return new HitlPolicyConfig(
-                effectiveDefault,
-                vessel.require() != null ? vessel.require() : global.require(),
-                vessel.skip() != null ? vessel.skip() : global.skip());
+                : effectiveDefault;
+        effectiveRequire = vessel.require() != null ? vessel.require() : effectiveRequire;
+        effectiveSkip = vessel.skip() != null ? vessel.skip() : effectiveSkip;
+        return new HitlPolicyConfig(effectiveDefault, effectiveRequire, effectiveSkip);
     }
 
     private HitlPolicyConfig defaultConfig() {

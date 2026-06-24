@@ -101,6 +101,17 @@ class ConfigurableHitlPolicyTest {
     }
 
     @Test
+    void nullRequireAndSkipDoNotCauseNpe() {
+        ConfigurableHitlPolicy policy = new ConfigurableHitlPolicy();
+        // 全局只设置 defaultRequireApproval=true，require/skip 为 null
+        policy.configure(null, (Set<String>) null, (Set<String>) null, true);
+
+        assertEquals(HitlDecision.REQUIRE_APPROVAL,
+                policy.decide(ToolCallContext.builder().vesselId("v1").toolName("any").build()));
+        assertEquals("所有工具调用都需要人工审批。", policy.getSummary());
+    }
+
+    @Test
     void perVesselConfigCanClearGlobalRequireWithEmptySet() {
         ConfigurableHitlPolicy policy = new ConfigurableHitlPolicy();
         policy.configure(Set.of("execute"), Set.of());
