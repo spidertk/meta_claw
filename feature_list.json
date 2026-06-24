@@ -744,9 +744,14 @@
           "date": "2026-06-23",
           "result": "passing",
           "detail": "彻底解决 HITL 循环依赖：@Lazy 未能消除 vesselManager -> vesselRuntime -> hitlSubSystem -> vesselManager 启动失败，将 per-vessel HITL 配置职责从 HitlSubSystem 上移到 VesselManager，HitlSubSystem 不再依赖 VesselManager，仅保留全局 HITL 加载与工具调用审批；新增 VesselManagerTest 覆盖 per-vessel HITL 配置；./init.sh 全量通过，core 105 个测试全部通过，tool 18 个测试全部通过。"
+        },
+        {
+          "date": "2026-06-24",
+          "result": "passing",
+          "detail": "修复 VesselManager <-> VesselRuntime 启动循环：真实环为 VesselManager -> VesselRuntime -> AgentEngine -> LlmClientManager -> OpenAiLlmClientProvider -> ShortMemoryAdvisor -> VesselManager；将 ShortMemoryAdvisor 的 VesselManager 直接注入改为 ObjectProvider<VesselManager>，只在流式响应完成时解析；./init.sh 全量通过，core 105 个测试全部通过，tool 18 个测试全部通过。"
         }
       ],
-      "notes": "Phase 3 完成。非流式与流式执行路径均已集成 HITL。InMemoryHitlGate 为内存实现，不支持进程重启恢复；Gateway 等渠道需自定义 onHitlSuspend 行为。2026-06-19 修复 InMemoryHitlGate 与 CliHitlGate 的注入歧义。2026-06-23 新增 Vessel 级 HITL 配置，支持按 vessel 设置 default_require_approval / require / skip，不同 Vessel 策略隔离。2026-06-23 补全全局 HITL 配置加载：global-config.tmpl.yaml 与 vessel.meta.tmpl.yaml 均包含 HITL 示例，GlobalConfig 支持 hitl 字段并由 HitlSubSystem 在启动时加载。2026-06-23 彻底解决 HITL 循环依赖：将 per-vessel HITL 配置职责从 HitlSubSystem 上移到 VesselManager，HitlSubSystem 不再依赖 VesselManager；新增 VesselManagerTest。"
+      "notes": "Phase 3 完成。非流式与流式执行路径均已集成 HITL。InMemoryHitlGate 为内存实现，不支持进程重启恢复；Gateway 等渠道需自定义 onHitlSuspend 行为。2026-06-19 修复 InMemoryHitlGate 与 CliHitlGate 的注入歧义。2026-06-23 新增 Vessel 级 HITL 配置，支持按 vessel 设置 default_require_approval / require / skip，不同 Vessel 策略隔离。2026-06-23 补全全局 HITL 配置加载：global-config.tmpl.yaml 与 vessel.meta.tmpl.yaml 均包含 HITL 示例，GlobalConfig 支持 hitl 字段并由 HitlSubSystem 在启动时加载。2026-06-23 彻底解决 HITL 循环依赖：将 per-vessel HITL 配置职责从 HitlSubSystem 上移到 VesselManager，HitlSubSystem 不再依赖 VesselManager；新增 VesselManagerTest。2026-06-24 修复另一启动循环：VesselManager -> VesselRuntime -> AgentEngine -> LlmClientManager -> OpenAiLlmClientProvider -> ShortMemoryAdvisor -> VesselManager，通过 ObjectProvider<VesselManager> 延迟 ShortMemoryAdvisor 对 VesselManager 的解析。"
     },
     {
       "id": "skill-001",
