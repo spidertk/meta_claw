@@ -14,6 +14,7 @@ import reactor.netty.http.client.HttpClient;
 import reactor.netty.resources.ConnectionProvider;
 
 import java.time.Duration;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 创建带日志过滤器和自定义 {@link ObjectMapper} 的 {@link WebClient.Builder}。
@@ -36,21 +37,30 @@ public final class OpenAiWebClientFactory {
      * 静态内部类单例：JVM 加载时才初始化，天然线程安全，只创建一次。
      */
     private static class NettyHolder {
+        // Moonshot 等云厂商的 idle timeout 通常在 30~60s 之间，
+        // 把连接池 maxIdleTime 设短一点，避免复用到已被服务端关闭的 stale connection。
         static final ConnectionProvider CONNECTION_PROVIDER = ConnectionProvider.builder("llm-pool")
                 .maxConnections(50)
                 .pendingAcquireMaxCount(100)
                 .pendingAcquireTimeout(Duration.ofSeconds(30))
-                .maxIdleTime(Duration.ofMinutes(5))
+                .maxIdleTime(Duration.ofSeconds(45))
                 .maxLifeTime(Duration.ofHours(1))
-                .evictInBackground(Duration.ofMinutes(2))
+                .evictInBackground(Duration.ofSeconds(15))
                 .build();
 
-        static final HttpClient HTTP_CLIENT = HttpClient.create(CONNECTION_PROVIDER)
-                .keepAlive(true)
-                .responseTimeout(Duration.ofMinutes(5));
+        static HttpClient createHttpClient(Duration responseTimeout) {
+            return HttpClient.create(CONNECTION_PROVIDER)
+                    .keepAlive(true)
+                    .option(io.netty.channel.ChannelOption.SO_KEEPALIVE, true)
+                    .responseTimeout(responseTimeout);
+        }
     }
 
     public static WebClient.Builder create(ObjectMapper objectMapper) {
+        return create(objectMapper, Duration.ofMinutes(5));
+    }
+
+    public static WebClient.Builder create(ObjectMapper objectMapper, Duration responseTimeout) {
         ExchangeFilterFunction requestLogFilter = ExchangeFilterFunction.ofRequestProcessor(clientRequest -> {
             long start = System.currentTimeMillis();
             log.debug("[HTTP-REQUEST-WEB] Start: {} {} Headers: {}",
@@ -90,6 +100,6 @@ public final class OpenAiWebClientFactory {
                 .filter(errorLogFilter)
                 .exchangeStrategies(exchangeStrategies)
                 .clientConnector(new LoggingReactorClientHttpConnector(
-                        new ReactorClientHttpConnector(NettyHolder.HTTP_CLIENT)));
+                        new ReactorClientHttpConnector(NettyHolder.createHttpClient(responseTimeout))));
     }
 }

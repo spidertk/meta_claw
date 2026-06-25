@@ -19,6 +19,7 @@
 - 最近已通过证据 11：2026-06-24 修复 HITL 运行时 NPE：当全局 `hitl` 配置只设置 `default_require_approval: true` 而 `require`/`skip` 为 null 时，`ConfigurableHitlPolicy.getSummary()` 与 `resolveConfig()` 因直接调用 `Set.isEmpty()` / `Set.contains()` 而抛空指针；修正 `resolveConfig()` 在全局或 Vessel 的 require/skip 为 null 时回退到空集合，并给 `getSummary()` 增加 null 检查；新增 `ConfigurableHitlPolicyTest#nullRequireAndSkipDoNotCauseNpe`；重新执行 `./init.sh` 通过，core 106 个测试全部通过，tool 模块 18 个测试全部通过
 - 最近已通过证据 12：2026-06-25 重构 CLI HITL 审批交互收口到 `CliHitlGate`：新增 `TerminalConfig` 把 `Terminal`/`LineReader` 注册为 Spring bean 供 CLI 复用；`ChatCommand` 改为注入 `Terminal` 与 `LineReader`，移除本地构造 `TerminalBuilder` 与 `BufferedReader`，并把 `SpiStreamingCallback.onHitlSuspend()` 中的打印/输入逻辑完全委托给 `HitlSubSystem.awaitResolution(ticket)` → `CliHitlGate.await(ticket)`；`CliHitlGate` 改为使用共享 `Terminal`/`LineReader`，统一审批提示文案；新增 `jline-reader` 依赖；重新执行 `./init.sh` 通过，core 106 个测试全部通过，tool 模块 18 个测试全部通过
 - 最近已通过证据 13：2026-06-25 修复流式 HITL 审批后 assistant 消息丢失 content/reasoning 的 bug：`StreamingAgentExecutor.executeApprovedToolCalls()` 从 `ApprovalTicket` 重建 tool calls 后，用 `SpiMessage.assistant(null, null, toolCalls)` 创建 assistant 消息，导致 content 与 reasoningContent 被清空；改为把原始 `SpiChatResponse` 的 `content`/`reasoningContent` 传入 `executeApprovedToolCalls` 并写入 assistant 消息；新增 `StreamingAgentExecutorTest#preservesAssistantContentAndReasoningAfterHitlApproval` 验证；重新执行 `./init.sh` 通过，core 107 个测试全部通过，tool 模块 18 个测试全部通过
+- 最近已通过证据 14：2026-06-25 修复 Moonshot 流式调用偶发 `Connection prematurely closed BEFORE response`：根因是连接池 `maxIdleTime` 过长（5 分钟），复用到已被 Moonshot 服务端关闭的 stale connection；将 `OpenAiWebClientFactory` 的 `maxIdleTime` 缩短为 45 秒、`evictInBackground` 缩短为 15 秒，并开启 `SO_KEEPALIVE`；`OpenAiLlmClientProvider` 将 provider 配置的 `timeout` 透传给 WebClient/RestClient 的 response/read timeout；重新执行 `./init.sh` 通过，core 107 个测试全部通过，tool 模块 18 个测试全部通过
 - 当前最高优先级未完成功能：agent-engine-001（Agent 执行引擎抽象：native / alibaba 双实现设计）Phase 0+1+2+3+4+5+6 已全部实现完成；下一步为真实 LLM 端到端验证或处理其他优先级功能
 - 当前 blocker：
   1. 当前无 blocker
@@ -47,6 +48,37 @@
 - `serve/start/stop/restart/status/logs`、工具引擎、MCP、Skill 系统仍未实现
 
 ## 会话记录
+
+### Session 061
+
+- 日期：2026-06-25
+- 本轮目标：修复 Moonshot 流式调用偶发 `Connection prematurely closed BEFORE response`
+- 背景：用户在真实 CLI 中遇到流式请求报错 `Connection prematurely closed BEFORE response`，发生在请求开始约 43 秒后，底层为 `reactor.netty.http.client.PrematureCloseException`。该错误通常是因为客户端从连接池复用了一条已被服务端关闭的 stale connection。
+- 实现：
+  - 调整 `OpenAiWebClientFactory` 的连接池策略：
+    - `maxIdleTime` 从 5 分钟缩短到 45 秒，避免超过云厂商常见的 idle timeout。
+    - `evictInBackground` 从 2 分钟缩短到 15 秒，加速清理过期连接。
+    - 为 `HttpClient` 开启 `SO_KEEPALIVE`。
+  - 扩展 `OpenAiWebClientFactory.create` 支持传入 `responseTimeout`，并保留无参版本默认 5 分钟。
+  - 扩展 `OpenAiRestClientFactory.create` 支持传入 `readTimeout`，并保留无参版本默认 5 分钟。
+  - 修改 `OpenAiLlmClientProvider.buildChatModel()`：将 `ProviderConfig.getTimeout()` 转换为 `Duration` 后传给 RestClient/WebClient factory，使 provider 配置中的 `timeout` 真正生效（此前仅用于 cache key）。
+- 运行过的验证：
+  - `./init.sh`（真实环境，Java 21）→ 成功；9 个 reactor 模块全部 SUCCESS，core 107 个测试全部通过，tool 模块 18 个测试全部通过
+- 已记录证据：
+  - 本文件已在顶部「当前已验证状态」增加证据 14
+  - `feature_list.json` 的 `llm-001` 已补充连接池调优记录
+- 更新过的文件或工件：
+  - `meta-claw-core/src/main/java/meta/claw/core/llm/provider/OpenAiWebClientFactory.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/llm/provider/OpenAiRestClientFactory.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/llm/provider/OpenAiLlmClientProvider.java`
+  - `claude-progress.md`
+  - `feature_list.json`
+- 已知风险或未解决的问题：
+  - 该修复缓解了 stale connection 导致的 premature close，但真实的 Moonshot 网络抖动仍可能触发同类错误；如再出现可进一步在 `LlmClientManager` 层增加按异常类型的重试
+  - 关于 `reasoning_content` 在请求中为空的问题：已确认 `MoonshotSerializerModule` 只是兜底补空字符串；若需把上一轮响应的 reasoning 内容真正写回下一轮请求，需要绕过 Spring AI `OpenAiChatModel` 硬编码的 `reasoningContent = null`，复杂度较高，待用户确认是否必要
+- 下一步最佳动作：
+  1. 提交本轮修改
+  2. 由用户在真实 CLI 中再次测试 Moonshot 流式调用稳定性
 
 ### Session 060
 

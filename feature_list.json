@@ -618,9 +618,14 @@
           "date": "2026-05-27",
           "result": "passing",
           "detail": "./init.sh 编译全仓并通过 P0 测试集。"
+        },
+        {
+          "date": "2026-06-25",
+          "result": "passing",
+          "detail": "修复 Moonshot 流式请求偶发 Connection prematurely closed BEFORE response：将 WebClient 连接池 maxIdleTime 从 5 分钟缩短为 45 秒、evictInBackground 从 2 分钟缩短为 15 秒并开启 SO_KEEPALIVE；OpenAiLlmClientProvider 将 provider timeout 透传给 RestClient/WebClient 的 read/response timeout；./init.sh 全量通过。"
         }
       ],
-      "notes": "Spring AI 1.1.7 将 reasoningContent 存入 AssistantMessage.metadata 而非 ChatGenerationMetadata；extractReasoningContent 已适配。streamUsage(true) 已启用以获取流式 usage。"
+      "notes": "Spring AI 1.1.7 将 reasoningContent 存入 AssistantMessage.metadata 而非 ChatGenerationMetadata；extractReasoningContent 已适配。streamUsage(true) 已启用以获取流式 usage。Moonshot 连接池参数在 2026-06-25 针对 stale connection 问题做了调优。"
     },
     {
       "id": "spi-001",

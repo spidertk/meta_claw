@@ -2,6 +2,8 @@ package meta.claw.core.llm.provider;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
+
+import java.time.Duration;
 import org.springframework.http.client.ClientHttpRequestInterceptor;
 import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
@@ -24,6 +26,10 @@ public final class OpenAiRestClientFactory {
     }
 
     public static RestClient.Builder create(ObjectMapper objectMapper) {
+        return create(objectMapper, Duration.ofMinutes(5));
+    }
+
+    public static RestClient.Builder create(ObjectMapper objectMapper, Duration readTimeout) {
         ClientHttpRequestInterceptor interceptor = (request, body, execution) -> {
             long start = System.currentTimeMillis();
             if (body != null && body.length > 0 && log.isDebugEnabled()) {

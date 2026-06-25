@@ -16,6 +16,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import java.time.Duration;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -103,9 +104,14 @@ public class OpenAiLlmClientProvider implements LlmClientProvider {
         // 根据模型选择 ObjectMapper：Moonshot K2.5/K2.6 需要特殊序列化补丁
         ObjectMapper mapper = selectObjectMapper(model);
 
+        // 使用 provider 配置的超时（秒），默认 5 分钟
+        Duration responseTimeout = providerConfig.getTimeout() != null
+                ? Duration.ofSeconds(providerConfig.getTimeout().longValue())
+                : Duration.ofMinutes(5);
+
         // 构建 RestClient（同步 call）和 WebClient（流式 stream）
-        RestClient.Builder restClientBuilder = OpenAiRestClientFactory.create(mapper);
-        WebClient.Builder webClientBuilder = OpenAiWebClientFactory.create(mapper);
+        RestClient.Builder restClientBuilder = OpenAiRestClientFactory.create(mapper, responseTimeout);
+        WebClient.Builder webClientBuilder = OpenAiWebClientFactory.create(mapper, responseTimeout);
 
         OpenAiApi.Builder apiBuilder = OpenAiApi.builder()
                 .apiKey(apiKey)
