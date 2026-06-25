@@ -95,7 +95,7 @@ public class StreamingAgentExecutor {
                                 .operator("stream-user")
                                 .build();
                     }
-                    executeApprovedToolCalls(messages, ctx, evaluation.getTicket(), resolution, toolMap);
+                    executeApprovedToolCalls(messages, ctx, response, evaluation.getTicket(), resolution, toolMap);
                     continue;
                 }
             }
@@ -116,10 +116,10 @@ public class StreamingAgentExecutor {
         throw new RuntimeException("超过最大步数: " + maxSteps);
     }
 
-    private void executeApprovedToolCalls(List<SpiMessage> messages, TaskContext ctx,
+    private void executeApprovedToolCalls(List<SpiMessage> messages, TaskContext ctx, SpiChatResponse response,
                                           ApprovalTicket ticket, ApprovalResolution resolution,
                                           Map<String, ToolCallback> toolMap) {
-        // 添加 assistant 消息（含 tool calls），从 ticket 重建
+        // 添加 assistant 消息（含 content + reasoning + tool calls），从 ticket 重建 tool calls
         List<SpiToolCall> toolCalls = ticket.getItems().stream()
                 .map(item -> SpiToolCall.builder()
                         .id(item.getToolCallId())
@@ -127,8 +127,10 @@ public class StreamingAgentExecutor {
                         .arguments(parseArguments(item.getArgumentsJson()))
                         .build())
                 .toList();
-        messages.add(SpiMessage.assistant(null, null, toolCalls));
-        ctx.getMessages().add(SpiMessage.assistant(null, null, toolCalls));
+        String content = response != null ? response.content() : null;
+        String reasoning = response != null ? response.reasoningContent() : null;
+        messages.add(SpiMessage.assistant(content, reasoning, toolCalls));
+        ctx.getMessages().add(SpiMessage.assistant(content, reasoning, toolCalls));
 
         for (ApprovalItem item : ticket.getItems()) {
             ApprovalStatus status = resolution.getDecisions().get(item.getToolCallId());

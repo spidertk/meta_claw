@@ -18,6 +18,7 @@
 - 最近已通过证据 10：2026-06-24 继续修复启动循环依赖：错误信息简化为 `vesselManager <-> vesselRuntime`，排查后发现真实环是 `VesselManager -> VesselRuntime -> AgentEngine -> LlmClientManager -> OpenAiLlmClientProvider -> ShortMemoryAdvisor -> VesselManager`；将 `ShortMemoryAdvisor` 中的 `VesselManager` 直接注入改为 `ObjectProvider<VesselManager>`，只在流式响应完成运行时解析，彻底切断静态依赖边；重新执行 `./init.sh` 通过，core 105 个测试全部通过，tool 模块 18 个测试全部通过
 - 最近已通过证据 11：2026-06-24 修复 HITL 运行时 NPE：当全局 `hitl` 配置只设置 `default_require_approval: true` 而 `require`/`skip` 为 null 时，`ConfigurableHitlPolicy.getSummary()` 与 `resolveConfig()` 因直接调用 `Set.isEmpty()` / `Set.contains()` 而抛空指针；修正 `resolveConfig()` 在全局或 Vessel 的 require/skip 为 null 时回退到空集合，并给 `getSummary()` 增加 null 检查；新增 `ConfigurableHitlPolicyTest#nullRequireAndSkipDoNotCauseNpe`；重新执行 `./init.sh` 通过，core 106 个测试全部通过，tool 模块 18 个测试全部通过
 - 最近已通过证据 12：2026-06-25 重构 CLI HITL 审批交互收口到 `CliHitlGate`：新增 `TerminalConfig` 把 `Terminal`/`LineReader` 注册为 Spring bean 供 CLI 复用；`ChatCommand` 改为注入 `Terminal` 与 `LineReader`，移除本地构造 `TerminalBuilder` 与 `BufferedReader`，并把 `SpiStreamingCallback.onHitlSuspend()` 中的打印/输入逻辑完全委托给 `HitlSubSystem.awaitResolution(ticket)` → `CliHitlGate.await(ticket)`；`CliHitlGate` 改为使用共享 `Terminal`/`LineReader`，统一审批提示文案；新增 `jline-reader` 依赖；重新执行 `./init.sh` 通过，core 106 个测试全部通过，tool 模块 18 个测试全部通过
+- 最近已通过证据 13：2026-06-25 修复流式 HITL 审批后 assistant 消息丢失 content/reasoning 的 bug：`StreamingAgentExecutor.executeApprovedToolCalls()` 从 `ApprovalTicket` 重建 tool calls 后，用 `SpiMessage.assistant(null, null, toolCalls)` 创建 assistant 消息，导致 content 与 reasoningContent 被清空；改为把原始 `SpiChatResponse` 的 `content`/`reasoningContent` 传入 `executeApprovedToolCalls` 并写入 assistant 消息；新增 `StreamingAgentExecutorTest#preservesAssistantContentAndReasoningAfterHitlApproval` 验证；重新执行 `./init.sh` 通过，core 107 个测试全部通过，tool 模块 18 个测试全部通过
 - 当前最高优先级未完成功能：agent-engine-001（Agent 执行引擎抽象：native / alibaba 双实现设计）Phase 0+1+2+3+4+5+6 已全部实现完成；下一步为真实 LLM 端到端验证或处理其他优先级功能
 - 当前 blocker：
   1. 当前无 blocker
@@ -46,6 +47,30 @@
 - `serve/start/stop/restart/status/logs`、工具引擎、MCP、Skill 系统仍未实现
 
 ## 会话记录
+
+### Session 060
+
+- 日期：2026-06-25
+- 本轮目标：修复流式 HITL 审批后 assistant 消息丢失 content/reasoning 的 bug
+- 背景：用户在查看 `StreamingAgentExecutor.executeApprovedToolCalls()` 时发现，审批通过后的 assistant 消息被重建为 `SpiMessage.assistant(null, null, toolCalls)`，把原始响应中的 `content` 与 `reasoningContent` 丢弃，导致后续 LLM 请求缺少完整的 reasoning 历史。
+- 实现：
+  - 修改 `StreamingAgentExecutor.execute()`：调用 `executeApprovedToolCalls` 时传入原始 `SpiChatResponse`，使其能拿到 `content` 与 `reasoningContent`。
+  - 修改 `StreamingAgentExecutor.executeApprovedToolCalls()` 签名，新增 `SpiChatResponse response` 参数；在从 `ApprovalTicket` 重建 tool calls 后，使用 `SpiMessage.assistant(content, reasoning, toolCalls)` 写入 content/reasoning。
+  - 新增 `StreamingAgentExecutorTest#preservesAssistantContentAndReasoningAfterHitlApproval`：mock LLM 返回含 content 与 reasoning 的响应，触发 HITL 审批并批准后，验证第二次 LLM 调用消息列表中的 assistant 消息完整保留 content 与 reasoning。
+- 运行过的验证：
+  - `./init.sh`（真实环境，Java 21）→ 成功；9 个 reactor 模块全部 SUCCESS，core 107 个测试全部通过（新增 1 个），tool 模块 18 个测试全部通过
+- 已记录证据：
+  - 本文件已在顶部「当前已验证状态」增加证据 13
+  - `feature_list.json` 的 `hitl-001` 已补充该 bug 修复记录
+- 更新过的文件或工件：
+  - `meta-claw-core/src/main/java/meta/claw/core/runtime/StreamingAgentExecutor.java`
+  - `meta-claw-core/src/test/java/meta/claw/core/runtime/StreamingAgentExecutorTest.java`
+  - `claude-progress.md`
+  - `feature_list.json`
+- 已知风险或未解决的问题：
+  - 非流式路径 `AgentExecutor` 在 HITL 挂起前未将 assistant 消息写入消息列表，恢复时同样可能丢失 content/reasoning；当前仅修复用户指出的流式路径，非流式路径如需修复可后续处理
+- 下一步最佳动作：
+  1. 提交本轮修改
 
 ### Session 059
 
