@@ -8,24 +8,19 @@ import meta.claw.core.memory.shortterm.SessionSelection;
 import meta.claw.core.llm.SpiChatResponse;
 import meta.claw.core.llm.SpiStreamingCallback;
 import meta.claw.core.llm.SpiUsage;
-import meta.claw.core.runtime.hitl.ApprovalItem;
 import meta.claw.core.runtime.hitl.ApprovalResolution;
-import meta.claw.core.runtime.hitl.ApprovalStatus;
 import meta.claw.core.runtime.hitl.ApprovalTicket;
 import meta.claw.core.runtime.VesselManager;
 import meta.claw.core.runtime.VesselRuntime;
+import meta.claw.core.runtime.subsystem.HitlSubSystem;
 import meta.claw.core.tool.SpiToolCall;
+import org.jline.reader.LineReader;
 import org.jline.terminal.Terminal;
-import org.jline.terminal.TerminalBuilder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
-
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
 
 import java.util.UUID;
 
@@ -39,6 +34,12 @@ public class ChatCommand implements Runnable {
     @Autowired
     private VesselManager vesselManager;
 
+    @Autowired
+    private Terminal terminal;
+
+    @Autowired
+    private LineReader lineReader;
+
     @Parameters(index = "0", defaultValue = "default", description = "Vessel name")
     private String vesselName;
 
@@ -49,18 +50,7 @@ public class ChatCommand implements Runnable {
 
     @Override
     public void run() {
-        Terminal terminal;
-        try {
-            terminal = TerminalBuilder.builder()
-                    .system(true)
-                    .dumb(true)
-                    .build();
-        } catch (IOException e) {
-            System.err.println("Failed to initialize terminal: " + e.getMessage());
-            return;
-        }
-
-        VesselRuntime  vesselRuntime = vesselManager.getRuntime(vesselName);
+        VesselRuntime vesselRuntime = vesselManager.getRuntime(vesselName);
         meta.claw.core.runtime.VesselProfile profile = vesselRuntime.getProfile();
         if (profile == null || profile.getBundle() == null) {
             System.err.println("Vessel profile not loaded");
@@ -110,14 +100,9 @@ public class ChatCommand implements Runnable {
         terminal.flush();
 
 
-        BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
-
-
         try {
             while (true) {
-                terminal.writer().print("> ");
-                terminal.writer().flush();
-                String input = reader.readLine();
+                String input = lineReader.readLine("> ");
                 if (input == null || "/exit".equalsIgnoreCase(input.trim())) {
                     break;
                 }
@@ -185,30 +170,8 @@ public class ChatCommand implements Runnable {
                             terminal.writer().println("\u001B[0m");
                             hasContent[0] = true;
                         }
-                        terminal.writer().println("\n🔒 以下工具调用需要审批：");
-                        for (ApprovalItem item : ticket.getItems()) {
-                            terminal.writer().printf("  - %s: %s%n", item.getToolName(), item.getArgumentsJson());
-                        }
-                        terminal.writer().print("批准全部? (Y/n): ");
-                        terminal.writer().flush();
-                        try {
-                            String input = reader.readLine();
-                            boolean approved = input == null || input.trim().isEmpty()
-                                    || input.trim().equalsIgnoreCase("Y")
-                                    || input.trim().equalsIgnoreCase("yes");
-                            java.util.Map<String, ApprovalStatus> decisions = new java.util.HashMap<>();
-                            for (ApprovalItem item : ticket.getItems()) {
-                                decisions.put(item.getToolCallId(), approved ? ApprovalStatus.APPROVED : ApprovalStatus.REJECTED);
-                            }
-                            return ApprovalResolution.builder()
-                                    .ticketId(ticket.getTicketId())
-                                    .decisions(decisions)
-                                    .operator("cli-user")
-                                    .build();
-                        } catch (IOException e) {
-                            log.warn("Failed to read HITL approval input", e);
-                            return null;
-                        }
+                        HitlSubSystem hitlSub = vesselRuntime.getRegistry().get("hitl");
+                        return hitlSub != null ? hitlSub.awaitResolution(ticket) : null;
                     }
 
                     @Override

@@ -17,6 +17,7 @@
 - 最近已通过证据 9：2026-06-23 彻底解决 HITL 循环依赖：`@Lazy` 未能实际消除启动失败，根因是 `HitlSubSystem` 仍然反向依赖 `VesselManager`；将按 Vessel 配置 HITL 策略的职责上移到 `VesselManager`（它本来就负责加载 VesselConfig），`HitlSubSystem` 只保留全局 HITL 配置加载与工具调用审批评估；新增 `VesselManagerTest` 覆盖 per-vessel HITL 配置加载；重新执行 `./init.sh` 通过，core 105 个测试全部通过，tool 模块 18 个测试全部通过
 - 最近已通过证据 10：2026-06-24 继续修复启动循环依赖：错误信息简化为 `vesselManager <-> vesselRuntime`，排查后发现真实环是 `VesselManager -> VesselRuntime -> AgentEngine -> LlmClientManager -> OpenAiLlmClientProvider -> ShortMemoryAdvisor -> VesselManager`；将 `ShortMemoryAdvisor` 中的 `VesselManager` 直接注入改为 `ObjectProvider<VesselManager>`，只在流式响应完成运行时解析，彻底切断静态依赖边；重新执行 `./init.sh` 通过，core 105 个测试全部通过，tool 模块 18 个测试全部通过
 - 最近已通过证据 11：2026-06-24 修复 HITL 运行时 NPE：当全局 `hitl` 配置只设置 `default_require_approval: true` 而 `require`/`skip` 为 null 时，`ConfigurableHitlPolicy.getSummary()` 与 `resolveConfig()` 因直接调用 `Set.isEmpty()` / `Set.contains()` 而抛空指针；修正 `resolveConfig()` 在全局或 Vessel 的 require/skip 为 null 时回退到空集合，并给 `getSummary()` 增加 null 检查；新增 `ConfigurableHitlPolicyTest#nullRequireAndSkipDoNotCauseNpe`；重新执行 `./init.sh` 通过，core 106 个测试全部通过，tool 模块 18 个测试全部通过
+- 最近已通过证据 12：2026-06-25 重构 CLI HITL 审批交互收口到 `CliHitlGate`：新增 `TerminalConfig` 把 `Terminal`/`LineReader` 注册为 Spring bean 供 CLI 复用；`ChatCommand` 改为注入 `Terminal` 与 `LineReader`，移除本地构造 `TerminalBuilder` 与 `BufferedReader`，并把 `SpiStreamingCallback.onHitlSuspend()` 中的打印/输入逻辑完全委托给 `HitlSubSystem.awaitResolution(ticket)` → `CliHitlGate.await(ticket)`；`CliHitlGate` 改为使用共享 `Terminal`/`LineReader`，统一审批提示文案；新增 `jline-reader` 依赖；重新执行 `./init.sh` 通过，core 106 个测试全部通过，tool 模块 18 个测试全部通过
 - 当前最高优先级未完成功能：agent-engine-001（Agent 执行引擎抽象：native / alibaba 双实现设计）Phase 0+1+2+3+4+5+6 已全部实现完成；下一步为真实 LLM 端到端验证或处理其他优先级功能
 - 当前 blocker：
   1. 当前无 blocker
@@ -45,6 +46,38 @@
 - `serve/start/stop/restart/status/logs`、工具引擎、MCP、Skill 系统仍未实现
 
 ## 会话记录
+
+### Session 059
+
+- 日期：2026-06-25
+- 本轮目标：重构 CLI 的 HITL 审批交互，使其统一收口到 `CliHitlGate` 实现，避免 `ChatCommand` 在匿名 `SpiStreamingCallback.onHitlSuspend()` 中重复实现终端输入逻辑
+- 背景：当前 `ChatCommand` 的流式回调里直接处理审批打印与 `BufferedReader.readLine()`，与 `CliHitlGate` 中的 `System.out`/`Scanner(System.in)` 实现重复，且职责分散。计划通过 `TerminalConfig` 把 `Terminal` 与 `BufferedReader` 注入 Spring 上下文，让 `CliHitlGate` 复用 `ChatCommand` 的终端资源，最终让 `onHitlSuspend()` 委托给 `HitlSubSystem.awaitResolution(ticket)` → `CliHitlGate.await()`。
+- 实现：
+  - 新增 `meta.claw.cli.config.TerminalConfig`：注册 `Terminal` bean（沿用 `.system(true).dumb(true)`）与 `LineReader` bean，使 CLI 组件共享同一终端输入输出。
+  - 改造 `meta.claw.cli.ChatCommand`：
+    - 注入 `Terminal` 与 `LineReader`，移除 `run()` 方法内本地构造 `TerminalBuilder` 与 `BufferedReader`。
+    - 普通用户输入改为 `lineReader.readLine("> ")`。
+    - `onHitlSuspend(ApprovalTicket ticket)` 仅负责关闭可能的 thinking 灰色模式，然后调用 `vesselRuntime.getRegistry().get("hitl").awaitResolution(ticket)`，将审批交互完全交给 `HitlSubSystem` / `CliHitlGate`。
+  - 改造 `meta.claw.cli.hitl.CliHitlGate`：使用注入的 `Terminal` 与 `LineReader` 打印审批提示并读取用户输入，统一文案与审批逻辑。
+  - 在 `pom.xml` 与 `meta-claw-cli/pom.xml` 中新增 `org.jline:jline-reader` 依赖（版本由父 POM 的 `${jline.version}` 管理）。
+- 运行过的验证：
+  - `./init.sh`（真实环境，Java 21）→ 成功；9 个 reactor 模块全部 SUCCESS，core 106 个测试全部通过，tool 模块 18 个测试全部通过
+- 已记录证据：
+  - 本文件已在顶部「当前已验证状态」增加证据 12
+  - `feature_list.json` 的 `hitl-001` 已补充 CLI HITL 审批交互收口记录
+- 更新过的文件或工件：
+  - `meta-claw-cli/src/main/java/meta/claw/cli/config/TerminalConfig.java`（新增）
+  - `meta-claw-cli/src/main/java/meta/claw/cli/ChatCommand.java`
+  - `meta-claw-cli/src/main/java/meta/claw/cli/hitl/CliHitlGate.java`
+  - `meta-claw-cli/pom.xml`
+  - `pom.xml`
+  - `claude-progress.md`
+  - `feature_list.json`
+- 已知风险或未解决的问题：
+  - CLI 真实端到端 HITL 验证仍待用户执行；可在某个 vessel 的 `vessel.meta.yaml` 中配置 `hitl.require: [calculate]` 后运行 `chat`，输入 `1+1` 观察是否出现统一审批提示
+- 下一步最佳动作：
+  1. 提交本轮修改
+  2. 由用户在真实 CLI 中验证 HITL 审批交互
 
 ### Session 058
 

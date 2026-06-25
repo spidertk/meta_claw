@@ -160,6 +160,11 @@
                 <artifactId>jline-terminal</artifactId>
                 <version>${jline.version}</version>
             </dependency>
+            <dependency>
+                <groupId>org.jline</groupId>
+                <artifactId>jline-reader</artifactId>
+                <version>${jline.version}</version>
+            </dependency>
             <!-- Apache Commons Lang3：Java 核心工具库 -->
             <dependency>
                 <groupId>org.apache.commons</groupId>
