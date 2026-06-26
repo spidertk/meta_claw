@@ -3,6 +3,7 @@ package meta.claw.core.llm.provider;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import meta.claw.core.config.ProviderConfig;
+import meta.claw.core.llm.advisor.OpenAiReasoningContentAdvisor;
 import meta.claw.core.llm.advisor.ShortMemoryAdvisor;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.ToolCallAdvisor;

@@ -1,6 +1,8 @@
-package meta.claw.core.llm.provider;
+package meta.claw.core.llm.advisor;
 
 import lombok.extern.slf4j.Slf4j;
+import meta.claw.core.llm.provider.OpenAiReasoningContentContext;
+import meta.claw.core.llm.provider.OpenAiReasoningContentModule;
 import org.springframework.ai.chat.client.ChatClientRequest;
 import org.springframework.ai.chat.client.ChatClientResponse;
 import org.springframework.ai.chat.client.advisor.api.AdvisorChain;
@@ -36,13 +38,19 @@ public class OpenAiReasoningContentAdvisor implements BaseAdvisor {
         OpenAiReasoningContentContext.clear();
 
         List<Message> messages = chatClientRequest.prompt().getInstructions();
-        for (Message message : messages) {
+        if (log.isDebugEnabled()) {
+            log.debug("[OpenAiReasoningContentAdvisor] Processing {} message(s) for reasoning_content passthrough", messages.size());
+        }
+        for (int i = 0; i < messages.size(); i++) {
+            Message message = messages.get(i);
             if (message instanceof AssistantMessage assistantMessage) {
                 String reasoningContent = extractReasoningContent(assistantMessage);
                 OpenAiReasoningContentContext.push(reasoningContent);
-                if (log.isDebugEnabled() && !reasoningContent.isEmpty()) {
-                    log.debug("[OpenAiReasoningContentAdvisor] Pushed reasoning_content for assistant message: {}",
-                            reasoningContent.substring(0, Math.min(50, reasoningContent.length())) + "...");
+                if (log.isDebugEnabled()) {
+                    log.debug("[OpenAiReasoningContentAdvisor] Message #{} assistant hasToolCalls={} reasoningContent={}",
+                            i,
+                            assistantMessage.hasToolCalls(),
+                            reasoningContent.isEmpty() ? "<empty>" : reasoningContent.substring(0, Math.min(80, reasoningContent.length())) + "...");
                 }
             }
         }
@@ -53,6 +61,9 @@ public class OpenAiReasoningContentAdvisor implements BaseAdvisor {
     @Override
     public ChatClientResponse after(ChatClientResponse chatClientResponse, AdvisorChain advisorChain) {
         // 请求-响应周期结束，清理线程上下文
+        if (log.isDebugEnabled()) {
+            log.debug("[OpenAiReasoningContentAdvisor] Response received, removing reasoning_content context");
+        }
         OpenAiReasoningContentContext.remove();
         return chatClientResponse;
     }
@@ -62,6 +73,11 @@ public class OpenAiReasoningContentAdvisor implements BaseAdvisor {
         Object reasoning = null;
         if (assistantMessage.getMetadata() != null) {
             reasoning = assistantMessage.getMetadata().get("reasoningContent");
+            if (log.isDebugEnabled()) {
+                log.debug("[OpenAiReasoningContentAdvisor] AssistantMessage.metadata keys={} reasoningContent={}",
+                        assistantMessage.getMetadata().keySet(),
+                        reasoning instanceof String s ? s.substring(0, Math.min(80, s.length())) + "..." : reasoning);
+            }
         }
         if (reasoning == null && assistantMessage.getMetadata() != null) {
             reasoning = assistantMessage.getMetadata().get("reasoning_content");

@@ -1,5 +1,6 @@
-package meta.claw.core.llm.provider;
+package meta.claw.core.llm.advisor;
 
+import meta.claw.core.llm.provider.OpenAiReasoningContentContext;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.client.ChatClientRequest;

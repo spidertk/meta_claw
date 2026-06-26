@@ -520,6 +520,9 @@ public class LlmClientManager implements SpiLlmClient {
                 java.util.Map<String, Object> properties = new java.util.HashMap<>();
                 if (msg.getReasoningContent() != null && !msg.getReasoningContent().isEmpty()) {
                     properties.put("reasoningContent", msg.getReasoningContent());
+                    if (log.isDebugEnabled()) {
+                        log.debug("[toSpringMessage] assistant message has reasoningContent, length={}", msg.getReasoningContent().length());
+                    }
                 }
                 yield AssistantMessage.builder()
                         .content(msg.getContent() != null ? msg.getContent() : "")

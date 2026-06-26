@@ -53,6 +53,11 @@ public class OpenAiReasoningContentModule extends SimpleModule {
 
                 if ("assistant".equals(role) && hasToolCalls && !hasReasoning) {
                     String reasoningContent = OpenAiReasoningContentContext.poll();
+                    if (log.isDebugEnabled()) {
+                        log.debug("[OpenAiReasoningContentModule] Polling reasoning_content for assistant tool_call, queueEmpty={} polled={}",
+                                OpenAiReasoningContentContext.isEmpty(),
+                                reasoningContent == null ? "<null>" : (reasoningContent.isEmpty() ? "<empty>" : reasoningContent.substring(0, Math.min(80, reasoningContent.length())) + "..."));
+                    }
                     if (reasoningContent == null) {
                         reasoningContent = "";
                     }
