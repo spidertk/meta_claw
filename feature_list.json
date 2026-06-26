@@ -627,7 +627,7 @@
         {
           "date": "2026-06-26",
           "result": "passing",
-          "detail": "修复 Spring AI 1.1.8 OpenAiChatModel 硬编码 reasoningContent=null 导致 OpenAI 兼容 provider 请求丢失真实 reasoning_content 的问题：新增 OpenAiReasoningContentAdvisor 从 outgoing Prompt 提取 reasoningContent，经 OpenAiReasoningContentContext 桥接，由 OpenAiReasoningContentModule 在序列化时回填；原 MoonshotSerializerModule 改名为通用 OpenAiReasoningContentModule；OpenAiLlmClientProvider 为所有 OpenAI 兼容 provider 统一注册；新增 3 个单元测试；./init.sh 全量通过。"
+          "detail": "修复 Spring AI 1.1.8 OpenAiChatModel 硬编码 reasoningContent=null 导致 OpenAI 兼容 provider 请求丢失真实 reasoning_content 的问题：新增 OpenAiReasoningContentAdvisor 从 outgoing Prompt 提取 reasoningContent，经 OpenAiReasoningContentContext 桥接，由 OpenAiReasoningContentModule 在序列化时回填；原 MoonshotSerializerModule 改名为通用 OpenAiReasoningContentModule；OpenAiLlmClientProvider 在 buildChatClient() 与 createRaw() 中统一注册 Advisor 与 Module（streamWithTools/chatWithTools 走 createRaw，最初漏注册导致真实 CLI 仍为空，已补齐）；新增 3 个单元测试；./init.sh 全量通过。"
         }
       ],
       "notes": "Spring AI 1.1.7 将 reasoningContent 存入 AssistantMessage.metadata 而非 ChatGenerationMetadata；extractReasoningContent 已适配。streamUsage(true) 已启用以获取流式 usage。Moonshot 连接池参数在 2026-06-25 针对 stale connection 问题做了调优。2026-06-26 新增 OpenAiReasoningContentAdvisor + Context + Module，解决 OpenAiChatModel 请求侧 reasoningContent 丢失的 Spring AI 版本缺陷。"

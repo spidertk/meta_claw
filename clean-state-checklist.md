@@ -1,7 +1,7 @@
 # 干净状态检查清单
 
 > 最后核对：2026-06-26
-> 结论：已修复 Spring AI 1.1.8 `OpenAiChatModel` 硬编码 `reasoningContent = null` 导致 OpenAI 兼容 provider 请求丢失真实 `reasoning_content` 的问题。新增 `OpenAiReasoningContentAdvisor` + `OpenAiReasoningContentContext` + `OpenAiReasoningContentModule`（由 `MoonshotSerializerModule` 改名并增强），在 `OpenAiLlmClientProvider` 中为所有 OpenAI 兼容 provider 统一注册。`./init.sh` 全量通过，core 107 个 P0 测试全部通过，tool 模块 18 个测试全部通过。
+> 结论：已修复 Spring AI 1.1.8 `OpenAiChatModel` 硬编码 `reasoningContent = null` 导致 OpenAI 兼容 provider 请求丢失真实 `reasoning_content` 的问题。新增 `OpenAiReasoningContentAdvisor` + `OpenAiReasoningContentContext` + `OpenAiReasoningContentModule`（由 `MoonshotSerializerModule` 改名并增强），在 `OpenAiLlmClientProvider` 的 `buildChatClient()` 与 `createRaw()` 中统一注册（`streamWithTools`/`chatWithTools` 走 `createRaw`，最初漏注册导致真实 CLI 日志中仍为空字符串，已补齐）。`./init.sh` 全量通过，core 107 个 P0 测试全部通过，tool 模块 18 个测试全部通过。
 
 - [x] 标准启动路径仍然可用
   证据：2026-06-26 执行 `./init.sh` 成功，内部 `mvn clean compile` + P0 测试完成，9 个 reactor 模块全部 SUCCESS；脚本自动使用 `~/.local/jdks/jdk-21.0.10+7/Contents/Home` 与 `~/.local/tools/apache-maven-3.9.15/bin/mvn`

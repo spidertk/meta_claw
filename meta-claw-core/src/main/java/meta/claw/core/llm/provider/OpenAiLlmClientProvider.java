@@ -57,7 +57,9 @@ public class OpenAiLlmClientProvider implements LlmClientProvider {
 
     @Override
     public ChatClient createRaw(ProviderConfig providerConfig) {
-        return ChatClient.builder(buildChatModel(providerConfig)).build();
+        return ChatClient.builder(buildChatModel(providerConfig))
+                .defaultAdvisors(new OpenAiReasoningContentAdvisor(100))
+                .build();
     }
 
     @Override
