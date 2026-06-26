@@ -155,20 +155,16 @@ public class OpenAiLlmClientProvider implements LlmClientProvider {
 
 
     /**
-     * 根据模型名称选择 ObjectMapper。
-     * <ul>
-     *   <li>非 Moonshot：直接复用 Spring 容器里的默认 {@link ObjectMapper}（含 {@code spring.jackson.*} 配置）</li>
-     *   <li>Moonshot K2.5/K2.6：copy 默认 ObjectMapper 并注册 {@link MoonshotSerializerModule}，避免污染共享实例</li>
-     * </ul>
+     * 选择 ObjectMapper。
+     * 所有 OpenAI 兼容 provider 都需要修复 Spring AI 1.1.8 在把 AssistantMessage
+     * 序列化为 ChatCompletionMessage 时硬编码 reasoningContent = null 的缺陷，
+     * 因此统一 copy 默认 ObjectMapper 并注册 {@link OpenAiReasoningContentModule}。
      */
     private ObjectMapper selectObjectMapper(String model) {
-        if (model != null && model.toLowerCase().contains("kimi")) {
-            ObjectMapper copy = objectMapper.copy();
-            copy.registerModule(new MoonshotSerializerModule());
-            log.debug("Registered MoonshotSerializerModule for model: {}", model);
-            return copy;
-        }
-        return objectMapper;
+        ObjectMapper copy = objectMapper.copy();
+        copy.registerModule(new OpenAiReasoningContentModule());
+        log.debug("Registered OpenAiReasoningContentModule for model: {}", model);
+        return copy;
     }
 
     @Override
