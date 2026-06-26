@@ -1,5 +1,7 @@
 # 恢复 OpenAI 兼容请求中 reasoning_content 真实值 Implementation Plan
 
+> **⚠️ 状态更新（2026-06-26）：** 本计划中的 "Advisor + ThreadLocal Context Bridge + Serializer Patch" 方案已在真实流式调用中被证明不可行：Advisor 在 `boundedElastic` 线程执行，而 Jackson 序列化在 `reactor-http-nio` 线程执行，ThreadLocal 无法跨线程传递。当前实现已改为同包 subclass `ReasoningAwareOpenAiChatModel` 直接重写 package-private 的 `OpenAiChatModel.createRequest(Prompt, boolean)`，在请求构造阶段从原始 Prompt 的 `AssistantMessage.metadata` 回填真实 `reasoning_content`。旧的 ThreadLocal 桥代码（`OpenAiReasoningContentContext`、`OpenAiReasoningContentAdvisor`、`OpenAiReasoningContentModule`）及其测试已删除。本计划文档保留作为历史上下文，实际代码实现以 `ReasoningAwareOpenAiChatModel` 为准，详见 `claude-progress.md` Session 063。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 修复 Spring AI 1.1.8 `OpenAiChatModel` 在 `AssistantMessage → ChatCompletionMessage` 转换时硬编码 `reasoningContent = null` 的缺陷，让所有基于 OpenAI 兼容协议的 provider（Moonshot、DeepSeek、OpenAI 等）在 assistant tool_call 请求中都能携带真实的 `reasoning_content`，而不是只能补空字符串。

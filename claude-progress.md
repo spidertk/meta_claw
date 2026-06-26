@@ -21,6 +21,7 @@
 - 最近已通过证据 13：2026-06-25 修复流式 HITL 审批后 assistant 消息丢失 content/reasoning 的 bug：`StreamingAgentExecutor.executeApprovedToolCalls()` 从 `ApprovalTicket` 重建 tool calls 后，用 `SpiMessage.assistant(null, null, toolCalls)` 创建 assistant 消息，导致 content 与 reasoningContent 被清空；改为把原始 `SpiChatResponse` 的 `content`/`reasoningContent` 传入 `executeApprovedToolCalls` 并写入 assistant 消息；新增 `StreamingAgentExecutorTest#preservesAssistantContentAndReasoningAfterHitlApproval` 验证；重新执行 `./init.sh` 通过，core 107 个测试全部通过，tool 模块 18 个测试全部通过
 - 最近已通过证据 14：2026-06-25 修复 Moonshot 流式调用偶发 `Connection prematurely closed BEFORE response`：根因是连接池 `maxIdleTime` 过长（5 分钟），复用到已被 Moonshot 服务端关闭的 stale connection；将 `OpenAiWebClientFactory` 的 `maxIdleTime` 缩短为 45 秒、`evictInBackground` 缩短为 15 秒，并开启 `SO_KEEPALIVE`；`OpenAiLlmClientProvider` 将 provider 配置的 `timeout` 透传给 WebClient/RestClient 的 response/read timeout；重新执行 `./init.sh` 通过，core 107 个测试全部通过，tool 模块 18 个测试全部通过
 - 最近已通过证据 15：2026-06-26 修复 Spring AI 1.1.8 `OpenAiChatModel` 硬编码 `reasoningContent = null` 导致的 OpenAI 兼容 provider 请求丢失真实 reasoning_content 的问题：参考 Spring AI Alibaba Playground 的 `ReasoningContentAdvisor` 模式，新增 `OpenAiReasoningContentAdvisor` 在 `before()` 阶段从 outgoing `Prompt` 的 `AssistantMessage.metadata` 提取 reasoningContent 并写入 `OpenAiReasoningContentContext`，`OpenAiReasoningContentModule` 在序列化 `OpenAiApi.ChatCompletionMessage` 时从上下文读取并回填 `reasoning_content` 字段；将原 `MoonshotSerializerModule` 重命名为通用 `OpenAiReasoningContentModule`；在 `OpenAiLlmClientProvider` 的 `buildChatClient()` 与 `createRaw()` 中统一注册 Advisor 与 Module（`streamWithTools`/`chatWithTools` 使用 `createRaw`，最初漏注册导致真实 CLI 日志中仍为空字符串，已补齐）；新增 `OpenAiReasoningContentContextTest`、`OpenAiReasoningContentModuleTest`、`OpenAiReasoningContentAdvisorTest`；重新执行 `./init.sh` 通过，core 107 个测试全部通过，tool 模块 18 个测试全部通过
+- 最近已通过证据 16：2026-06-26 进一步彻底解决跨线程丢失问题：用同包 subclass `ReasoningAwareOpenAiChatModel` 重写 package-private 的 `OpenAiChatModel.createRequest(Prompt, boolean)`，在父类构造完 `ChatCompletionRequest` 后通过 Jackson 直接修改 messages，从原始 Prompt 的 `AssistantMessage.metadata` 回填真实 `reasoning_content`；删除不再需要的 ThreadLocal 桥（`OpenAiReasoningContentContext`、`OpenAiReasoningContentAdvisor`、`OpenAiReasoningContentModule` 及其测试）；`OpenAiLlmClientProvider.buildChatModel()` 改为返回 `ReasoningAwareOpenAiChatModel`；新增 `ReasoningAwareOpenAiChatModelTest`（2 个用例）验证 assistant tool-call 消息的真实 reasoning_content 被回填；将新测试纳入 `init.sh` P0 基线；重新执行 `./init.sh` 通过，core 112 个测试全部通过，tool 模块 18 个测试全部通过
 - 当前最高优先级未完成功能：agent-engine-001（Agent 执行引擎抽象：native / alibaba 双实现设计）Phase 0+1+2+3+4+5+6 已全部实现完成；下一步为真实 LLM 端到端验证或处理其他优先级功能
 - 当前 blocker：
   1. 当前无 blocker
@@ -49,6 +50,47 @@
 - `serve/start/stop/restart/status/logs`、工具引擎、MCP、Skill 系统仍未实现
 
 ## 会话记录
+
+### Session 063
+
+- 日期：2026-06-26
+- 本轮目标：用同包 subclass 彻底解决 Spring AI 1.1.8 `OpenAiChatModel` 硬编码 `reasoningContent = null` 导致的跨线程 reasoning_content 丢失问题
+- 背景：Session 062 的 ThreadLocal 桥方案在真实流式调用中仍失效，因为 Advisor 在 `boundedElastic-2` 线程 push，而 Jackson 序列化在 `reactor-http-nio-4` 线程执行，ThreadLocal 无法跨线程传递。需要把回填逻辑移到与 Prompt 同线程的 `createRequest` 阶段。
+- 实现：
+  - 在 `org.springframework.ai.openai` 包下新增 `ReasoningAwareOpenAiChatModel`，继承 `OpenAiChatModel` 并重写 package-private 的 `createRequest(Prompt, boolean)`。
+  - 父类构造完 `ChatCompletionRequest` 后，子类遍历 messages，对 `role == assistant` 且含 `tool_calls` 且缺少 `reasoning_content` 的消息，从原始 Prompt 的 `AssistantMessage.metadata` 中按 toolCallId 查找真实 reasoningContent，并用 Jackson 在 JSON 树层面写入 `reasoning_content` 字段，最后 `treeToValue` 转回请求对象。
+  - 修改 `OpenAiLlmClientProvider.buildChatModel()`：返回 `ReasoningAwareOpenAiChatModel` 替代父类，保留原有 timeout / RestClient / WebClient / OpenAiChatOptions 配置。
+  - 删除 Session 062 的 ThreadLocal 桥实现：`OpenAiReasoningContentContext`、`OpenAiReasoningContentAdvisor`、`OpenAiReasoningContentModule` 及其对应测试，避免死代码和跨线程风险。
+  - 新增 `ReasoningAwareOpenAiChatModelTest`：
+    - 验证当 Prompt 中包含带 `reasoningContent` metadata 的 assistant tool-call 消息时，`createRequest` 生成的 `ChatCompletionRequest` 中对应 message 的 `reasoning_content` 为真实值。
+    - 验证当没有 reasoningContent 时，tool-call 消息的 `reasoning_content` 被补为空字符串，满足 Moonshot 等 OpenAI 兼容 API 的字段存在性要求。
+  - 将 `ReasoningAwareOpenAiChatModelTest` 与遗漏的 `LlmClientManagerToolMessageTest` 一起纳入 `init.sh` P0 基线。
+- 运行过的验证：
+  - `mvn -pl meta-claw-core test -Dtest=ReasoningAwareOpenAiChatModelTest`（真实环境，Java 21）→ 2/2 通过
+  - `./init.sh`（真实环境，Java 21）→ 成功；9 个 reactor 模块全部 SUCCESS，core 112 个 P0 测试全部通过，tool 模块 18 个测试全部通过
+- 已记录证据：
+  - 本文件已在顶部「当前已验证状态」增加证据 16
+  - `feature_list.json` 的 `llm-001` 已更新为 subclass 方案并标记 ThreadLocal 方案被替换
+  - `clean-state-checklist.md` 已更新
+- 更新过的文件或工件：
+  - `meta-claw-core/src/main/java/org/springframework/ai/openai/ReasoningAwareOpenAiChatModel.java`（新增）
+  - `meta-claw-core/src/test/java/org/springframework/ai/openai/ReasoningAwareOpenAiChatModelTest.java`（新增）
+  - `meta-claw-core/src/main/java/meta/claw/core/llm/provider/OpenAiLlmClientProvider.java`（修改）
+  - `meta-claw-core/src/main/java/meta/claw/core/llm/advisor/OpenAiReasoningContentAdvisor.java`（删除）
+  - `meta-claw-core/src/main/java/meta/claw/core/llm/provider/OpenAiReasoningContentContext.java`（删除）
+  - `meta-claw-core/src/main/java/meta/claw/core/llm/provider/OpenAiReasoningContentModule.java`（删除）
+  - `meta-claw-core/src/test/java/meta/claw/core/llm/advisor/OpenAiReasoningContentAdvisorTest.java`（删除）
+  - `meta-claw-core/src/test/java/meta/claw/core/llm/provider/OpenAiReasoningContentContextTest.java`（删除）
+  - `meta-claw-core/src/test/java/meta/claw/core/llm/provider/OpenAiReasoningContentModuleTest.java`（删除）
+  - `init.sh`（P0 基线增加 `ReasoningAwareOpenAiChatModelTest`，补齐 `LlmClientManagerToolMessageTest`）
+  - `claude-progress.md`
+  - `feature_list.json`
+  - `clean-state-checklist.md`
+- 已知风险或未解决的问题：
+  - 真实 CLI 端到端验证仍待用户执行：在配置好 Moonshot API key 的 vessel 中输入多轮 tool-call 问题，观察第二轮请求是否携带真实 `reasoning_content`
+- 下一步最佳动作：
+  1. 提交本轮修改
+  2. 由用户在真实 CLI 中验证 Moonshot 多轮 tool-call 对话
 
 ### Session 062
 

@@ -1,6 +1,6 @@
 {
   "project": "meta-claw",
-  "last_updated": "2026-06-25",
+  "last_updated": "2026-06-26",
   "package_structure": {
     "config": "meta.claw.core.config — 所有配置模型 + 加载器 + 解析器",
     "vessel": "meta.claw.core.vessel — Vessel 用户域（Profile + Initializer）",
@@ -628,9 +628,14 @@
           "date": "2026-06-26",
           "result": "passing",
           "detail": "修复 Spring AI 1.1.8 OpenAiChatModel 硬编码 reasoningContent=null 导致 OpenAI 兼容 provider 请求丢失真实 reasoning_content 的问题：新增 OpenAiReasoningContentAdvisor 从 outgoing Prompt 提取 reasoningContent，经 OpenAiReasoningContentContext 桥接，由 OpenAiReasoningContentModule 在序列化时回填；原 MoonshotSerializerModule 改名为通用 OpenAiReasoningContentModule；OpenAiLlmClientProvider 在 buildChatClient() 与 createRaw() 中统一注册 Advisor 与 Module（streamWithTools/chatWithTools 走 createRaw，最初漏注册导致真实 CLI 仍为空，已补齐）；新增 3 个单元测试；./init.sh 全量通过。"
+        },
+        {
+          "date": "2026-06-26",
+          "result": "passing",
+          "detail": "彻底解决跨线程丢失：用同包 subclass ReasoningAwareOpenAiChatModel 重写 package-private 的 OpenAiChatModel.createRequest(Prompt, boolean)，在父类构造完 ChatCompletionRequest 后从原始 Prompt 的 AssistantMessage.metadata 回填真实 reasoning_content；OpenAiLlmClientProvider.buildChatModel() 改为返回该子类；删除 ThreadLocal 桥（OpenAiReasoningContentContext/OpenAiReasoningContentAdvisor/OpenAiReasoningContentModule）及其测试；新增 ReasoningAwareOpenAiChatModelTest（2 个用例）；将新测试与 LlmClientManagerToolMessageTest 纳入 init.sh P0 基线；./init.sh 全量通过，core 112 个测试全部通过，tool 18 个测试全部通过。"
         }
       ],
-      "notes": "Spring AI 1.1.7 将 reasoningContent 存入 AssistantMessage.metadata 而非 ChatGenerationMetadata；extractReasoningContent 已适配。streamUsage(true) 已启用以获取流式 usage。Moonshot 连接池参数在 2026-06-25 针对 stale connection 问题做了调优。2026-06-26 新增 OpenAiReasoningContentAdvisor + Context + Module，解决 OpenAiChatModel 请求侧 reasoningContent 丢失的 Spring AI 版本缺陷。"
+      "notes": "Spring AI 1.1.7 将 reasoningContent 存入 AssistantMessage.metadata 而非 ChatGenerationMetadata；extractReasoningContent 已适配。streamUsage(true) 已启用以获取流式 usage。Moonshot 连接池参数在 2026-06-25 针对 stale connection 问题做了调优。2026-06-26 先用 Advisor + ThreadLocal + Module 方案绕过 OpenAiChatModel 请求侧 reasoningContent 丢失，后因 Advisor 与 Jackson 序列化跨线程失效，改为同包 subclass ReasoningAwareOpenAiChatModel 直接重写 createRequest 在请求构造阶段回填，彻底消除跨线程风险。ThreadLocal 相关实现已删除。"
     },
     {
       "id": "spi-001",
