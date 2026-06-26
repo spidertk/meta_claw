@@ -79,9 +79,11 @@ public class OpenAiLlmClientProvider implements LlmClientProvider {
     }
 
     private ChatClient buildChatClient(ProviderConfig providerConfig) {
-        ChatClient chatClient = ChatClient.builder(buildChatModel(providerConfig)).defaultAdvisors(
-                        ToolCallAdvisor.builder().build(),  // 外层：自动处理 tool calling 循环
-                        shortMemoryAdvisor                     // 内层：流式响应持久化到 ShortMemory
+        ChatClient chatClient = ChatClient.builder(buildChatModel(providerConfig))
+                .defaultAdvisors(
+                        new OpenAiReasoningContentAdvisor(100),  // 最外层：在请求发送前提取 reasoningContent
+                        ToolCallAdvisor.builder().build(),       // 外层：自动处理 tool calling 循环
+                        shortMemoryAdvisor                         // 内层：流式响应持久化到 ShortMemory
                 )
                 .build();
 
