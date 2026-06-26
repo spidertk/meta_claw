@@ -20,6 +20,7 @@
 - 最近已通过证据 12：2026-06-25 重构 CLI HITL 审批交互收口到 `CliHitlGate`：新增 `TerminalConfig` 把 `Terminal`/`LineReader` 注册为 Spring bean 供 CLI 复用；`ChatCommand` 改为注入 `Terminal` 与 `LineReader`，移除本地构造 `TerminalBuilder` 与 `BufferedReader`，并把 `SpiStreamingCallback.onHitlSuspend()` 中的打印/输入逻辑完全委托给 `HitlSubSystem.awaitResolution(ticket)` → `CliHitlGate.await(ticket)`；`CliHitlGate` 改为使用共享 `Terminal`/`LineReader`，统一审批提示文案；新增 `jline-reader` 依赖；重新执行 `./init.sh` 通过，core 106 个测试全部通过，tool 模块 18 个测试全部通过
 - 最近已通过证据 13：2026-06-25 修复流式 HITL 审批后 assistant 消息丢失 content/reasoning 的 bug：`StreamingAgentExecutor.executeApprovedToolCalls()` 从 `ApprovalTicket` 重建 tool calls 后，用 `SpiMessage.assistant(null, null, toolCalls)` 创建 assistant 消息，导致 content 与 reasoningContent 被清空；改为把原始 `SpiChatResponse` 的 `content`/`reasoningContent` 传入 `executeApprovedToolCalls` 并写入 assistant 消息；新增 `StreamingAgentExecutorTest#preservesAssistantContentAndReasoningAfterHitlApproval` 验证；重新执行 `./init.sh` 通过，core 107 个测试全部通过，tool 模块 18 个测试全部通过
 - 最近已通过证据 14：2026-06-25 修复 Moonshot 流式调用偶发 `Connection prematurely closed BEFORE response`：根因是连接池 `maxIdleTime` 过长（5 分钟），复用到已被 Moonshot 服务端关闭的 stale connection；将 `OpenAiWebClientFactory` 的 `maxIdleTime` 缩短为 45 秒、`evictInBackground` 缩短为 15 秒，并开启 `SO_KEEPALIVE`；`OpenAiLlmClientProvider` 将 provider 配置的 `timeout` 透传给 WebClient/RestClient 的 response/read timeout；重新执行 `./init.sh` 通过，core 107 个测试全部通过，tool 模块 18 个测试全部通过
+- 最近已通过证据 15：2026-06-26 修复 Spring AI 1.1.8 `OpenAiChatModel` 硬编码 `reasoningContent = null` 导致的 OpenAI 兼容 provider 请求丢失真实 reasoning_content 的问题：参考 Spring AI Alibaba Playground 的 `ReasoningContentAdvisor` 模式，新增 `OpenAiReasoningContentAdvisor` 在 `before()` 阶段从 outgoing `Prompt` 的 `AssistantMessage.metadata` 提取 reasoningContent 并写入 `OpenAiReasoningContentContext`，`OpenAiReasoningContentModule` 在序列化 `OpenAiApi.ChatCompletionMessage` 时从上下文读取并回填 `reasoning_content` 字段；将原 `MoonshotSerializerModule` 重命名为通用 `OpenAiReasoningContentModule`，并在 `OpenAiLlmClientProvider` 中为所有 OpenAI 兼容 provider 统一注册 Advisor 与 Module；新增 `OpenAiReasoningContentContextTest`、`OpenAiReasoningContentModuleTest`、`OpenAiReasoningContentAdvisorTest`；重新执行 `./init.sh` 通过，core 107 个测试全部通过，tool 模块 18 个测试全部通过
 - 当前最高优先级未完成功能：agent-engine-001（Agent 执行引擎抽象：native / alibaba 双实现设计）Phase 0+1+2+3+4+5+6 已全部实现完成；下一步为真实 LLM 端到端验证或处理其他优先级功能
 - 当前 blocker：
   1. 当前无 blocker
@@ -48,6 +49,44 @@
 - `serve/start/stop/restart/status/logs`、工具引擎、MCP、Skill 系统仍未实现
 
 ## 会话记录
+
+### Session 062
+
+- 日期：2026-06-26
+- 本轮目标：修复 Spring AI 1.1.8 `OpenAiChatModel` 硬编码 `reasoningContent = null` 导致 OpenAI 兼容 provider 请求丢失真实 reasoning_content 的问题
+- 背景：用户在调研 Spring AI Alibaba Playground 的 `ReasoningContentAdvisor` 后提供线索。该 Advisor 用于把响应中的 reasoning content 包进 `<think>` 标签展示，但它展示了如何用 `BaseAdvisor` 在 `before()` 中扫描 outgoing `Prompt`。我们借鉴该模式，把 reasoningContent 从 `AssistantMessage.metadata` 经线程上下文桥传到 Jackson 序列化器。
+- 实现：
+  - 新增 `OpenAiReasoningContentContext`：基于 ThreadLocal 的 FIFO 队列，按 assistant 消息顺序保存 reasoningContent。
+  - 新增 `OpenAiReasoningContentAdvisor`：实现 `BaseAdvisor`，`before()` 从 `Prompt` 的 assistant 消息提取 reasoningContent 写入上下文，`after()` 清理上下文。
+  - 新增 `OpenAiReasoningContentModule`（由 `MoonshotSerializerModule` 改名并增强）：序列化 `OpenAiApi.ChatCompletionMessage` 时，对 assistant + tool_calls 且缺失 `reasoning_content` 的消息，优先从上下文 poll 真实值回填，否则兜底空字符串。
+  - 修改 `OpenAiLlmClientProvider`：
+    - `selectObjectMapper()` 对所有模型统一注册 `OpenAiReasoningContentModule`。
+    - `buildChatClient()` 对所有 OpenAI 兼容 ChatClient 注册 `OpenAiReasoningContentAdvisor`。
+  - 删除旧的 `MoonshotSerializerModule.java`。
+- 运行过的验证：
+  - `mvn -pl meta-claw-core test`（真实环境，Java 21）→ 成功；core 142 个测试全部通过（含新增 11 个）
+  - `./init.sh`（真实环境，Java 21）→ 成功；9 个 reactor 模块全部 SUCCESS，core 107 个 P0 测试全部通过，tool 模块 18 个测试全部通过
+- 已记录证据：
+  - 本文件已在顶部「当前已验证状态」增加证据 15
+  - `feature_list.json` 的 `llm-001` 已补充 reasoning_content 真实值透传记录
+  - `clean-state-checklist.md` 已更新
+- 更新过的文件或工件：
+  - `meta-claw-core/src/main/java/meta/claw/core/llm/provider/OpenAiReasoningContentContext.java`（新增）
+  - `meta-claw-core/src/main/java/meta/claw/core/llm/provider/OpenAiReasoningContentAdvisor.java`（新增）
+  - `meta-claw-core/src/main/java/meta/claw/core/llm/provider/OpenAiReasoningContentModule.java`（新增，由 MoonshotSerializerModule 改名增强）
+  - `meta-claw-core/src/main/java/meta/claw/core/llm/provider/OpenAiLlmClientProvider.java`（修改）
+  - `meta-claw-core/src/main/java/meta/claw/core/llm/provider/MoonshotSerializerModule.java`（删除）
+  - `meta-claw-core/src/test/java/meta/claw/core/llm/provider/OpenAiReasoningContentContextTest.java`（新增）
+  - `meta-claw-core/src/test/java/meta/claw/core/llm/provider/OpenAiReasoningContentAdvisorTest.java`（新增）
+  - `meta-claw-core/src/test/java/meta/claw/core/llm/provider/OpenAiReasoningContentModuleTest.java`（新增）
+  - `claude-progress.md`
+  - `feature_list.json`
+  - `clean-state-checklist.md`
+- 已知风险或未解决的问题：
+  - 当前方案依赖 ThreadLocal，在 `LlmClientManager` 使用 `blockLast()` 的同步订阅模式下有效；若未来改为纯异步 Reactive 调用，需要把上下文桥改为 Reactor Context 或自定义 ChatModel
+- 下一步最佳动作：
+  1. 提交本轮修改
+  2. 由用户在真实 CLI 中测试 Moonshot 多轮 tool-call 对话，确认第二轮请求的 `reasoning_content` 已携带真实 thinking 内容
 
 ### Session 061
 
