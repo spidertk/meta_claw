@@ -1,0 +1,7 @@
+meta-claw:
+  llm:
+    multimodal:
+      enabled: false
+      supported-media-types: image/png, image/jpeg, image/webp
+      pdf-page-images: false
+      max-image-size-bytes: 5242880

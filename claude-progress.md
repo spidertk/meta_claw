@@ -24,7 +24,7 @@
 - 最近已通过证据 16：2026-06-26 进一步彻底解决跨线程丢失问题：用同包 subclass `ReasoningAwareOpenAiChatModel` 重写 package-private 的 `OpenAiChatModel.createRequest(Prompt, boolean)`，在父类构造完 `ChatCompletionRequest` 后通过 Jackson 直接修改 messages，从原始 Prompt 的 `AssistantMessage.metadata` 回填真实 `reasoning_content`；删除不再需要的 ThreadLocal 桥（`OpenAiReasoningContentContext`、`OpenAiReasoningContentAdvisor`、`OpenAiReasoningContentModule` 及其测试）；`OpenAiLlmClientProvider.buildChatModel()` 改为返回 `ReasoningAwareOpenAiChatModel`；新增 `ReasoningAwareOpenAiChatModelTest`（2 个用例）验证 assistant tool-call 消息的真实 reasoning_content 被回填；将新测试纳入 `init.sh` P0 基线；重新执行 `./init.sh` 通过，core 112 个测试全部通过，tool 模块 18 个测试全部通过
 - 最近已通过证据 17：2026-06-30 实现 multimodal knowledge extension 计划的 Task 5：创建 `LocalAssetManager`，按 `.meta-claw/vessels/<vesselId>/assets/<assetId>/original.<ext>` 持久化 `KnowledgeSource` 的 stream、uri 或 text/plain content；新增 `LocalAssetManagerTest` 覆盖 text/plain content 存储；定向测试 BUILD SUCCESS，Tests run: 1, Failures: 0, Errors: 0, Skipped: 0
 - 最近已通过证据 18：2026-06-30 实现 multimodal knowledge extension 计划的 Task 6：重构 `KnowledgeManager.acquire` 以使用 `KnowledgeSource`；`KnowledgeManager` 注入 `ContentExtractorService` 与 `AssetManager`，`acquire` 方法改为接收 `KnowledgeSource`，先 `assetManager.store` 持久化原始资源，再 `extractorService.extract` 得到 `ExtractedDocument`，使用 `doc.getMarkdownBody()` 提取关键词与分析；`executeAcquire` 写入 `source_asset`、`media_type`、`multimodal_used` 到 `KnowledgeEntry.extra`；`KnowledgeTool.knowledgeAcquire` 保持现有 `@Tool` 签名，内部将文本包装为 `text/plain` 的 `KnowledgeSource`；更新 `KnowledgeToolTest` 注入新依赖；定向测试 `mvn -pl meta-claw-tool -am test -Dtest=KnowledgeToolTest -Dsurefire.failIfNoSpecifiedTests=false -q` BUILD SUCCESS，全量 `mvn -pl meta-claw-tool -am test -q` 46 个测试全部通过
-- 当前最高优先级未完成功能：multimodal-knowledge-001/002/003 已完成 Task 4、Task 5 与 Task 6；按 `2026-06-29-multimodal-knowledge-extension-plan.md` 下一步为 Task 7：添加 `ModelCapability` / `MultimodalConfig`
+- 当前最高优先级未完成功能：multimodal-knowledge-001/002/003/004 已完成 Task 4、Task 5、Task 6 与 Task 7；按 `2026-06-29-multimodal-knowledge-extension-plan.md` 下一步为 Task 8：让 `KnowledgeAnalyzer` multimodal-aware
 - 当前 blocker：
   1. 当前无 blocker
 
@@ -116,6 +116,36 @@
 - 下一步最佳动作：
   1. 提交本轮修改。
   2. 继续执行 Task 7：添加 `ModelCapability` / `MultimodalConfig`。
+
+### Session 067
+
+- 日期：2026-06-30
+- 本轮目标：实现 multimodal knowledge extension 计划的 Task 7：添加 `ModelCapability` / `MultimodalConfig`，补充单元测试与配置示例。
+- 实现：
+  - 在 `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/multimodal/` 下新增 `MultimodalConfig` 与 `ModelCapability`。
+  - `MultimodalConfig` 使用 `@ConfigurationProperties(prefix = "meta-claw.llm.multimodal")` + `@Component` + `@Data`，字段包含 `enabled`（默认 false）、`supportedMediaTypes`（默认 image/png, image/jpeg, image/webp）、`pdfPageImages`（默认 false）、`maxImageSizeBytes`（默认 5*1024*1024）。
+  - `ModelCapability` 为 `@Component`，通过构造方法注入 `MultimodalConfig`，提供 `supportsMultimodal()`、`supportsMediaType(String)`、`supportsPdfPageImages()`。
+  - 新增 `ModelCapabilityTest`，覆盖 enabled 时支持已配置类型、disabled 时拒绝所有类型两种场景。
+  - 创建 `meta-claw-tool/src/main/resources/application.yml`，写入多模态配置示例。
+- 运行过的验证：
+  - `export JAVA_HOME=/Users/kai/.local/jdks/jdk-21.0.10+7/Contents/Home && /Users/kai/.local/tools/apache-maven-3.9.15/bin/mvn -pl meta-claw-tool -am test -Dtest=ModelCapabilityTest -Dsurefire.failIfNoSpecifiedTests=false -q` → BUILD SUCCESS，Tests run: 2, Failures: 0, Errors: 0, Skipped: 0。
+  - `./init.sh`（修改前基线）→ 成功；9 个 reactor 模块全部 SUCCESS，core 112 个测试全部通过，tool 模块 18 个测试全部通过。
+- 已记录证据：
+  - `feature_list.json` 已新增 `multimodal-knowledge-004` 并标记为 passing。
+  - `clean-state-checklist.md` 已更新。
+- 更新过的文件或工件：
+  - `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/multimodal/MultimodalConfig.java`（新增）
+  - `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/multimodal/ModelCapability.java`（新增）
+  - `meta-claw-tool/src/test/java/meta/claw/tool/knowledge/multimodal/ModelCapabilityTest.java`（新增）
+  - `meta-claw-tool/src/main/resources/application.yml`（新增）
+  - `feature_list.json`
+  - `claude-progress.md`
+  - `clean-state-checklist.md`
+- 已知风险或未解决的问题：
+  - `KnowledgeAnalyzer` 尚未真正利用 `ModelCapability` 进行多模态分析，该能力将在 Task 8 中补充。
+- 下一步最佳动作：
+  1. 提交本轮修改。
+  2. 继续执行 Task 8：让 `KnowledgeAnalyzer` multimodal-aware，注入 `ModelCapability` 并走多模态分析路径。
 
 ### Session 064
 

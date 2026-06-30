@@ -1055,6 +1055,29 @@
         }
       ],
       "notes": "Task 6 已完成。由于 Task 8 的 multimodal-aware analyzer 尚未实施，本次同步添加了 KnowledgeAnalyzer.analyze(ExtractedDocument,...) 委托重载与 AnalysisResult.multimodalUsed 默认值，以保证当前代码可编译并通过测试。"
+    },
+    {
+      "id": "multimodal-knowledge-004",
+      "priority": 32,
+      "area": "knowledge",
+      "title": "ModelCapability / MultimodalConfig：模型多模态能力配置",
+      "user_visible_behavior": "meta-claw-tool 的 knowledge 子系统可通过 Spring 配置属性 `meta-claw.llm.multimodal` 声明当前模型是否支持多模态、支持哪些媒体类型、是否将 PDF 转为页面图片以及最大图片大小；`ModelCapability` 组件据此统一判定多模态支持能力。",
+      "status": "passing",
+      "verification": [
+        "创建 MultimodalConfig，使用 @ConfigurationProperties(prefix = \"meta-claw.llm.multimodal\") + @Component + @Data，提供 enabled / supportedMediaTypes / pdfPageImages / maxImageSizeBytes 字段及默认值。",
+        "创建 ModelCapability，注入 MultimodalConfig，提供 supportsMultimodal() / supportsMediaType(String) / supportsPdfPageImages()。",
+        "创建 ModelCapabilityTest，覆盖 enabled 时支持已配置类型、disabled 时拒绝所有类型。",
+        "创建/更新 meta-claw-tool/src/main/resources/application.yml，写入多模态配置示例。",
+        "运行 mvn -pl meta-claw-tool -am test -Dtest=ModelCapabilityTest -Dsurefire.failIfNoSpecifiedTests=false -q 并通过。"
+      ],
+      "evidence": [
+        {
+          "date": "2026-06-30",
+          "result": "passing",
+          "detail": "mvn -pl meta-claw-tool -am test -Dtest=ModelCapabilityTest -Dsurefire.failIfNoSpecifiedTests=false -q BUILD SUCCESS；ModelCapabilityTest 2/2 通过；全量 ./init.sh 在修改前已通过（core 112 个测试、tool 18 个测试）。"
+        }
+      ],
+      "notes": "Task 7 已完成。MultimodalConfig 默认值 enabled=false，supportedMediaTypes=image/png,image/jpeg,image/webp，pdfPageImages=false，maxImageSizeBytes=5242880。下一步 Task 8：让 KnowledgeAnalyzer  multimodal-aware，注入 ModelCapability 并走多模态分析路径。"
     }
   ]
 }
