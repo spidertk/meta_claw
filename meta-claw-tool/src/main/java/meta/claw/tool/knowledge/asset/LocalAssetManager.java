@@ -41,7 +41,7 @@ public class LocalAssetManager implements AssetManager {
                 Files.copy(source.getStream(), originalPath);
             } else if (source.getUri() != null) {
                 Files.copy(source.getUri().toURL().openStream(), originalPath);
-            } else if (source.getContent() != null && "text/plain".equals(source.getMediaType())) {
+            } else if (source.getContent() != null) {
                 Files.writeString(originalPath, source.getContent());
             }
         } catch (IOException e) {
@@ -77,7 +77,8 @@ public class LocalAssetManager implements AssetManager {
             case "image/jpeg" -> ".jpg";
             case "image/webp" -> ".webp";
             case "application/pdf" -> ".pdf";
-            case "video/url.douyin", "video/mp4" -> ".mp4";
+            case "video/url.douyin" -> ".url";
+            case "video/mp4" -> ".mp4";
             default -> "";
         };
     }
