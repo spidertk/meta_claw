@@ -21,6 +21,7 @@ public class SpiMessage {
     private List<SpiToolCall> toolCalls;
     private String toolCallId;
     private String toolName;
+    private List<MediaPart> mediaParts;
 
     public static SpiMessage system(String content) {
         return SpiMessage.builder().role("system").content(content).build();
@@ -28,6 +29,10 @@ public class SpiMessage {
 
     public static SpiMessage user(String content) {
         return SpiMessage.builder().role("user").content(content).build();
+    }
+
+    public static SpiMessage user(String content, List<MediaPart> mediaParts) {
+        return SpiMessage.builder().role("user").content(content).mediaParts(mediaParts).build();
     }
 
     public static SpiMessage assistant(String content) {
