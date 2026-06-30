@@ -18,6 +18,7 @@ class LocalAssetManagerTest {
 
     @Test
     void storesTextSource() throws Exception {
+        String originalUserDir = System.getProperty("user.dir");
         System.setProperty("user.dir", tempDir.toString());
         try {
             LocalAssetManager manager = new LocalAssetManager();
@@ -30,7 +31,11 @@ class LocalAssetManagerTest {
             assertTrue(Files.exists(ref.getOriginalPath()));
             assertEquals("hello", Files.readString(ref.getOriginalPath()));
         } finally {
-            System.clearProperty("user.dir");
+            if (originalUserDir != null) {
+                System.setProperty("user.dir", originalUserDir);
+            } else {
+                System.clearProperty("user.dir");
+            }
         }
     }
 }

@@ -1031,6 +1031,30 @@
         }
       ],
       "notes": "Task 5 已完成。LocalAssetManager 为 @Component，store 方法根据 sourceId 或 8 位 UUID 生成 assetId，并按 mediaType 选择扩展名。"
+    },
+    {
+      "id": "multimodal-knowledge-003",
+      "priority": 31,
+      "area": "knowledge",
+      "title": "KnowledgeManager.acquire 统一使用 KnowledgeSource",
+      "user_visible_behavior": "KnowledgeManager.acquire 接收 KnowledgeSource，通过 ContentExtractorService 提取为 ExtractedDocument，经 AssetManager 持久化原始资源后再分析入库；KnowledgeTool 的 knowledgeAcquire 继续兼容现有 @Tool 签名，内部将文本包装为 text/plain 的 KnowledgeSource。",
+      "status": "passing",
+      "verification": [
+        "修改 KnowledgeManager 构造方法注入 ContentExtractorService 与 AssetManager。",
+        "将 acquire(String, String, boolean) 改为 acquire(KnowledgeSource, String, boolean)。",
+        "在 acquire 中调用 assetManager.store 与 extractorService.extract，使用 doc.getMarkdownBody() 提取关键词与分析。",
+        "更新 executeAcquire 签名，写入 source_asset / media_type / multimodal_used 到 KnowledgeEntry.extra，并在结果中返回 asset_id。",
+        "更新 KnowledgeTool.knowledgeAcquire 保持 @Tool 签名，内部构建 KnowledgeSource。",
+        "更新 KnowledgeToolTest 的 setUp 注入新依赖并运行 KnowledgeToolTest 通过。"
+      ],
+      "evidence": [
+        {
+          "date": "2026-06-30",
+          "result": "passing",
+          "detail": "mvn -pl meta-claw-tool -am test -Dtest=KnowledgeToolTest -Dsurefire.failIfNoSpecifiedTests=false -q BUILD SUCCESS；mvn -pl meta-claw-tool -am test -q BUILD SUCCESS（46 个测试全部通过）。"
+        }
+      ],
+      "notes": "Task 6 已完成。由于 Task 8 的 multimodal-aware analyzer 尚未实施，本次同步添加了 KnowledgeAnalyzer.analyze(ExtractedDocument,...) 委托重载与 AnalysisResult.multimodalUsed 默认值，以保证当前代码可编译并通过测试。"
     }
   ]
 }

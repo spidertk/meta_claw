@@ -23,7 +23,8 @@
 - 最近已通过证据 15：2026-06-26 修复 Spring AI 1.1.8 `OpenAiChatModel` 硬编码 `reasoningContent = null` 导致的 OpenAI 兼容 provider 请求丢失真实 reasoning_content 的问题：参考 Spring AI Alibaba Playground 的 `ReasoningContentAdvisor` 模式，新增 `OpenAiReasoningContentAdvisor` 在 `before()` 阶段从 outgoing `Prompt` 的 `AssistantMessage.metadata` 提取 reasoningContent 并写入 `OpenAiReasoningContentContext`，`OpenAiReasoningContentModule` 在序列化 `OpenAiApi.ChatCompletionMessage` 时从上下文读取并回填 `reasoning_content` 字段；将原 `MoonshotSerializerModule` 重命名为通用 `OpenAiReasoningContentModule`；在 `OpenAiLlmClientProvider` 的 `buildChatClient()` 与 `createRaw()` 中统一注册 Advisor 与 Module（`streamWithTools`/`chatWithTools` 使用 `createRaw`，最初漏注册导致真实 CLI 日志中仍为空字符串，已补齐）；新增 `OpenAiReasoningContentContextTest`、`OpenAiReasoningContentModuleTest`、`OpenAiReasoningContentAdvisorTest`；重新执行 `./init.sh` 通过，core 107 个测试全部通过，tool 模块 18 个测试全部通过
 - 最近已通过证据 16：2026-06-26 进一步彻底解决跨线程丢失问题：用同包 subclass `ReasoningAwareOpenAiChatModel` 重写 package-private 的 `OpenAiChatModel.createRequest(Prompt, boolean)`，在父类构造完 `ChatCompletionRequest` 后通过 Jackson 直接修改 messages，从原始 Prompt 的 `AssistantMessage.metadata` 回填真实 `reasoning_content`；删除不再需要的 ThreadLocal 桥（`OpenAiReasoningContentContext`、`OpenAiReasoningContentAdvisor`、`OpenAiReasoningContentModule` 及其测试）；`OpenAiLlmClientProvider.buildChatModel()` 改为返回 `ReasoningAwareOpenAiChatModel`；新增 `ReasoningAwareOpenAiChatModelTest`（2 个用例）验证 assistant tool-call 消息的真实 reasoning_content 被回填；将新测试纳入 `init.sh` P0 基线；重新执行 `./init.sh` 通过，core 112 个测试全部通过，tool 模块 18 个测试全部通过
 - 最近已通过证据 17：2026-06-30 实现 multimodal knowledge extension 计划的 Task 5：创建 `LocalAssetManager`，按 `.meta-claw/vessels/<vesselId>/assets/<assetId>/original.<ext>` 持久化 `KnowledgeSource` 的 stream、uri 或 text/plain content；新增 `LocalAssetManagerTest` 覆盖 text/plain content 存储；定向测试 BUILD SUCCESS，Tests run: 1, Failures: 0, Errors: 0, Skipped: 0
-- 当前最高优先级未完成功能：multimodal-knowledge-001/002 已完成 Task 4 与 Task 5；按 `2026-06-29-multimodal-knowledge-extension-plan.md` 下一步为 Task 6：重构 `KnowledgeManager.acquire` 以使用 `KnowledgeSource`
+- 最近已通过证据 18：2026-06-30 实现 multimodal knowledge extension 计划的 Task 6：重构 `KnowledgeManager.acquire` 以使用 `KnowledgeSource`；`KnowledgeManager` 注入 `ContentExtractorService` 与 `AssetManager`，`acquire` 方法改为接收 `KnowledgeSource`，先 `assetManager.store` 持久化原始资源，再 `extractorService.extract` 得到 `ExtractedDocument`，使用 `doc.getMarkdownBody()` 提取关键词与分析；`executeAcquire` 写入 `source_asset`、`media_type`、`multimodal_used` 到 `KnowledgeEntry.extra`；`KnowledgeTool.knowledgeAcquire` 保持现有 `@Tool` 签名，内部将文本包装为 `text/plain` 的 `KnowledgeSource`；更新 `KnowledgeToolTest` 注入新依赖；定向测试 `mvn -pl meta-claw-tool -am test -Dtest=KnowledgeToolTest -Dsurefire.failIfNoSpecifiedTests=false -q` BUILD SUCCESS，全量 `mvn -pl meta-claw-tool -am test -q` 46 个测试全部通过
+- 当前最高优先级未完成功能：multimodal-knowledge-001/002/003 已完成 Task 4、Task 5 与 Task 6；按 `2026-06-29-multimodal-knowledge-extension-plan.md` 下一步为 Task 7：添加 `ModelCapability` / `MultimodalConfig`
 - 当前 blocker：
   1. 当前无 blocker
 
@@ -79,6 +80,42 @@
 - 下一步最佳动作：
   1. 提交本轮修改。
   2. 继续执行 Task 6：重构 `KnowledgeManager.acquire`。
+
+### Session 066
+
+- 日期：2026-06-30
+- 本轮目标：实现 multimodal knowledge extension 计划的 Task 6：重构 `KnowledgeManager.acquire` 以使用 `KnowledgeSource`，并接入 `ContentExtractorService` / `AssetManager`。
+- 实现：
+  - 修改 `KnowledgeManager` 构造方法，注入 `ContentExtractorService` 与 `AssetManager`。
+  - 将 `acquire(String content, String context, boolean dryRun)` 改为 `acquire(KnowledgeSource source, String context, boolean dryRun)`。
+  - 在 `acquire` 中先调用 `assetManager.store(source, vesselId)` 持久化原始资源，再构造 `ExtractionContext` 并调用 `extractorService.extract(source, ctx)` 得到 `ExtractedDocument`。
+  - 使用 `doc.getMarkdownBody()` 提取关键词并调用 `analyzer.analyze(doc, relatedEntries, context)`。
+  - 更新 `executeAcquire` 签名，接收 `ExtractedDocument doc` 与 `AssetRef asset`；在 `KnowledgeEntry.extra` 中写入 `source_asset`、`media_type`、`multimodal_used`；在结果中返回 `asset_id`。
+  - 更新 `KnowledgeTool.knowledgeAcquire`，保持现有 `@Tool` 方法签名，内部构建 `KnowledgeSource.mediaType("text/plain").content(content)` 后调用 `knowledgeManager.acquire`。
+  - 更新 `KnowledgeToolTest.setUp`，构造 `ContentExtractorService(List.of(new TextExtractor()))` 与 `LocalAssetManager()` 并传入 `KnowledgeManager`。
+  - 因当前 `KnowledgeAnalyzer` 尚未实现 `analyze(ExtractedDocument, ...)` 重载（计划 Task 8），本次同步添加了该委托重载，并在 `AnalysisResult` 中新增 `multimodalUsed` 默认值，以保证代码可编译且测试通过。
+  - 修复 `LocalAssetManagerTest` 在 finally 中 `System.clearProperty("user.dir")` 导致后续测试 `user.dir` 为 null 的问题，改为保存并恢复原始 `user.dir`。
+- 运行过的验证：
+  - `export JAVA_HOME=/Users/kai/.local/jdks/jdk-21.0.10+7/Contents/Home && /Users/kai/.local/tools/apache-maven-3.9.15/bin/mvn -pl meta-claw-tool -am test -Dtest=KnowledgeToolTest -Dsurefire.failIfNoSpecifiedTests=false -q` → BUILD SUCCESS，`KnowledgeToolTest` 14 个测试全部通过。
+  - `export JAVA_HOME=/Users/kai/.local/jdks/jdk-21.0.10+7/Contents/Home && /Users/kai/.local/tools/apache-maven-3.9.15/bin/mvn -pl meta-claw-tool -am test -q` → BUILD SUCCESS，tool 模块 46 个测试全部通过。
+- 已记录证据：
+  - `feature_list.json` 已新增 `multimodal-knowledge-003` 并标记为 passing。
+  - `clean-state-checklist.md` 已更新。
+- 更新过的文件或工件：
+  - `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/KnowledgeManager.java`（修改）
+  - `meta-claw-tool/src/main/java/meta/claw/tool/KnowledgeTool.java`（修改）
+  - `meta-claw-tool/src/test/java/meta/claw/tool/KnowledgeToolTest.java`（修改）
+  - `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/KnowledgeAnalyzer.java`（新增 `analyze(ExtractedDocument, ...)` 委托重载）
+  - `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/model/AnalysisResult.java`（新增 `multimodalUsed` 字段）
+  - `meta-claw-tool/src/test/java/meta/claw/tool/knowledge/asset/LocalAssetManagerTest.java`（修复 user.dir 恢复）
+  - `feature_list.json`
+  - `claude-progress.md`
+  - `clean-state-checklist.md`
+- 已知风险或未解决的问题：
+  - `KnowledgeAnalyzer` 当前仅提供 `analyze(ExtractedDocument, ...)` 的文本回退实现，真正的多模态分析能力（`ModelCapability`、视觉资源、multimodal used 判定）将在 Task 7/8 中补充。
+- 下一步最佳动作：
+  1. 提交本轮修改。
+  2. 继续执行 Task 7：添加 `ModelCapability` / `MultimodalConfig`。
 
 ### Session 064
 
