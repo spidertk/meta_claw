@@ -26,7 +26,8 @@
 - 最近已通过证据 18：2026-06-30 实现 multimodal knowledge extension 计划的 Task 6：重构 `KnowledgeManager.acquire` 以使用 `KnowledgeSource`；`KnowledgeManager` 注入 `ContentExtractorService` 与 `AssetManager`，`acquire` 方法改为接收 `KnowledgeSource`，先 `assetManager.store` 持久化原始资源，再 `extractorService.extract` 得到 `ExtractedDocument`，使用 `doc.getMarkdownBody()` 提取关键词与分析；`executeAcquire` 写入 `source_asset`、`media_type`、`multimodal_used` 到 `KnowledgeEntry.extra`；`KnowledgeTool.knowledgeAcquire` 保持现有 `@Tool` 签名，内部将文本包装为 `text/plain` 的 `KnowledgeSource`；更新 `KnowledgeToolTest` 注入新依赖；定向测试 `mvn -pl meta-claw-tool -am test -Dtest=KnowledgeToolTest -Dsurefire.failIfNoSpecifiedTests=false -q` BUILD SUCCESS，全量 `mvn -pl meta-claw-tool -am test -q` 46 个测试全部通过
 - 最近已通过证据 19：2026-06-30 实现 multimodal knowledge extension 计划的 Task 8：让 `KnowledgeAnalyzer` multimodal-aware；`KnowledgeAnalyzer` 构造方法注入 `ModelCapability`，`analyze(ExtractedDocument,...)` 在 `supportsMultimodal() && hasVisualAssets(doc) && supportsMediaType(doc.getMediaType())` 时走多模态路径，将最多 5 张图片转为 `MediaPart` 随 prompt 发送，解析后设置 `multimodalUsed=true`，异常时回退到文本分析；更新 `KnowledgeToolTest.setUp` 构造 `MultimodalConfig` / `ModelCapability` 并传入 `KnowledgeAnalyzer`；定向测试 `mvn -pl meta-claw-tool -am test -Dtest=KnowledgeToolTest -Dsurefire.failIfNoSpecifiedTests=false -q` BUILD SUCCESS，`KnowledgeToolTest` 14 个测试全部通过；全量 `./init.sh` BUILD SUCCESS，9 个 reactor 模块全部 SUCCESS，core 112 个测试、tool 18 个测试全部通过
 - 最近已通过证据 20：2026-06-29 实现 multimodal knowledge extension 计划的 Task 9：新增 `VisionDescriber` 与 `ImageExtractor`；`VisionDescriber` 作为 `@Component` 注入 `SpiLlmClient`，将图片路径转为 `image_url` 类型的 `MediaPart` 并调用 LLM 获取中文描述；`ImageExtractor` 实现 `ContentExtractor`，支持 `image/*`，先 `assetManager.store` 持久化图片，再调用 `visionDescriber.describe`，生成包含描述与 `![image](assets/{assetId}/{filename})` 的 markdownBody；新增 `ImageExtractorTest`，mock `VisionDescriber` 并用内存 PNG + `LocalAssetManager` 验证描述与资产路径；定向测试 `mvn -pl meta-claw-tool -am test -Dtest=ImageExtractorTest -Dsurefire.failIfNoSpecifiedTests=false -q` BUILD SUCCESS，`ImageExtractorTest` 1/1 通过；全量 `mvn -pl meta-claw-tool -am test -q` BUILD SUCCESS，tool 模块全部测试通过
-- 当前最高优先级未完成功能：multimodal-knowledge-001/002/003/004/005/006 已完成 Task 4、Task 5、Task 6、Task 7、Task 8 与 Task 9；按 `2026-06-29-multimodal-knowledge-extension-plan.md` 下一步为 Task 10：扩展 `KnowledgeEntry` frontmatter 以支持资产引用
+- 最近已通过证据 21：2026-06-30 完成 multimodal knowledge extension 计划 Task 10~15：扩展 `KnowledgeEntry` frontmatter 资产引用字段（asset_id / media_type / multimodal_used）；新增 `PdfExtractor`（PDFBox 文本抽取 + 可选页面图片描述）；新增 `DouyinVideoExtractor`（通过 `YtDlpVideoExtractor` 调用 yt-dlp，30 秒同步超时）；在 `KnowledgeTool` 新增 `knowledgeAcquireFromFile` 与 `knowledgeAcquireFromUrl`；扩展 `GitManager.grepFiles` 同时搜索 `knowledge/**/*.md` 与 `assets/**/extracted.md`，结果返回 `media_type` 与 `asset_id`；新增端到端 `KnowledgeAcquisitionSmokeTest` 覆盖图片+文本采集与检索；修复 `ImageExtractorTest.tearDown` 因 `originalUserDir` 可能为 null 导致的 NPE；全量 `./init.sh` BUILD SUCCESS，9 个 reactor 模块全部 SUCCESS，core 112 个测试全部通过，tool 模块 P0 18 个测试全部通过；全量 `mvn -pl meta-claw-tool -am test -q` BUILD SUCCESS，tool 模块 57 个测试全部通过（1 个跳过）
+- 当前最高优先级未完成功能：multimodal knowledge extension 计划 Task 1~15 已全部完成；feature_list.json 已补充 multimodal-knowledge-007~012 与 multimodal-core-001/002 并标记为 passing；下一步为整体收尾与提交，或按路线图开始后续功能。
 - 当前 blocker：
   1. 当前无 blocker
 
@@ -218,6 +219,64 @@
 - 下一步最佳动作：
   1. 提交本轮修改。
   2. 继续执行 Task 10：扩展 `KnowledgeEntry` frontmatter 以支持资产引用。
+
+### Session 070
+
+- 日期：2026-06-30
+- 本轮目标：完成 multimodal knowledge extension 计划的 Task 10~15，并进行全模块集成验证与状态文档更新。
+- 实现：
+  - Task 10：扩展 `KnowledgeEntry` frontmatter 资产引用。
+    - 在 `KnowledgeEntry` 中新增 `asset_id`、`media_type`、`multimodal_used` 访问器，读取 `extra` 中的 `source_asset`、`media_type`、`multimodal_used`。
+    - 在 `KnowledgeManager.executeAcquire` 中把 `AssetRef.assetId`、`source.mediaType`、`AnalysisResult.multimodalUsed` 写入 `KnowledgeEntry.extra`。
+  - Task 11：实现 `PdfExtractor`。
+    - 新增 `PdfExtractor`，实现 `ContentExtractor`，支持 `application/pdf`。
+    - 使用 PDFBox `PDDocument.load` + `PDFTextStripper` 抽取文本。
+    - 当 `ModelCapability.supportsPdfPageImages()` 为 true 时，将页面渲染为图片并调用 `VisionDescriber` 描述。
+  - Task 12：实现 `DouyinVideoExtractor`。
+    - 新增 `DouyinVideoExtractor`，支持 `video/url.douyin` 与已知抖音域名。
+    - 通过 `YtDlpVideoExtractor` 调用 `yt-dlp`，使用 30 秒同步超时，返回 `title + transcript` 作为 markdownBody。
+  - Task 13：添加文件与 URL 采集工具。
+    - 在 `KnowledgeTool` 中新增 `knowledgeAcquireFromFile` 与 `knowledgeAcquireFromUrl`。
+    - 文件路径转为 `InputStream`，URL 转为 `URI` 后包装为 `KnowledgeSource`。
+    - 原有 `knowledgeAcquire` 保持 `@Tool` 签名，内部包装为 `text/plain` 的 `KnowledgeSource`。
+  - Task 14：扩展检索至资产提取文本。
+    - 修改 `GitManager.grepFiles`，同时搜索 `knowledge/**/*.md` 与 `assets/**/extracted.md`。
+    - `KnowledgeManager.retrieve` 在返回结果中补充 `media_type` 与 `asset_id`。
+  - Task 15：端到端冒烟测试。
+    - 新增 `KnowledgeAcquisitionSmokeTest`，在临时目录中初始化 vessel，先采集一张内存 PNG，再采集一段文本。
+    - 验证两次采集均被检索到，且图片结果包含 `asset_id`、`media_type=image/png` 与视觉描述。
+  - 修复 `ImageExtractorTest.tearDown`：当 `originalUserDir` 为 null 时不再调用 `System.setProperty`，避免 NPE。
+  - 更新状态文件：
+    - `feature_list.json` 新增 `multimodal-knowledge-007~012` 与 `multimodal-core-001/002` 并标记为 passing。
+    - `claude-progress.md` 已补充证据 21 与本 Session 070。
+    - `clean-state-checklist.md` 已更新。
+- 运行过的验证：
+  - `export JAVA_HOME=/Users/kai/.local/jdks/jdk-21.0.10+7/Contents/Home && /Users/kai/.local/tools/apache-maven-3.9.15/bin/mvn -pl meta-claw-tool -am test -q` → BUILD SUCCESS，tool 模块 57 个测试全部通过（1 个跳过）。
+  - `./init.sh`（真实环境，Java 21）→ BUILD SUCCESS；9 个 reactor 模块全部 SUCCESS，core 112 个测试全部通过，tool 模块 18 个 P0 测试全部通过。
+- 已记录证据：
+  - `feature_list.json` 已新增 Task 10~15 及 Task 1/2 对应功能并标记为 passing。
+  - `clean-state-checklist.md` 已更新。
+- 更新过的文件或工件：
+  - `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/KnowledgeEntry.java`（修改）
+  - `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/KnowledgeManager.java`（修改）
+  - `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/extract/PdfExtractor.java`（新增）
+  - `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/extract/video/YtDlpVideoExtractor.java`（新增）
+  - `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/extract/video/DouyinVideoExtractor.java`（新增）
+  - `meta-claw-tool/src/main/java/meta/claw/tool/KnowledgeTool.java`（修改）
+  - `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/GitManager.java`（修改）
+  - `meta-claw-tool/src/test/java/meta/claw/tool/knowledge/KnowledgeAcquisitionSmokeTest.java`（新增）
+  - `meta-claw-tool/src/test/java/meta/claw/tool/knowledge/extract/ImageExtractorTest.java`（修复 tearDown NPE）
+  - `feature_list.json`
+  - `claude-progress.md`
+  - `clean-state-checklist.md`
+- 已知风险或未解决的问题：
+  - `KnowledgeAnalyzer.extractKeywords` 在测试中因 mock LLM 返回 JSON 对象而非数组而打印反序列化警告，但测试仍通过（fallback 关键词提取生效）。
+  - 真实多模态能力默认关闭（`meta-claw.llm.multimodal.enabled=false`），启用后需在真实 provider 上验证 `MediaPart` 视觉调用。
+  - `yt-dlp` 视频提取依赖本地安装与网络，未安装时返回占位文本。
+  - 工作树中仍存在 pre-existing 未提交文件：`meta-claw-core/src/main/java/meta/claw/core/runtime/AgentExecutor.java`（修改）与 `meta-claw-core/src/main/java/meta/claw/core/runtime/VesselContext.java`（未跟踪），它们不属于本轮 multimodal knowledge 工作。
+- 下一步最佳动作：
+  1. 提交本轮 multimodal knowledge extension 的变更（注意不要把 pre-existing 的 `AgentExecutor.java`/`VesselContext.java` 误提交）。
+  2. 按路线图开始下一项功能，或在真实 provider 上启用多模态配置进行端到端验证。
 
 ### Session 064
 

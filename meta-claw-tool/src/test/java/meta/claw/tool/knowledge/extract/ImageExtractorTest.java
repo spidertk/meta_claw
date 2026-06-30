@@ -33,7 +33,9 @@ class ImageExtractorTest {
 
     @AfterEach
     void tearDown() {
-        System.setProperty("user.dir", originalUserDir);
+        if (originalUserDir != null) {
+            System.setProperty("user.dir", originalUserDir);
+        }
     }
 
     @Test

@@ -1127,6 +1127,178 @@
         }
       ],
       "notes": "Task 9 已完成。VisionDescriber 与 ImageExtractor 均为 Spring @Component，可被 ContentExtractorService 自动收集。"
+    },
+    {
+      "id": "multimodal-knowledge-007",
+      "priority": 35,
+      "area": "knowledge",
+      "title": "扩展 KnowledgeEntry frontmatter 资产引用",
+      "user_visible_behavior": "KnowledgeManager 在把多模态知识提交到 Git 时，会在 KnowledgeEntry frontmatter / extra 中写入 source_asset、media_type、multimodal_used 等字段，使后续检索能区分文本、图片、PDF、视频等来源并定位原始资产。",
+      "status": "passing",
+      "verification": [
+        "在 KnowledgeEntry 中新增 asset_id / media_type / multimodal_used 访问器，读取 extra 中的 source_asset / media_type / multimodal_used。",
+        "在 KnowledgeManager.executeAcquire 中把 AssetRef.assetId、source.mediaType、AnalysisResult.multimodalUsed 写入 extra。",
+        "运行 mvn -pl meta-claw-tool -am test -q 并通过。"
+      ],
+      "evidence": [
+        {
+          "date": "2026-06-30",
+          "result": "passing",
+          "detail": "mvn -pl meta-claw-tool -am test -q BUILD SUCCESS，tool 模块 57 个测试全部通过（1 个跳过）。KnowledgeAcquisitionSmokeTest 验证提交后的 markdown 中包含 asset_id 与 media_type。"
+        }
+      ],
+      "notes": "Task 10 已完成。原始资产保存在 .meta-claw/vessels/<vesselId>/assets/ 下，不在 Git 中版本化；Git 中只保存提取后的 markdown 与 frontmatter。"
+    },
+    {
+      "id": "multimodal-knowledge-008",
+      "priority": 36,
+      "area": "knowledge",
+      "title": "PdfExtractor：PDF 文本提取与页面图片描述",
+      "user_visible_behavior": "meta-claw-tool 支持 application/pdf 类型的 KnowledgeSource；PdfExtractor 用 PDFBox 抽取文本，可选将页面渲染为图片并由 VisionDescriber 描述，最终生成包含文本与图片描述的 markdownBody。",
+      "status": "passing",
+      "verification": [
+        "创建 PdfExtractor 实现 ContentExtractor，supports 返回 mediaType 为 application/pdf。",
+        "使用 PDFBox PDDocument + PDFTextStripper 抽取文本。",
+        "当 ModelCapability.supportsPdfPageImages() 为 true 时渲染页面为图片并调用 VisionDescriber。",
+        "运行 mvn -pl meta-claw-tool -am test -q 并通过。"
+      ],
+      "evidence": [
+        {
+          "date": "2026-06-30",
+          "result": "passing",
+          "detail": "mvn -pl meta-claw-tool -am test -q BUILD SUCCESS，tool 模块 57 个测试全部通过（1 个跳过）。"
+        }
+      ],
+      "notes": "Task 11 已完成。PDFBox 首次在 macOS 运行会重建字体缓存并输出警告，不影响结果。"
+    },
+    {
+      "id": "multimodal-knowledge-009",
+      "priority": 37,
+      "area": "knowledge",
+      "title": "DouyinVideoExtractor：抖音分享链接视频提取",
+      "user_visible_behavior": "meta-claw-tool 支持 video/url.douyin 类型的 KnowledgeSource；DouyinVideoExtractor 识别抖音分享链接，调用 yt-dlp 下载/转录，生成包含标题与转录文本的 markdownBody。",
+      "status": "passing",
+      "verification": [
+        "创建 DouyinVideoExtractor 实现 ContentExtractor，supports 匹配 video/url.douyin 或已知抖音域名。",
+        "通过 YtDlpVideoExtractor 执行 yt-dlp，使用 30 秒同步超时。",
+        "返回 title + transcript 作为 markdownBody。",
+        "运行 mvn -pl meta-claw-tool -am test -q 并通过。"
+      ],
+      "evidence": [
+        {
+          "date": "2026-06-30",
+          "result": "passing",
+          "detail": "mvn -pl meta-claw-tool -am test -q BUILD SUCCESS，tool 模块 57 个测试全部通过（1 个跳过）；无 yt-dlp 环境时 Douyin 视频提取器返回占位文本，不阻塞测试。"
+        }
+      ],
+      "notes": "Task 12 已完成。yt-dlp 需要本地安装且网络可达；未安装时 extractor 返回占位文本，不阻塞其他测试。"
+    },
+    {
+      "id": "multimodal-knowledge-010",
+      "priority": 38,
+      "area": "knowledge",
+      "title": "KnowledgeTool 文件与 URL 采集入口",
+      "user_visible_behavior": "LLM 可通过 knowledgeAcquireFromFile 与 knowledgeAcquireFromUrl 工具分别把本地文件路径或远程 URL 作为 KnowledgeSource 提交给 KnowledgeManager，原有 knowledgeAcquire 继续兼容文本输入。",
+      "status": "passing",
+      "verification": [
+        "在 KnowledgeTool 中新增 knowledgeAcquireFromFile(String filePath, ...) 与 knowledgeAcquireFromUrl(String url, ...) @Tool 方法。",
+        "方法内部构造 KnowledgeSource（文件路径转为 InputStream、URL 转为 URI）并调用 knowledgeManager.acquire。",
+        "更新 KnowledgeToolTest 并运行通过。",
+        "运行 mvn -pl meta-claw-tool -am test -q 并通过。"
+      ],
+      "evidence": [
+        {
+          "date": "2026-06-30",
+          "result": "passing",
+          "detail": "mvn -pl meta-claw-tool -am test -q BUILD SUCCESS，tool 模块 57 个测试全部通过（1 个跳过），KnowledgeToolTest 全部通过。"
+        }
+      ],
+      "notes": "Task 13 已完成。knowledgeAcquireFromUrl 当前同步下载，大文件/慢网络场景未来可引入异步或流式限制。"
+    },
+    {
+      "id": "multimodal-knowledge-011",
+      "priority": 39,
+      "area": "knowledge",
+      "title": "检索扩展：同时搜索知识条目与资产提取文本",
+      "user_visible_behavior": "KnowledgeManager.retrieve 在按关键词搜索时，不仅扫描 knowledge/**/*.md，还扫描 assets/**/extracted.md；返回结果包含 media_type 与 asset_id，使多模态资产可被文本关键词检索到。",
+      "status": "passing",
+      "verification": [
+        "扩展 GitManager.grepFiles，使其在搜索路径下同时查找 knowledge 与 assets 中的 .md 文件。",
+        "在 retrieve 结果中为每个匹配项补充 media_type 与 asset_id。",
+        "运行 mvn -pl meta-claw-tool -am test -q 并通过。"
+      ],
+      "evidence": [
+        {
+          "date": "2026-06-30",
+          "result": "passing",
+          "detail": "mvn -pl meta-claw-tool -am test -q BUILD SUCCESS，tool 模块 57 个测试全部通过（1 个跳过）；KnowledgeAcquisitionSmokeTest 验证图片与文本均可被检索。"
+        }
+      ],
+      "notes": "Task 14 已完成。assets 下的 extracted.md 是提取器生成的中间产物，与原始资产一起保存在 .meta-claw/vessels/<vesselId>/assets/ 下。"
+    },
+    {
+      "id": "multimodal-knowledge-012",
+      "priority": 40,
+      "area": "knowledge",
+      "title": "多模态知识采集端到端冒烟测试",
+      "user_visible_behavior": "KnowledgeAcquisitionSmokeTest 在临时目录中初始化 vessel，依次采集一张图片与一段文本，验证两者都能被检索到，且图片结果包含 asset_id、media_type=image/png 与视觉描述。",
+      "status": "passing",
+      "verification": [
+        "创建 KnowledgeAcquisitionSmokeTest，使用 @TempDir 与 mock LLM。",
+        "生成内存 PNG 作为图片知识源，验证 commit 后的 markdown 包含描述与资产元数据。",
+        "再采集文本知识源，验证 retrieve 能返回两条结果。",
+        "运行 mvn -pl meta-claw-tool -am test -Dtest=KnowledgeAcquisitionSmokeTest -Dsurefire.failIfNoSpecifiedTests=false -q 并通过；全量 tool 测试通过。"
+      ],
+      "evidence": [
+        {
+          "date": "2026-06-30",
+          "result": "passing",
+          "detail": "mvn -pl meta-claw-tool -am test -Dtest=KnowledgeAcquisitionSmokeTest -Dsurefire.failIfNoSpecifiedTests=false -q BUILD SUCCESS，KnowledgeAcquisitionSmokeTest 1/1 通过；mvn -pl meta-claw-tool -am test -q BUILD SUCCESS，tool 模块 57 个测试全部通过（1 个跳过）。"
+        }
+      ],
+      "notes": "Task 15 已完成。该冒烟测试覆盖图片+文本的完整采集-提交-检索链路。"
+    },
+    {
+      "id": "multimodal-core-001",
+      "priority": 41,
+      "area": "core",
+      "title": "SpiMessage 支持多模态输入 MediaPart",
+      "user_visible_behavior": "核心消息模型 SpiMessage 可携带图片等媒体的 MediaPart 列表，并提供 user(String content, List<MediaPart> mediaParts) 工厂方法，为视觉模型调用提供统一数据载体。",
+      "status": "passing",
+      "verification": [
+        "在 SpiMessage 中新增 List<MediaPart> mediaParts 字段与 user(content, mediaParts) 工厂方法。",
+        "创建 MediaPart 模型，包含 type、url、mimeType。",
+        "运行 ./init.sh 全量编译与 P0 测试通过。"
+      ],
+      "evidence": [
+        {
+          "date": "2026-06-30",
+          "result": "passing",
+          "detail": "./init.sh BUILD SUCCESS，9 个 reactor 模块全部 SUCCESS，core 112 个测试全部通过，tool 18 个 P0 测试全部通过。"
+        }
+      ],
+      "notes": "Task 1 已完成。MediaPart 的 type 当前使用 image_url 以兼容视觉模型调用。"
+    },
+    {
+      "id": "multimodal-core-002",
+      "priority": 42,
+      "area": "core",
+      "title": "SpiMessageConverter 将 MediaPart 映射为 Spring AI Media",
+      "user_visible_behavior": "当 SpiMessage 带有 mediaParts 时，SpiMessageConverter 把它转换为 Spring AI UserMessage.builder().text(...).media(...)，使视觉模型请求能正确携带图片。",
+      "status": "passing",
+      "verification": [
+        "修改 SpiMessageConverter，将 user 消息中的 mediaParts 转为 org.springframework.ai.content.Media 列表。",
+        "无 mediaParts 时保持原有 UserMessage 行为。",
+        "运行 ./init.sh 全量编译与 P0 测试通过。"
+      ],
+      "evidence": [
+        {
+          "date": "2026-06-30",
+          "result": "passing",
+          "detail": "./init.sh BUILD SUCCESS，9 个 reactor 模块全部 SUCCESS，core 112 个测试全部通过，tool 18 个 P0 测试全部通过。"
+        }
+      ],
+      "notes": "Task 2 已完成。映射时默认 mimeType 为 image/png，可在 MediaPart 中显式指定。"
     }
   ]
 }
