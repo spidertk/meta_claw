@@ -27,8 +27,7 @@
 - 最近已通过证据 19：2026-06-30 实现 multimodal knowledge extension 计划的 Task 8：让 `KnowledgeAnalyzer` multimodal-aware；`KnowledgeAnalyzer` 构造方法注入 `ModelCapability`，`analyze(ExtractedDocument,...)` 在 `supportsMultimodal() && hasVisualAssets(doc) && supportsMediaType(doc.getMediaType())` 时走多模态路径，将最多 5 张图片转为 `MediaPart` 随 prompt 发送，解析后设置 `multimodalUsed=true`，异常时回退到文本分析；更新 `KnowledgeToolTest.setUp` 构造 `MultimodalConfig` / `ModelCapability` 并传入 `KnowledgeAnalyzer`；定向测试 `mvn -pl meta-claw-tool -am test -Dtest=KnowledgeToolTest -Dsurefire.failIfNoSpecifiedTests=false -q` BUILD SUCCESS，`KnowledgeToolTest` 14 个测试全部通过；全量 `./init.sh` BUILD SUCCESS，9 个 reactor 模块全部 SUCCESS，core 112 个测试、tool 18 个测试全部通过
 - 最近已通过证据 20：2026-06-29 实现 multimodal knowledge extension 计划的 Task 9：新增 `VisionDescriber` 与 `ImageExtractor`；`VisionDescriber` 作为 `@Component` 注入 `SpiLlmClient`，将图片路径转为 `image_url` 类型的 `MediaPart` 并调用 LLM 获取中文描述；`ImageExtractor` 实现 `ContentExtractor`，支持 `image/*`，先 `assetManager.store` 持久化图片，再调用 `visionDescriber.describe`，生成包含描述与 `![image](assets/{assetId}/{filename})` 的 markdownBody；新增 `ImageExtractorTest`，mock `VisionDescriber` 并用内存 PNG + `LocalAssetManager` 验证描述与资产路径；定向测试 `mvn -pl meta-claw-tool -am test -Dtest=ImageExtractorTest -Dsurefire.failIfNoSpecifiedTests=false -q` BUILD SUCCESS，`ImageExtractorTest` 1/1 通过；全量 `mvn -pl meta-claw-tool -am test -q` BUILD SUCCESS，tool 模块全部测试通过
 - 最近已通过证据 21：2026-06-30 完成 multimodal knowledge extension 计划 Task 10~15：扩展 `KnowledgeEntry` frontmatter 资产引用字段（asset_id / media_type / multimodal_used）；新增 `PdfExtractor`（PDFBox 文本抽取 + 可选页面图片描述）；新增 `DouyinVideoExtractor`（通过 `YtDlpVideoExtractor` 调用 yt-dlp，30 秒同步超时）；在 `KnowledgeTool` 新增 `knowledgeAcquireFromFile` 与 `knowledgeAcquireFromUrl`；扩展 `GitManager.grepFiles` 同时搜索 `knowledge/**/*.md` 与 `assets/**/extracted.md`，结果返回 `media_type` 与 `asset_id`；新增端到端 `KnowledgeAcquisitionSmokeTest` 覆盖图片+文本采集与检索；修复 `ImageExtractorTest.tearDown` 因 `originalUserDir` 可能为 null 导致的 NPE；全量 `./init.sh` BUILD SUCCESS，9 个 reactor 模块全部 SUCCESS，core 112 个测试全部通过，tool 模块 P0 18 个测试全部通过；全量 `mvn -pl meta-claw-tool -am test -q` BUILD SUCCESS，tool 模块 57 个测试全部通过（1 个跳过）
-- 最近已通过证据 22：2026-06-30 修复 meta-claw-bootstrap web 模式 Spring Boot 启动失败：将 knowledge 子系统从 `meta-claw-tool` 迁移到 `meta-claw-core`，并把 `LlmClientManager` 对 `ToolRegistry` 的依赖移除，切断 `LlmClientManager -> ToolRegistry -> KnowledgeTool -> LlmClientManager` 的 Spring 循环依赖；同时把 `InMemoryHitlGate` 的 `@ConditionalOnMissingBean(HitlGate.class)` 移除，使其作为无条件的兜底 `HitlGate` bean，在 `meta-claw-bootstrap` 无 `meta-claw-cli` 时稳定提供 `HitlGate`；`CliHitlGate` 保留 `@Primary` 与 `@ConditionalOnProperty(meta.claw.channel=cli)`，在 CLI 入口仍优先于 `InMemoryHitlGate`。验证结果： `./init.sh` BUILD SUCCESS，9 个 reactor 模块全部 SUCCESS，core 114 个测试全部通过，tool 模块 18 个测试全部通过；`meta-claw-bootstrap` 执行 `spring-boot:run` 成功启动，Tomcat 监听 8080，`ToolRegistry` 注册 6 个工具实例（含 `KnowledgeTool`）。
-- 当前最高优先级未完成功能：multimodal knowledge extension 计划 Task 1~15 与 bootstrap 启动修复均已完成；feature_list.json 已补充 `arch-002` 并更新 multimodal-knowledge 系列描述，下一步为整体提交，或按路线图开始后续功能。
+- 当前最高优先级未完成功能：multimodal knowledge extension 计划 Task 1~15 已全部完成；feature_list.json 已补充 multimodal-knowledge-007~012 与 multimodal-core-001/002 并标记为 passing；下一步为整体收尾与提交，或按路线图开始后续功能。
 - 当前 blocker：
   1. 当前无 blocker
 
@@ -62,7 +61,7 @@
 - 日期：2026-06-30
 - 本轮目标：实现 multimodal knowledge extension 计划的 Task 5：创建 `LocalAssetManager`，补充单元测试，并更新状态文件。
 - 实现：
-  - 在 `meta-claw-core/src/main/java/meta/claw/core/knowledge/asset/` 下新增 `LocalAssetManager`，实现 `AssetManager` 接口并标记为 `@Component`。
+  - 在 `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/asset/` 下新增 `LocalAssetManager`，实现 `AssetManager` 接口并标记为 `@Component`。
   - `store(KnowledgeSource, vesselId)` 根据 `sourceId` 或 8 位 UUID 生成 `assetId`，目录为 `ProjectRootFinder.getMetaClawDir().resolve("vessels").resolve(vesselId).resolve("assets").resolve(assetId)`。
   - 按 `mediaType` 选择扩展名（`.txt`、`.png`、`.jpg`、`.webp`、`.pdf`、`.mp4`），将原始资源写入 `original<ext>`。
   - 支持三种来源：优先 `InputStream`，其次 `URI`，再次 text/plain 的 `content`。
@@ -74,8 +73,8 @@
   - `feature_list.json` 已新增 `multimodal-knowledge-002` 并标记为 passing。
   - `clean-state-checklist.md` 已更新。
 - 更新过的文件或工件：
-  - `meta-claw-core/src/main/java/meta/claw/core/knowledge/asset/LocalAssetManager.java`（新增）
-  - `meta-claw-core/src/test/java/meta/claw/core/knowledge/asset/LocalAssetManagerTest.java`（新增）
+  - `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/asset/LocalAssetManager.java`（新增）
+  - `meta-claw-tool/src/test/java/meta/claw/tool/knowledge/asset/LocalAssetManagerTest.java`（新增）
   - `feature_list.json`
   - `claude-progress.md`
   - `clean-state-checklist.md`
@@ -106,12 +105,12 @@
   - `feature_list.json` 已新增 `multimodal-knowledge-003` 并标记为 passing。
   - `clean-state-checklist.md` 已更新。
 - 更新过的文件或工件：
-  - `meta-claw-core/src/main/java/meta/claw/core/knowledge/KnowledgeManager.java`（修改）
+  - `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/KnowledgeManager.java`（修改）
   - `meta-claw-tool/src/main/java/meta/claw/tool/KnowledgeTool.java`（修改）
   - `meta-claw-tool/src/test/java/meta/claw/tool/KnowledgeToolTest.java`（修改）
-  - `meta-claw-core/src/main/java/meta/claw/core/knowledge/KnowledgeAnalyzer.java`（新增 `analyze(ExtractedDocument, ...)` 委托重载）
-  - `meta-claw-core/src/main/java/meta/claw/core/knowledge/model/AnalysisResult.java`（新增 `multimodalUsed` 字段）
-  - `meta-claw-core/src/test/java/meta/claw/core/knowledge/asset/LocalAssetManagerTest.java`（修复 user.dir 恢复）
+  - `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/KnowledgeAnalyzer.java`（新增 `analyze(ExtractedDocument, ...)` 委托重载）
+  - `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/model/AnalysisResult.java`（新增 `multimodalUsed` 字段）
+  - `meta-claw-tool/src/test/java/meta/claw/tool/knowledge/asset/LocalAssetManagerTest.java`（修复 user.dir 恢复）
   - `feature_list.json`
   - `claude-progress.md`
   - `clean-state-checklist.md`
@@ -126,11 +125,11 @@
 - 日期：2026-06-30
 - 本轮目标：实现 multimodal knowledge extension 计划的 Task 7：添加 `ModelCapability` / `MultimodalConfig`，补充单元测试与配置示例。
 - 实现：
-  - 在 `meta-claw-core/src/main/java/meta/claw/core/knowledge/multimodal/` 下新增 `MultimodalConfig` 与 `ModelCapability`。
+  - 在 `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/multimodal/` 下新增 `MultimodalConfig` 与 `ModelCapability`。
   - `MultimodalConfig` 使用 `@ConfigurationProperties(prefix = "meta-claw.llm.multimodal")` + `@Component` + `@Data`，字段包含 `enabled`（默认 false）、`supportedMediaTypes`（默认 image/png, image/jpeg, image/webp）、`pdfPageImages`（默认 false）、`maxImageSizeBytes`（默认 5*1024*1024）。
   - `ModelCapability` 为 `@Component`，通过构造方法注入 `MultimodalConfig`，提供 `supportsMultimodal()`、`supportsMediaType(String)`、`supportsPdfPageImages()`。
   - 新增 `ModelCapabilityTest`，覆盖 enabled 时支持已配置类型、disabled 时拒绝所有类型两种场景。
-  - 创建 `meta-claw-core/src/main/resources/application.yml`，写入多模态配置示例。
+  - 创建 `meta-claw-tool/src/main/resources/application.yml`，写入多模态配置示例。
 - 运行过的验证：
   - `export JAVA_HOME=/Users/kai/.local/jdks/jdk-21.0.10+7/Contents/Home && /Users/kai/.local/tools/apache-maven-3.9.15/bin/mvn -pl meta-claw-tool -am test -Dtest=ModelCapabilityTest -Dsurefire.failIfNoSpecifiedTests=false -q` → BUILD SUCCESS，Tests run: 2, Failures: 0, Errors: 0, Skipped: 0。
   - `./init.sh`（修改前基线）→ 成功；9 个 reactor 模块全部 SUCCESS，core 112 个测试全部通过，tool 模块 18 个测试全部通过。
@@ -138,10 +137,10 @@
   - `feature_list.json` 已新增 `multimodal-knowledge-004` 并标记为 passing。
   - `clean-state-checklist.md` 已更新。
 - 更新过的文件或工件：
-  - `meta-claw-core/src/main/java/meta/claw/core/knowledge/multimodal/MultimodalConfig.java`（新增）
-  - `meta-claw-core/src/main/java/meta/claw/core/knowledge/multimodal/ModelCapability.java`（新增）
-  - `meta-claw-core/src/test/java/meta/claw/core/knowledge/multimodal/ModelCapabilityTest.java`（新增）
-  - `meta-claw-core/src/main/resources/application.yml`（新增）
+  - `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/multimodal/MultimodalConfig.java`（新增）
+  - `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/multimodal/ModelCapability.java`（新增）
+  - `meta-claw-tool/src/test/java/meta/claw/tool/knowledge/multimodal/ModelCapabilityTest.java`（新增）
+  - `meta-claw-tool/src/main/resources/application.yml`（新增）
   - `feature_list.json`
   - `claude-progress.md`
   - `clean-state-checklist.md`
@@ -174,7 +173,7 @@
   - `feature_list.json` 已新增 `multimodal-knowledge-005` 并标记为 passing。
   - `clean-state-checklist.md` 已更新。
 - 更新过的文件或工件：
-  - `meta-claw-core/src/main/java/meta/claw/core/knowledge/KnowledgeAnalyzer.java`（修改）
+  - `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/KnowledgeAnalyzer.java`（修改）
   - `meta-claw-tool/src/test/java/meta/claw/tool/KnowledgeToolTest.java`（修改）
   - `feature_list.json`
   - `claude-progress.md`
@@ -190,7 +189,7 @@
 - 日期：2026-06-29
 - 本轮目标：实现 multimodal knowledge extension 计划的 Task 9：新增 `VisionDescriber` 与 `ImageExtractor`，使图片知识源可被持久化、描述并生成包含资产引用的 markdownBody。
 - 实现：
-  - 在 `meta-claw-core/src/main/java/meta/claw/core/knowledge/extract/` 下新增 `VisionDescriber`，标记为 `@Component`，通过构造方法注入 `SpiLlmClient`。
+  - 在 `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/extract/` 下新增 `VisionDescriber`，标记为 `@Component`，通过构造方法注入 `SpiLlmClient`。
     - `describe(Path, String)` 在 `llmClient` 为空时返回 `[Image: filename]` 占位符。
     - 构造 `MediaPart`（type=image_url，url=imagePath.toUri().toString()，mimeType）。
     - 使用 prompt "请用一段简洁的中文描述这张图片的内容，提取其中的文字和关键信息。" 与上述 `MediaPart` 调用 `llmClient.chat`，返回 `response.content()`；异常时返回 `[Failed to describe image: filename]`。
@@ -209,9 +208,9 @@
   - `feature_list.json` 已新增 `multimodal-knowledge-006` 并标记为 passing。
   - `clean-state-checklist.md` 已更新。
 - 更新过的文件或工件：
-  - `meta-claw-core/src/main/java/meta/claw/core/knowledge/extract/VisionDescriber.java`（新增）
-  - `meta-claw-core/src/main/java/meta/claw/core/knowledge/extract/ImageExtractor.java`（新增）
-  - `meta-claw-core/src/test/java/meta/claw/core/knowledge/extract/ImageExtractorTest.java`（新增）
+  - `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/extract/VisionDescriber.java`（新增）
+  - `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/extract/ImageExtractor.java`（新增）
+  - `meta-claw-tool/src/test/java/meta/claw/tool/knowledge/extract/ImageExtractorTest.java`（新增）
   - `feature_list.json`
   - `claude-progress.md`
   - `clean-state-checklist.md`
@@ -258,15 +257,15 @@
   - `feature_list.json` 已新增 Task 10~15 及 Task 1/2 对应功能并标记为 passing。
   - `clean-state-checklist.md` 已更新。
 - 更新过的文件或工件：
-  - `meta-claw-core/src/main/java/meta/claw/core/knowledge/KnowledgeEntry.java`（修改）
-  - `meta-claw-core/src/main/java/meta/claw/core/knowledge/KnowledgeManager.java`（修改）
-  - `meta-claw-core/src/main/java/meta/claw/core/knowledge/extract/PdfExtractor.java`（新增）
-  - `meta-claw-core/src/main/java/meta/claw/core/knowledge/extract/video/YtDlpVideoExtractor.java`（新增）
-  - `meta-claw-core/src/main/java/meta/claw/core/knowledge/extract/video/DouyinVideoExtractor.java`（新增）
+  - `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/KnowledgeEntry.java`（修改）
+  - `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/KnowledgeManager.java`（修改）
+  - `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/extract/PdfExtractor.java`（新增）
+  - `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/extract/video/YtDlpVideoExtractor.java`（新增）
+  - `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/extract/video/DouyinVideoExtractor.java`（新增）
   - `meta-claw-tool/src/main/java/meta/claw/tool/KnowledgeTool.java`（修改）
-  - `meta-claw-core/src/main/java/meta/claw/core/knowledge/GitManager.java`（修改）
-  - `meta-claw-core/src/test/java/meta/claw/core/knowledge/KnowledgeAcquisitionSmokeTest.java`（新增）
-  - `meta-claw-core/src/test/java/meta/claw/core/knowledge/extract/ImageExtractorTest.java`（修复 tearDown NPE）
+  - `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/GitManager.java`（修改）
+  - `meta-claw-tool/src/test/java/meta/claw/tool/knowledge/KnowledgeAcquisitionSmokeTest.java`（新增）
+  - `meta-claw-tool/src/test/java/meta/claw/tool/knowledge/extract/ImageExtractorTest.java`（修复 tearDown NPE）
   - `feature_list.json`
   - `claude-progress.md`
   - `clean-state-checklist.md`
@@ -279,73 +278,28 @@
   1. 提交本轮 multimodal knowledge extension 的变更（注意不要把 pre-existing 的 `AgentExecutor.java`/`VesselContext.java` 误提交）。
   2. 按路线图开始下一项功能，或在真实 provider 上启用多模态配置进行端到端验证。
 
-### Session 071
-
-- 日期：2026-06-30
-- 本轮目标：修复 meta-claw-bootstrap web 模式 Spring Boot 启动失败，并彻底消除 knowledge 子系统引发的 Spring 循环依赖。
-- 背景：
-  - 在 multimodal knowledge extension 计划完成后，`KnowledgeTool` 与 `KnowledgeAnalyzer` 等 knowledge 类仍位于 `meta-claw-tool`，但 `ToolRegistry` 在 `meta-claw-core` 启动并扫描所有 bean，`KnowledgeTool` 依赖 `KnowledgeManager` -> `KnowledgeAnalyzer` -> `SpiLlmClient` -> `LlmClientManager` -> `ToolRegistry`，形成 Spring Bean 循环依赖，导致启动失败。
-  - 同时 `meta-claw-bootstrap` 不依赖 `meta-claw-cli`，因此没有 `CliHitlGate`；`InMemoryHitlGate` 的 `@ConditionalOnMissingBean(HitlGate.class)` 在 bootstrap 的组件扫描顺序下未生效，出现 `HitlSubSystem` 找不到 `HitlGate` bean 的启动错误。
-- 实现：
-  - 将 `meta.claw.tool.knowledge.*` 全部移动到 `meta.claw.core.knowledge.*`（含 source、extract、asset、model、multimodal 包及测试）。
-  - 将 `KnowledgeTool` 从 `meta-claw-tool` 移到 `meta-claw-core/src/main/java/meta/claw/core/knowledge/`。
-  - 将 `meta-claw-tool/src/main/resources/application.yml` 多模态默认配置移到 `meta-claw-core/src/main/resources/application.yml`。
-  - 在 `meta-claw-core/pom.xml` 添加 `org.eclipse.jgit` 与 `org.apache.pdfbox` 依赖；从 `meta-claw-tool/pom.xml` 移除 `pdfbox`（保留 `jgit` 供 `GitTool` 使用）。
-  - 从 `LlmClientManager` 移除 `ToolRegistry` 字段与注入，`chat()` 与 `chatStream()` 改为使用纯 `Prompt(messages)`，不再自动挂载工具；`chatWithTools()` 与 `streamWithTools(..., ToolCallback[])` 继续通过显式 `ToolCallback` 注册工具。
-  - 更新 `LlmClientManagerStreamWithToolsTest`，移除通过 `ReflectionTestUtils` 注入 `toolRegistry` 的步骤。
-  - 移除 `InMemoryHitlGate` 的 `@ConditionalOnMissingBean(HitlGate.class)`，使其无条件作为 `HitlGate` 兜底实现；`CliHitlGate` 保留 `@Primary` 与 `@ConditionalOnProperty(name = "meta.claw.channel", havingValue = "cli", matchIfMissing = true)`，在 CLI 入口仍优先被注入。
-  - 更新 `init.sh` 路径引用、`docs/superpowers/plans/2026-06-29-multimodal-knowledge-extension-plan.md` 中的文件路径、`feature_list.json` 中 multimodal-knowledge 系列描述与新增 `arch-002`，以及 `clean-state-checklist.md`。
-- 运行过的验证：
-  - `export JAVA_HOME=/Users/kai/.local/jdks/jdk-21.0.10+7/Contents/Home && cd /Users/kai/IdeaProjects/meta_claw && ./init.sh` → BUILD SUCCESS；9 个 reactor 模块全部 SUCCESS，core 114 个测试全部通过，tool 模块 18 个测试全部通过。
-  - `export JAVA_HOME=/Users/kai/.local/jdks/jdk-21.0.10+7/Contents/Home && cd /Users/kai/IdeaProjects/meta_claw/meta-claw-bootstrap && /Users/kai/.local/tools/apache-maven-3.9.15/bin/mvn spring-boot:run -DskipTests` → Tomcat 成功启动并监听 8080；日志显示 `ToolRegistry` 注册 6 个工具实例，含 `meta.claw.core.knowledge.KnowledgeTool`；无 `HitlGate` 缺失错误。
-- 已记录证据：
-  - `claude-progress.md` 顶部「当前已验证状态」已增加证据 22。
-  - `feature_list.json` 已新增 `arch-002` 并更新 multimodal-knowledge 系列描述；`hitl-001` 已补充 bootstrap 启动修复证据。
-  - `clean-state-checklist.md` 已更新。
-- 更新过的文件或工件：
-  - `meta-claw-core/pom.xml`（添加 jgit/pdfbox）
-  - `meta-claw-tool/pom.xml`（移除 pdfbox）
-  - `meta-claw-core/src/main/java/meta/claw/core/knowledge/**`（由 `meta-claw-tool/.../knowledge/**` 迁移并改包名）
-  - `meta-claw-core/src/main/java/meta/claw/core/knowledge/KnowledgeTool.java`（新增）
-  - `meta-claw-core/src/main/resources/application.yml`（由 meta-claw-tool 移入）
-  - `meta-claw-core/src/test/java/meta/claw/core/knowledge/**`（迁移并改包名）
-  - `meta-claw-core/src/main/java/meta/claw/core/runtime/LlmClientManager.java`（移除 ToolRegistry 注入，chat/chatStream 使用纯 Prompt）
-  - `meta-claw-core/src/main/java/meta/claw/core/runtime/hitl/InMemoryHitlGate.java`（移除 @ConditionalOnMissingBean）
-  - `meta-claw-core/src/test/java/meta/claw/core/runtime/LlmClientManagerStreamWithToolsTest.java`（移除 toolRegistry 反射注入）
-  - `meta-claw-cli/src/main/java/meta/claw/cli/hitl/CliHitlGate.java`（保留 @Primary，确保 CLI 入口优先）
-  - `init.sh`
-  - `docs/superpowers/plans/2026-06-29-multimodal-knowledge-extension-plan.md`
-  - `feature_list.json`
-  - `claude-progress.md`
-  - `clean-state-checklist.md`
-- 已知风险或未解决的问题：
-  - 工作树中仍存在 pre-existing 未提交文件：`meta-claw-core/src/main/java/meta/claw/core/runtime/AgentExecutor.java`（修改）与 `meta-claw-core/src/main/java/meta/claw/core/runtime/VesselContext.java`（未跟踪），它们与本轮 bootstrap 启动修复无关，应单独处理。
-- 下一步最佳动作：
-  1. 提交本轮修改（注意不要误包含 `AgentExecutor.java`/`VesselContext.java`）。
-  2. 按路线图开始下一项功能。
-
 ### Session 064
 
 - 日期：2026-06-30
 - 本轮目标：实现 multimodal knowledge extension 计划的 Task 4：创建 ContentExtractor SPI、提取上下文、路由服务与 TextExtractor，并补充单元测试。
 - 实现：
-  - 在 `meta-claw-core/src/main/java/meta/claw/core/knowledge/extract/` 下新增 `ContentExtractor` 接口、`ExtractionContext`、`ContentExtractorService`、`TextExtractor`。
+  - 在 `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/extract/` 下新增 `ContentExtractor` 接口、`ExtractionContext`、`ContentExtractorService`、`TextExtractor`。
   - `ContentExtractorService` 为 `@Component`，通过构造方法注入 `List<ContentExtractor>`，按顺序路由到第一个支持的提取器；无支持提取器时抛出 `UnsupportedOperationException`。
   - `TextExtractor` 为 `@Component`，支持 `text/plain`，将 `KnowledgeSource.content` 作为 `markdownBody` 返回。
   - 新增 `ContentExtractorServiceTest`，覆盖 text/plain 路由与无支持提取器异常。
-  - 因 Task 4 的 `ExtractionContext` 依赖 `AssetManager`，提前创建 `meta-claw-core/src/main/java/meta/claw/core/knowledge/asset/AssetManager.java` 接口，使模块能编译通过。
+  - 因 Task 4 的 `ExtractionContext` 依赖 `AssetManager`，提前创建 `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/asset/AssetManager.java` 接口，使模块能编译通过。
 - 运行过的验证：
   - `export JAVA_HOME=/Users/kai/.local/jdks/jdk-21.0.10+7/Contents/Home && /Users/kai/.local/tools/apache-maven-3.9.15/bin/mvn -pl meta-claw-tool -am test -Dtest=ContentExtractorServiceTest -Dsurefire.failIfNoSpecifiedTests=false -q` → BUILD SUCCESS，Tests run: 2, Failures: 0, Errors: 0, Skipped: 0。
 - 已记录证据：
   - `feature_list.json` 已新增 `multimodal-knowledge-001` 并标记为 passing。
   - `clean-state-checklist.md` 已更新。
 - 更新过的文件或工件：
-  - `meta-claw-core/src/main/java/meta/claw/core/knowledge/extract/ContentExtractor.java`（新增）
-  - `meta-claw-core/src/main/java/meta/claw/core/knowledge/extract/ExtractionContext.java`（新增）
-  - `meta-claw-core/src/main/java/meta/claw/core/knowledge/extract/ContentExtractorService.java`（新增）
-  - `meta-claw-core/src/main/java/meta/claw/core/knowledge/extract/TextExtractor.java`（新增）
-  - `meta-claw-core/src/main/java/meta/claw/core/knowledge/asset/AssetManager.java`（新增）
-  - `meta-claw-core/src/test/java/meta/claw/core/knowledge/extract/ContentExtractorServiceTest.java`（新增）
+  - `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/extract/ContentExtractor.java`（新增）
+  - `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/extract/ExtractionContext.java`（新增）
+  - `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/extract/ContentExtractorService.java`（新增）
+  - `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/extract/TextExtractor.java`（新增）
+  - `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/asset/AssetManager.java`（新增）
+  - `meta-claw-tool/src/test/java/meta/claw/tool/knowledge/extract/ContentExtractorServiceTest.java`（新增）
   - `feature_list.json`
   - `claude-progress.md`
   - `clean-state-checklist.md`

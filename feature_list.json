@@ -779,14 +779,9 @@
           "date": "2026-06-25",
           "result": "passing",
           "detail": "修复流式 HITL 审批后 assistant 消息丢失 content/reasoning 的 bug：StreamingAgentExecutor.executeApprovedToolCalls 从 ApprovalTicket 重建 tool calls 后使用 SpiMessage.assistant(null, null, toolCalls)，导致 content 与 reasoningContent 被丢弃；改为传入原始 SpiChatResponse 的 content/reasoningContent 并写入 assistant 消息；新增 StreamingAgentExecutorTest#preservesAssistantContentAndReasoningAfterHitlApproval 验证；./init.sh 全量通过，core 107 个测试全部通过，tool 18 个测试全部通过。"
-        },
-        {
-          "date": "2026-06-30",
-          "result": "passing",
-          "detail": "修复 meta-claw-bootstrap web 模式启动失败：HitlSubSystem 需要 HitlGate bean，但 InMemoryHitlGate 的 @ConditionalOnMissingBean 在 bootstrap 扫描顺序下未生效，导致无 HitlGate 可用。移除 InMemoryHitlGate 的 @ConditionalOnMissingBean，使其作为无条件兜底 bean；CliHitlGate 保持 @Primary + @ConditionalOnProperty，在 CLI 入口优先于 InMemoryHitlGate；meta-claw-bootstrap spring-boot:run 启动成功，Tomcat 监听 8080，ToolRegistry 注册 6 个工具实例（含 KnowledgeTool）。"
         }
       ],
-      "notes": "Phase 3 完成。非流式与流式执行路径均已集成 HITL。InMemoryHitlGate 为内存实现，不支持进程重启恢复；Gateway 等渠道需自定义 onHitlSuspend 行为。2026-06-19 修复 InMemoryHitlGate 与 CliHitlGate 的注入歧义。2026-06-23 新增 Vessel 级 HITL 配置，支持按 vessel 设置 default_require_approval / require / skip，不同 Vessel 策略隔离。2026-06-23 补全全局 HITL 配置加载：global-config.tmpl.yaml 与 vessel.meta.tmpl.yaml 均包含 HITL 示例，GlobalConfig 支持 hitl 字段并由 HitlSubSystem 在启动时加载。2026-06-23 彻底解决 HITL 循环依赖：将 per-vessel HITL 配置职责从 HitlSubSystem 上移到 VesselManager，HitlSubSystem 不再依赖 VesselManager；新增 VesselManagerTest。2026-06-24 修复启动循环：VesselManager -> VesselRuntime -> AgentEngine -> LlmClientManager -> OpenAiLlmClientProvider -> ShortMemoryAdvisor -> VesselManager，通过 ObjectProvider<VesselManager> 延迟 ShortMemoryAdvisor 对 VesselManager 的解析。2026-06-24 修复 HITL NPE：全局 hitl 只设置 default_require_approval 时 require/skip 可能为 null，resolveConfig/getSummary 已做 null 回退。2026-06-25 重构 CLI HITL 审批交互：ChatCommand 的 onHitlSuspend 委托给 HitlSubSystem.awaitResolution -> CliHitlGate.await，避免在匿名回调中重复实现终端输入逻辑；Terminal/LineReader 由 TerminalConfig 统一注入。2026-06-25 修复流式 HITL 审批后 assistant 消息丢失 content/reasoning：StreamingAgentExecutor.executeApprovedToolCalls 使用原始 SpiChatResponse 的 content/reasoningContent 重建 assistant 消息。2026-06-30 移除 InMemoryHitlGate 的 @ConditionalOnMissingBean，使其在 web/bootstrap 无 CLI 时稳定作为默认 HITL 实现；CliHitlGate 通过 @Primary 在 CLI 入口优先。"
+      "notes": "Phase 3 完成。非流式与流式执行路径均已集成 HITL。InMemoryHitlGate 为内存实现，不支持进程重启恢复；Gateway 等渠道需自定义 onHitlSuspend 行为。2026-06-19 修复 InMemoryHitlGate 与 CliHitlGate 的注入歧义。2026-06-23 新增 Vessel 级 HITL 配置，支持按 vessel 设置 default_require_approval / require / skip，不同 Vessel 策略隔离。2026-06-23 补全全局 HITL 配置加载：global-config.tmpl.yaml 与 vessel.meta.tmpl.yaml 均包含 HITL 示例，GlobalConfig 支持 hitl 字段并由 HitlSubSystem 在启动时加载。2026-06-23 彻底解决 HITL 循环依赖：将 per-vessel HITL 配置职责从 HitlSubSystem 上移到 VesselManager，HitlSubSystem 不再依赖 VesselManager；新增 VesselManagerTest。2026-06-24 修复启动循环：VesselManager -> VesselRuntime -> AgentEngine -> LlmClientManager -> OpenAiLlmClientProvider -> ShortMemoryAdvisor -> VesselManager，通过 ObjectProvider<VesselManager> 延迟 ShortMemoryAdvisor 对 VesselManager 的解析。2026-06-24 修复 HITL NPE：全局 hitl 只设置 default_require_approval 时 require/skip 可能为 null，resolveConfig/getSummary 已做 null 回退。2026-06-25 重构 CLI HITL 审批交互：ChatCommand 的 onHitlSuspend 委托给 HitlSubSystem.awaitResolution -> CliHitlGate.await，避免在匿名回调中重复实现终端输入逻辑；Terminal/LineReader 由 TerminalConfig 统一注入。2026-06-25 修复流式 HITL 审批后 assistant 消息丢失 content/reasoning：StreamingAgentExecutor.executeApprovedToolCalls 使用原始 SpiChatResponse 的 content/reasoningContent 重建 assistant 消息。"
     },
     {
       "id": "skill-001",
@@ -998,7 +993,7 @@
       "priority": 29,
       "area": "knowledge",
       "title": "ContentExtractor SPI、提取上下文与 TextExtractor",
-      "user_visible_behavior": "meta-claw-core 的 knowledge 子系统新增 ContentExtractor SPI，支持按 KnowledgeSource.mediaType 路由到具体提取器；TextExtractor 处理 text/plain 并返回 markdownBody；未找到支持提取器时抛出 UnsupportedOperationException。",
+      "user_visible_behavior": "meta-claw-tool 的 knowledge 子系统新增 ContentExtractor SPI，支持按 KnowledgeSource.mediaType 路由到具体提取器；TextExtractor 处理 text/plain 并返回 markdownBody；未找到支持提取器时抛出 UnsupportedOperationException。",
       "status": "passing",
       "verification": [
         "创建 ContentExtractor 接口、ExtractionContext、ContentExtractorService、TextExtractor。",
@@ -1019,7 +1014,7 @@
       "priority": 30,
       "area": "knowledge",
       "title": "LocalAssetManager：按 Vessel 持久化原始资源",
-      "user_visible_behavior": "meta-claw-core 的 knowledge 子系统能够将 KnowledgeSource 中的文本、流或 URI 资源持久化到 `.meta-claw/vessels/<vesselId>/assets/<assetId>/original.<ext>`，并提供 load 与 resolvePath 能力。",
+      "user_visible_behavior": "meta-claw-tool 的 knowledge 子系统能够将 KnowledgeSource 中的文本、流或 URI 资源持久化到 `.meta-claw/vessels/<vesselId>/assets/<assetId>/original.<ext>`，并提供 load 与 resolvePath 能力。",
       "status": "passing",
       "verification": [
         "创建 LocalAssetManager 实现 AssetManager 接口，标记为 @Component。",
@@ -1066,13 +1061,13 @@
       "priority": 32,
       "area": "knowledge",
       "title": "ModelCapability / MultimodalConfig：模型多模态能力配置",
-      "user_visible_behavior": "meta-claw-core 的 knowledge 子系统可通过 Spring 配置属性 `meta-claw.llm.multimodal` 声明当前模型是否支持多模态、支持哪些媒体类型、是否将 PDF 转为页面图片以及最大图片大小；`ModelCapability` 组件据此统一判定多模态支持能力。",
+      "user_visible_behavior": "meta-claw-tool 的 knowledge 子系统可通过 Spring 配置属性 `meta-claw.llm.multimodal` 声明当前模型是否支持多模态、支持哪些媒体类型、是否将 PDF 转为页面图片以及最大图片大小；`ModelCapability` 组件据此统一判定多模态支持能力。",
       "status": "passing",
       "verification": [
         "创建 MultimodalConfig，使用 @ConfigurationProperties(prefix = \"meta-claw.llm.multimodal\") + @Component + @Data，提供 enabled / supportedMediaTypes / pdfPageImages / maxImageSizeBytes 字段及默认值。",
         "创建 ModelCapability，注入 MultimodalConfig，提供 supportsMultimodal() / supportsMediaType(String) / supportsPdfPageImages()。",
         "创建 ModelCapabilityTest，覆盖 enabled 时支持已配置类型、disabled 时拒绝所有类型。",
-        "创建/更新 meta-claw-core/src/main/resources/application.yml，写入多模态配置示例。",
+        "创建/更新 meta-claw-tool/src/main/resources/application.yml，写入多模态配置示例。",
         "运行 mvn -pl meta-claw-tool -am test -Dtest=ModelCapabilityTest -Dsurefire.failIfNoSpecifiedTests=false -q 并通过。"
       ],
       "evidence": [
@@ -1114,7 +1109,7 @@
       "priority": 34,
       "area": "knowledge",
       "title": "ImageExtractor：图片资源提取与视觉描述",
-      "user_visible_behavior": "meta-claw-core 的 knowledge 子系统支持 image/* 类型的 KnowledgeSource；ImageExtractor 将图片持久化为资产，调用 VisionDescriber 获取 LLM 视觉描述，并生成包含图片描述与资产引用的 markdownBody。",
+      "user_visible_behavior": "meta-claw-tool 的 knowledge 子系统支持 image/* 类型的 KnowledgeSource；ImageExtractor 将图片持久化为资产，调用 VisionDescriber 获取 LLM 视觉描述，并生成包含图片描述与资产引用的 markdownBody。",
       "status": "passing",
       "verification": [
         "创建 VisionDescriber，作为 @Component 注入 SpiLlmClient，提供 describe(Path, String mimeType)。",
@@ -1159,7 +1154,7 @@
       "priority": 36,
       "area": "knowledge",
       "title": "PdfExtractor：PDF 文本提取与页面图片描述",
-      "user_visible_behavior": "meta-claw-core 支持 application/pdf 类型的 KnowledgeSource；PdfExtractor 用 PDFBox 抽取文本，可选将页面渲染为图片并由 VisionDescriber 描述，最终生成包含文本与图片描述的 markdownBody。",
+      "user_visible_behavior": "meta-claw-tool 支持 application/pdf 类型的 KnowledgeSource；PdfExtractor 用 PDFBox 抽取文本，可选将页面渲染为图片并由 VisionDescriber 描述，最终生成包含文本与图片描述的 markdownBody。",
       "status": "passing",
       "verification": [
         "创建 PdfExtractor 实现 ContentExtractor，supports 返回 mediaType 为 application/pdf。",
@@ -1181,7 +1176,7 @@
       "priority": 37,
       "area": "knowledge",
       "title": "DouyinVideoExtractor：抖音分享链接视频提取",
-      "user_visible_behavior": "meta-claw-core 支持 video/url.douyin 类型的 KnowledgeSource；DouyinVideoExtractor 识别抖音分享链接，调用 yt-dlp 下载/转录，生成包含标题与转录文本的 markdownBody。",
+      "user_visible_behavior": "meta-claw-tool 支持 video/url.douyin 类型的 KnowledgeSource；DouyinVideoExtractor 识别抖音分享链接，调用 yt-dlp 下载/转录，生成包含标题与转录文本的 markdownBody。",
       "status": "passing",
       "verification": [
         "创建 DouyinVideoExtractor 实现 ContentExtractor，supports 匹配 video/url.douyin 或已知抖音域名。",
@@ -1304,30 +1299,6 @@
         }
       ],
       "notes": "Task 2 已完成。映射时默认 mimeType 为 image/png，可在 MediaPart 中显式指定。"
-    },
-    {
-      "id": "arch-002",
-      "priority": 43,
-      "area": "core-architecture",
-      "title": "Knowledge 子系统迁入 meta-claw-core 并消除循环依赖",
-      "user_visible_behavior": "所有 knowledge 相关类与资源位于 meta-claw-core，可被 core/tool/bootstrap/cli 共享；Spring Bean 层不再出现 LlmClientManager <-> ToolRegistry 循环依赖；meta-claw-bootstrap web 模式可正常启动。",
-      "status": "passing",
-      "verification": [
-        "将 meta.claw.tool.knowledge.* 移动到 meta.claw.core.knowledge.*。",
-        "将 KnowledgeTool 从 meta-claw-tool 移到 meta-claw-core。",
-        "将多模态配置 application.yml 从 meta-claw-tool 移到 meta-claw-core。",
-        "在 meta-claw-core/pom.xml 添加 jgit/pdfbox 依赖；从 meta-claw-tool/pom.xml 移除 pdfbox。",
-        "从 LlmClientManager 移除 ToolRegistry 注入，chat()/chatStream() 不再自动挂载工具。",
-        "运行 ./init.sh 通过；运行 meta-claw-bootstrap spring-boot:run 确认 Tomcat 启动成功。"
-      ],
-      "evidence": [
-        {
-          "date": "2026-06-30",
-          "result": "passing",
-          "detail": "./init.sh BUILD SUCCESS，9 个 reactor 模块全部 SUCCESS，core 114 个测试全部通过，tool 18 个测试全部通过；meta-claw-bootstrap spring-boot:run 启动成功，Tomcat 监听 8080，ToolRegistry 注册 6 个工具实例（含 KnowledgeTool）。"
-        }
-      ],
-      "notes": "原始循环依赖是 Spring Bean 级别：LlmClientManager 依赖 ToolRegistry，而 ToolRegistry 扫描的 KnowledgeTool 间接依赖 LlmClientManager。通过把 KnowledgeTool 移入 core 并解除 LlmClientManager 对 ToolRegistry 的依赖消除。InMemoryHitlGate 改为无条件 @Component，配合 CliHitlGate 的 @Primary，在 web/bootstrap 无 CLI 时自动成为默认 HITL 实现。"
     }
   ]
 }
