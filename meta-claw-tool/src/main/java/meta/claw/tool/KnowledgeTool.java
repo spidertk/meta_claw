@@ -3,6 +3,7 @@ package meta.claw.tool;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
+import meta.claw.core.infra.ProjectRootFinder;
 import meta.claw.core.runtime.VesselContext;
 import meta.claw.core.tool.annotation.ToolService;
 import meta.claw.tool.knowledge.GitManager;
@@ -12,6 +13,8 @@ import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import java.net.URI;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -57,6 +60,74 @@ public class KnowledgeTool {
         Map<String, Object> result = knowledgeManager.acquire(source, ctx, dry);
 
         return formatAcquireResult(result);
+    }
+
+    @Tool(description = "Acquire knowledge from a local file (image, PDF, etc.)")
+    public String knowledgeAcquireFromFile(
+            @ToolParam(description = "Absolute or vessel-relative file path") String filePath,
+            @ToolParam(description = "Optional context", required = false) String context,
+            @ToolParam(description = "If true, only analyze without committing", required = false) Boolean dryRun) {
+
+        if (filePath == null || filePath.isBlank()) {
+            return "Error: filePath is required";
+        }
+
+        Path path = Path.of(filePath);
+        if (!path.isAbsolute()) {
+            path = ProjectRootFinder.getMetaClawDir()
+                    .resolve("vessels")
+                    .resolve(VesselContext.getVesselId())
+                    .resolve(filePath);
+        }
+
+        if (!Files.exists(path)) {
+            return "Error: file not found: " + filePath;
+        }
+
+        String mediaType = inferMediaType(filePath);
+        KnowledgeSource source = KnowledgeSource.builder()
+                .mediaType(mediaType)
+                .uri(path.toUri())
+                .originalName(path.getFileName().toString())
+                .build();
+
+        Map<String, Object> result = knowledgeManager.acquire(source, context != null ? context : "", dryRun != null && dryRun);
+        return formatAcquireResult(result);
+    }
+
+    @Tool(description = "Acquire knowledge from a URL (currently Douyin prioritized)")
+    public String knowledgeAcquireFromUrl(
+            @ToolParam(description = "Source URL") String url,
+            @ToolParam(description = "Optional context", required = false) String context,
+            @ToolParam(description = "If true, only analyze without committing", required = false) Boolean dryRun) {
+
+        if (url == null || url.isBlank()) {
+            return "Error: url is required";
+        }
+
+        String mediaType = inferMediaType(url);
+        if (!"video/url.douyin".equals(mediaType)) {
+            return "Error: unsupported URL type: " + url;
+        }
+
+        KnowledgeSource source = KnowledgeSource.builder()
+                .mediaType(mediaType)
+                .uri(URI.create(url))
+                .originalName("douyin_link")
+                .build();
+
+        Map<String, Object> result = knowledgeManager.acquire(source, context != null ? context : "", dryRun != null && dryRun);
+        return formatAcquireResult(result);
+    }
+
+    private String inferMediaType(String pathOrUrl) {
+        String lower = pathOrUrl.toLowerCase();
+        if (lower.endsWith(".png")) return "image/png";
+        if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
+        if (lower.endsWith(".webp")) return "image/webp";
+        if (lower.endsWith(".pdf")) return "application/pdf";
+        if (lower.contains("douyin.com") || lower.contains("iesdouyin.com")) return "video/url.douyin";
+        return "text/plain";
     }
 
     @Tool(description = """

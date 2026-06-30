@@ -140,6 +140,18 @@ class KnowledgeToolTest {
         assertTrue(content.contains("multimodal_used: false"), "Expected multimodal_used frontmatter, got: " + content);
     }
 
+    @Test
+    void acquireFromFileRejectsMissingFile() {
+        String result = tool.knowledgeAcquireFromFile("/nonexistent/file.pdf", null, null);
+        assertTrue(result.startsWith("Error"), "Expected error for missing file, got: " + result);
+    }
+
+    @Test
+    void acquireFromUrlRejectsUnsupportedHost() {
+        String result = tool.knowledgeAcquireFromUrl("https://example.com/video", null, null);
+        assertTrue(result.startsWith("Error"), "Expected error for unsupported URL, got: " + result);
+    }
+
     // ========== knowledgeRetrieve ==========
 
     @Test
