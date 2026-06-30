@@ -60,6 +60,8 @@
         <commons-lang3.version>3.14.0</commons-lang3.version>
         <!-- Eclipse JGit 版本：为 GitTool 提供 Java Git 能力 -->
         <jgit.version>6.10.0.202406032230-r</jgit.version>
+        <!-- Apache PDFBox 版本：PDF 文本与页面提取 -->
+        <pdfbox.version>3.0.2</pdfbox.version>
     </properties>
 
     <!-- 依赖版本管理：子模块可引用而不必指定版本 -->
@@ -182,6 +184,12 @@
                 <groupId>org.eclipse.jgit</groupId>
                 <artifactId>org.eclipse.jgit</artifactId>
                 <version>${jgit.version}</version>
+            </dependency>
+            <!-- Apache PDFBox：PDF 文本与页面提取 -->
+            <dependency>
+                <groupId>org.apache.pdfbox</groupId>
+                <artifactId>pdfbox</artifactId>
+                <version>${pdfbox.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
