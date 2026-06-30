@@ -127,6 +127,19 @@ class KnowledgeToolTest {
         assertTrue(result.startsWith("Error"), "Expected error for empty content, got: " + result);
     }
 
+    @Test
+    void textAcquireRecordsAssetMetadata() {
+        tool.knowledgeAcquire("Java 21 was released in September 2023.", null, false);
+
+        String listResult = tool.knowledgeList();
+        String path = extractPath(listResult);
+        assertNotNull(path, "Could not extract path from list output: " + listResult);
+
+        String content = tool.knowledgeRead(path);
+        assertTrue(content.contains("media_type: text/plain"), "Expected media_type frontmatter, got: " + content);
+        assertTrue(content.contains("multimodal_used: false"), "Expected multimodal_used frontmatter, got: " + content);
+    }
+
     // ========== knowledgeRetrieve ==========
 
     @Test

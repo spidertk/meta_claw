@@ -48,6 +48,18 @@ public class KnowledgeEntry {
         return knowledgeType == KnowledgeType.FACT && status == KnowledgeStatus.ACTIVE;
     }
 
+    public String getSourceAsset() {
+        return extra != null ? String.valueOf(extra.getOrDefault("source_asset", "")) : "";
+    }
+
+    public String getMediaType() {
+        return extra != null ? String.valueOf(extra.getOrDefault("media_type", "text/plain")) : "text/plain";
+    }
+
+    public boolean isMultimodalUsed() {
+        return extra != null && Boolean.TRUE.equals(extra.get("multimodal_used"));
+    }
+
     public void supersede(String newId, String commitHash) {
         this.status = KnowledgeStatus.SUPERSEDED;
         this.previousVersion = newId;
