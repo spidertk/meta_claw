@@ -38,7 +38,8 @@ venv.bak/
 .*
 graphify-out
 *.class
-knowledge
+# Ignore runtime knowledge storage, but keep source packages named knowledge
+.meta-claw/vessels/*/knowledge/
 *.lst
 */.meta-claw/
 target/*
