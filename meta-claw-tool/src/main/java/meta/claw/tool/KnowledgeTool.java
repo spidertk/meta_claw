@@ -167,6 +167,12 @@ public class KnowledgeTool {
             if (r.containsKey("status")) {
                 sb.append("   Status: ").append(r.get("status")).append("\n");
             }
+            if (r.containsKey("media_type")) {
+                sb.append("   Media: ").append(r.get("media_type")).append("\n");
+            }
+            if (r.containsKey("source_asset")) {
+                sb.append("   Asset: ").append(r.get("source_asset")).append("\n");
+            }
 
             if ("history".equals(m) && r.containsKey("history")) {
                 sb.append("   History:\n");

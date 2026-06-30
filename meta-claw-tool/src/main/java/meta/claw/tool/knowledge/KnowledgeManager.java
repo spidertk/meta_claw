@@ -242,13 +242,22 @@ public class KnowledgeManager {
     public List<Map<String, Object>> retrieve(String query, String mode, int maxResults) {
         Path knowledgeDir = getKnowledgeDir();
         Path vesselDir = getVesselDir();
+        Path assetsDir = vesselDir.resolve("assets");
         ensureKnowledgeDir(knowledgeDir);
 
         List<String> keywords = Arrays.asList(query.toLowerCase().split("\\s+"));
-        List<Path> files = gitManager.grepFiles(keywords, knowledgeDir);
+
+        List<Path> knowledgeFiles = gitManager.grepFiles(keywords, knowledgeDir, "*.md");
+        List<Path> assetFiles = Files.exists(assetsDir)
+                ? gitManager.grepFiles(keywords, assetsDir, "*.md")
+                : Collections.emptyList();
+
+        Set<Path> allFiles = new LinkedHashSet<>();
+        allFiles.addAll(knowledgeFiles);
+        allFiles.addAll(assetFiles);
 
         List<Map<String, Object>> results = new ArrayList<>();
-        for (Path filePath : files) {
+        for (Path filePath : allFiles) {
             if (results.size() >= maxResults) {
                 break;
             }
@@ -274,6 +283,8 @@ public class KnowledgeManager {
                     result.put("type", entry.getKnowledgeType().getValue());
                     result.put("status", entry.getStatus().getValue());
                     result.put("topics", entry.getTopics());
+                    result.put("media_type", entry.getMediaType());
+                    result.put("source_asset", entry.getSourceAsset());
                 } else if ("history".equals(mode)) {
                     GitFileHistory history = gitManager.getFileHistory(filePath, 3);
                     result.put("id", entry.getId());
@@ -281,6 +292,8 @@ public class KnowledgeManager {
                     result.put("path", vesselDir.relativize(filePath).toString());
                     result.put("current_content", entry.getContent());
                     result.put("current_status", entry.getStatus().getValue());
+                    result.put("media_type", entry.getMediaType());
+                    result.put("source_asset", entry.getSourceAsset());
 
                     List<Map<String, Object>> historyList = history.getRecentCommits().stream()
                             .map(c -> {

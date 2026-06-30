@@ -175,6 +175,13 @@ class KnowledgeToolTest {
         assertTrue(result.startsWith("Error"), "Expected error for empty query, got: " + result);
     }
 
+    @Test
+    void retrieveIncludesAssetMetadata() {
+        tool.knowledgeAcquire("Java 21 was released in September 2023.", null, false);
+        String result = tool.knowledgeRetrieve("Java", "current", 5);
+        assertTrue(result.contains("Media: text/plain"), "Expected media_type in retrieve result, got: " + result);
+    }
+
     // ========== knowledgeList ==========
 
     @Test

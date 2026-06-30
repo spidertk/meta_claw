@@ -132,11 +132,16 @@ public class GitManager {
     }
 
     public List<Path> grepFiles(List<String> keywords, Path searchPath) {
+        return grepFiles(keywords, searchPath, "*.md");
+    }
+
+    public List<Path> grepFiles(List<String> keywords, Path searchPath, String glob) {
         if (keywords == null || keywords.isEmpty()) {
             return Collections.emptyList();
         }
 
         Path targetPath = searchPath != null ? searchPath : repoPath;
+        String filePattern = glob != null ? glob : "*.md";
         List<Path> results = new ArrayList<>();
 
         try {
@@ -144,7 +149,7 @@ public class GitManager {
                 return results;
             }
             try (var stream = Files.walk(targetPath)) {
-                stream.filter(p -> p.toString().endsWith(".md"))
+                stream.filter(p -> p.getFileSystem().getPathMatcher("glob:" + filePattern).matches(p.getFileName()))
                         .forEach(filePath -> {
                             try {
                                 String content = Files.readString(filePath).toLowerCase();
