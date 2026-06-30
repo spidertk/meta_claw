@@ -51,6 +51,37 @@
 
 ## 会话记录
 
+### Session 064
+
+- 日期：2026-06-30
+- 本轮目标：实现 multimodal knowledge extension 计划的 Task 4：创建 ContentExtractor SPI、提取上下文、路由服务与 TextExtractor，并补充单元测试。
+- 实现：
+  - 在 `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/extract/` 下新增 `ContentExtractor` 接口、`ExtractionContext`、`ContentExtractorService`、`TextExtractor`。
+  - `ContentExtractorService` 为 `@Component`，通过构造方法注入 `List<ContentExtractor>`，按顺序路由到第一个支持的提取器；无支持提取器时抛出 `UnsupportedOperationException`。
+  - `TextExtractor` 为 `@Component`，支持 `text/plain`，将 `KnowledgeSource.content` 作为 `markdownBody` 返回。
+  - 新增 `ContentExtractorServiceTest`，覆盖 text/plain 路由与无支持提取器异常。
+  - 因 Task 4 的 `ExtractionContext` 依赖 `AssetManager`，提前创建 `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/asset/AssetManager.java` 接口，使模块能编译通过。
+- 运行过的验证：
+  - `export JAVA_HOME=/Users/kai/.local/jdks/jdk-21.0.10+7/Contents/Home && /Users/kai/.local/tools/apache-maven-3.9.15/bin/mvn -pl meta-claw-tool -am test -Dtest=ContentExtractorServiceTest -Dsurefire.failIfNoSpecifiedTests=false -q` → BUILD SUCCESS，Tests run: 2, Failures: 0, Errors: 0, Skipped: 0。
+- 已记录证据：
+  - `feature_list.json` 已新增 `multimodal-knowledge-001` 并标记为 passing。
+  - `clean-state-checklist.md` 已更新。
+- 更新过的文件或工件：
+  - `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/extract/ContentExtractor.java`（新增）
+  - `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/extract/ExtractionContext.java`（新增）
+  - `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/extract/ContentExtractorService.java`（新增）
+  - `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/extract/TextExtractor.java`（新增）
+  - `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/asset/AssetManager.java`（新增）
+  - `meta-claw-tool/src/test/java/meta/claw/tool/knowledge/extract/ContentExtractorServiceTest.java`（新增）
+  - `feature_list.json`
+  - `claude-progress.md`
+  - `clean-state-checklist.md`
+- 已知风险或未解决的问题：
+  - 当前仅完成 Task 4；`AssetManager` 仅有接口，LocalAssetManager 实现、KnowledgeManager 重构等后续任务按 `2026-06-29-multimodal-knowledge-extension-plan.md` 继续执行。
+- 下一步最佳动作：
+  1. 提交本轮修改。
+  2. 继续执行 Task 5：创建 `LocalAssetManager`。
+
 ### Session 063
 
 - 日期：2026-06-26

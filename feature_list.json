@@ -1,6 +1,6 @@
 {
   "project": "meta-claw",
-  "last_updated": "2026-06-26",
+  "last_updated": "2026-06-30",
   "package_structure": {
     "config": "meta.claw.core.config — 所有配置模型 + 加载器 + 解析器",
     "vessel": "meta.claw.core.vessel — Vessel 用户域（Profile + Initializer）",
@@ -987,6 +987,27 @@
         }
       ],
       "notes": "AgentEngine SPI Phase 0+1+2+3+4+5+6 已全部实现完成。AgentEngine.executeStream 返回 Reply 以保持 VesselRuntime 落盘逻辑简单；SAA 流式通过 streamMessages() 驱动 callback，usage 信息当前由 ModelMetricsHook 从 AssistantMessage metadata 最佳 effort 读取；HITL 已在 alibaba 引擎下通过 AFTER_MODEL Hook 实现中断/恢复；多 Agent 编排已接入 Sequential/Parallel/Routing；SAA checkpoint 已通过 VesselCheckpointSaver 持久化到文件系统，进程重启后可从 checkpoint 恢复。当前实现不足点详见主设计文档 1.2 节与 Phase 3+ 实施计划对应章节。"
+    },
+    {
+      "id": "multimodal-knowledge-001",
+      "priority": 29,
+      "area": "knowledge",
+      "title": "ContentExtractor SPI、提取上下文与 TextExtractor",
+      "user_visible_behavior": "meta-claw-tool 的 knowledge 子系统新增 ContentExtractor SPI，支持按 KnowledgeSource.mediaType 路由到具体提取器；TextExtractor 处理 text/plain 并返回 markdownBody；未找到支持提取器时抛出 UnsupportedOperationException。",
+      "status": "passing",
+      "verification": [
+        "创建 ContentExtractor 接口、ExtractionContext、ContentExtractorService、TextExtractor。",
+        "创建 ContentExtractorServiceTest 覆盖 text/plain 路由与无支持提取器异常。",
+        "运行 mvn -pl meta-claw-tool -am test -Dtest=ContentExtractorServiceTest -Dsurefire.failIfNoSpecifiedTests=false -q 并通过。"
+      ],
+      "evidence": [
+        {
+          "date": "2026-06-30",
+          "result": "passing",
+          "detail": "ContentExtractorServiceTest 2/2 通过；TextExtractor 将 KnowledgeSource.content 原样返回为 markdownBody；image/png 场景正确抛出 UnsupportedOperationException。"
+        }
+      ],
+      "notes": "Task 4 已完成。AssetManager 接口已提前创建以让 ExtractionContext 编译通过，具体 LocalAssetManager 实现属于 Task 5。"
     }
   ]
 }

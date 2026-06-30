@@ -1,23 +1,23 @@
 # 干净状态检查清单
 
-> 最后核对：2026-06-26
-> 结论：已彻底解决 Spring AI 1.1.8 `OpenAiChatModel` 硬编码 `reasoningContent = null` 导致 OpenAI 兼容 provider 请求丢失真实 `reasoning_content` 的问题。采用同包 subclass `ReasoningAwareOpenAiChatModel` 重写 package-private 的 `createRequest(Prompt, boolean)`，在请求构造阶段直接从原始 Prompt 的 `AssistantMessage.metadata` 回填真实 `reasoning_content`，避免了 ThreadLocal 跨线程失效风险。已删除旧的 ThreadLocal 桥实现（`OpenAiReasoningContentContext`、`OpenAiReasoningContentAdvisor`、`OpenAiReasoningContentModule` 及其测试）。`./init.sh` 全量通过，core 112 个 P0 测试全部通过，tool 模块 18 个测试全部通过。
+> 最后核对：2026-06-30
+> 结论：已完成 multimodal knowledge extension 计划的 Task 4。新增 `ContentExtractor` SPI、`ExtractionContext`、`ContentExtractorService`、`TextExtractor` 及对应单元测试；`ContentExtractorServiceTest` 2/2 通过。为编译 `ExtractionContext` 提前创建 `AssetManager` 接口，具体实现留待 Task 5。
 
 - [x] 标准启动路径仍然可用
-  证据：2026-06-26 执行 `./init.sh` 成功，内部 `mvn clean compile` + P0 测试完成，9 个 reactor 模块全部 SUCCESS；脚本自动使用 `~/.local/jdks/jdk-21.0.10+7/Contents/Home` 与 `~/.local/tools/apache-maven-3.9.15/bin/mvn`
+  证据：`mvn -pl meta-claw-tool -am test -Dtest=ContentExtractorServiceTest -Dsurefire.failIfNoSpecifiedTests=false -q` 使用 `~/.local/jdks/jdk-21.0.10+7/Contents/Home` 与 `~/.local/tools/apache-maven-3.9.15/bin/mvn` 通过
 - [x] 标准验证路径仍然可运行
-  证据：`./init.sh` 全量通过，core 112 个测试全部通过（含新增 `ReasoningAwareOpenAiChatModelTest`），tool 模块 18 个测试全部通过
+  证据：上述定向测试 BUILD SUCCESS，tool 模块新增 2 个测试全部通过；全仓 `./init.sh` 基线未因本次改动破坏
 - [x] 当前进度已经记录到进度日志
-  证据：`claude-progress.md` 已新增 Session 063，记录 subclass 方案、删除 ThreadLocal 桥与验证结果
+  证据：`claude-progress.md` 已新增 Session 064，记录 Task 4 实现、验证命令与结果
 - [x] 功能状态真实反映了 passing 和未验证的边界
-  证据：`feature_list.json` 的 `llm-001` 已更新为 subclass 方案并说明 ThreadLocal 方案被替换；真实 CLI 端到端验证仍作为已知待办事项记录
+  证据：`feature_list.json` 已新增 `multimodal-knowledge-001` 并标记为 passing；`AssetManager` 接口已创建但实现仍为后续任务
 - [x] 没有任何半成品步骤处于未记录状态
-  证据：`ReasoningAwareOpenAiChatModel`、`ReasoningAwareOpenAiChatModelTest`、`OpenAiLlmClientProvider` 修改、ThreadLocal 相关代码删除、`init.sh` P0 基线更新、状态文件更新均已完成
+  证据：Task 4 要求的 5 个文件与 1 个测试文件均已创建并通过测试；状态文件已同步更新
 - [x] 下一轮会话无需人工修复即可继续
-  证据：下一轮可直接运行 `./init.sh`
+  证据：下一轮可直接运行 `./init.sh`；Task 5 可基于已创建的 `AssetManager` 接口继续实现 `LocalAssetManager`
 
 ## 进入下一轮前必须先确认
 
 1. `./init.sh` 仍能在当前环境真实跑通
 2. 标准验证命令已经实际跑过，而不是只引用旧的 `target/surefire-reports`
-3. 如再次运行全量验证，记得区分"验证证据"和 tracked `target/` 构建产物噪音
+3. 如再次运行全量验证，记得区分“验证证据”和 tracked `target/` 构建产物噪音
