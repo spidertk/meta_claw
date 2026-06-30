@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
+import meta.claw.core.llm.MediaPart;
 import meta.claw.core.llm.SpiChatRequest;
 import meta.claw.core.llm.SpiChatResponse;
 import meta.claw.core.llm.SpiLlmClient;
@@ -11,6 +12,8 @@ import meta.claw.core.llm.SpiMessage;
 import meta.claw.tool.knowledge.model.AnalysisResult;
 import meta.claw.tool.knowledge.model.ContradictionInfo;
 import meta.claw.tool.knowledge.model.KnowledgeEntry;
+import meta.claw.tool.knowledge.multimodal.ModelCapability;
+import meta.claw.tool.knowledge.source.AssetRef;
 import meta.claw.tool.knowledge.source.ExtractedDocument;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -23,17 +26,32 @@ import java.util.stream.Collectors;
 public class KnowledgeAnalyzer {
 
     private final SpiLlmClient llmClient;
+    private final ModelCapability modelCapability;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Autowired
-    public KnowledgeAnalyzer(SpiLlmClient llmClient) {
+    public KnowledgeAnalyzer(SpiLlmClient llmClient, ModelCapability modelCapability) {
         this.llmClient = llmClient;
+        this.modelCapability = modelCapability;
     }
 
     public AnalysisResult analyze(ExtractedDocument doc,
                                   List<KnowledgeEntry> relatedEntries,
                                   String context) {
-        return analyze(doc != null ? doc.getMarkdownBody() : null, relatedEntries, context);
+        if (llmClient == null) {
+            log.warn("No LLM client available, returning default analysis");
+            return defaultAnalysis();
+        }
+
+        boolean useMultimodal = modelCapability.supportsMultimodal()
+                && hasVisualAssets(doc)
+                && modelCapability.supportsMediaType(doc.getMediaType());
+
+        if (useMultimodal) {
+            return analyzeWithMultimodal(doc, relatedEntries, context);
+        }
+
+        return analyzeTextFallback(doc, relatedEntries, context);
     }
 
     public AnalysisResult analyze(String newContent, List<KnowledgeEntry> relatedEntries, String context) {
@@ -53,6 +71,60 @@ public class KnowledgeAnalyzer {
             return parseAnalysisResponse(response.content(), newContent);
         } catch (Exception e) {
             log.error("LLM analysis failed: {}", e.getMessage());
+            return defaultAnalysis();
+        }
+    }
+
+    private boolean hasVisualAssets(ExtractedDocument doc) {
+        if (doc == null || doc.getEmbeddedAssets() == null || doc.getEmbeddedAssets().isEmpty()) {
+            return false;
+        }
+        return doc.getEmbeddedAssets().stream()
+                .anyMatch(a -> a.getMediaType() != null && a.getMediaType().startsWith("image/"));
+    }
+
+    private AnalysisResult analyzeWithMultimodal(ExtractedDocument doc,
+                                                 List<KnowledgeEntry> relatedEntries,
+                                                 String context) {
+        List<MediaPart> mediaParts = doc.getEmbeddedAssets().stream()
+                .filter(a -> a.getMediaType() != null && a.getMediaType().startsWith("image/"))
+                .filter(a -> a.getOriginalPath() != null)
+                .map(a -> MediaPart.builder()
+                        .type("image_url")
+                        .mimeType(a.getMediaType())
+                        .url(a.getOriginalPath().toUri().toString())
+                        .build())
+                .limit(5)
+                .collect(Collectors.toList());
+
+        String prompt = buildAnalysisPrompt(doc.getMarkdownBody(), relatedEntries, context);
+        SpiChatRequest request = SpiChatRequest.builder()
+                .messages(List.of(SpiMessage.user(prompt, mediaParts)))
+                .build();
+
+        try {
+            SpiChatResponse response = llmClient.chat(request);
+            AnalysisResult result = parseAnalysisResponse(response.content(), doc.getMarkdownBody());
+            result.setMultimodalUsed(true);
+            return result;
+        } catch (Exception e) {
+            log.error("Multimodal analysis failed, falling back to text: {}", e.getMessage());
+            return analyzeTextFallback(doc, relatedEntries, context);
+        }
+    }
+
+    private AnalysisResult analyzeTextFallback(ExtractedDocument doc,
+                                               List<KnowledgeEntry> relatedEntries,
+                                               String context) {
+        String prompt = buildAnalysisPrompt(doc.getMarkdownBody(), relatedEntries, context);
+        try {
+            SpiChatRequest request = SpiChatRequest.builder()
+                    .messages(List.of(SpiMessage.user(prompt)))
+                    .build();
+            SpiChatResponse response = llmClient.chat(request);
+            return parseAnalysisResponse(response.content(), doc.getMarkdownBody());
+        } catch (Exception e) {
+            log.error("LLM text analysis failed: {}", e.getMessage());
             return defaultAnalysis();
         }
     }

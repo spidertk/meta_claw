@@ -7,6 +7,8 @@ import meta.claw.core.runtime.VesselContext;
 import meta.claw.tool.knowledge.GitManager;
 import meta.claw.tool.knowledge.KnowledgeAnalyzer;
 import meta.claw.tool.knowledge.KnowledgeManager;
+import meta.claw.tool.knowledge.multimodal.ModelCapability;
+import meta.claw.tool.knowledge.multimodal.MultimodalConfig;
 import meta.claw.tool.knowledge.asset.AssetManager;
 import meta.claw.tool.knowledge.asset.LocalAssetManager;
 import meta.claw.tool.knowledge.extract.ContentExtractorService;
@@ -80,7 +82,9 @@ class KnowledgeToolTest {
         GitManager gitManager = new GitManager();
         gitManager.init(knowledgeDir);
 
-        KnowledgeAnalyzer analyzer = new KnowledgeAnalyzer(mockLlm);
+        MultimodalConfig multimodalConfig = new MultimodalConfig();
+        ModelCapability modelCapability = new ModelCapability(multimodalConfig);
+        KnowledgeAnalyzer analyzer = new KnowledgeAnalyzer(mockLlm, modelCapability);
         ContentExtractorService extractorService = new ContentExtractorService(List.of(new TextExtractor()));
         AssetManager assetManager = new LocalAssetManager();
         KnowledgeManager knowledgeManager = new KnowledgeManager(gitManager, analyzer, extractorService, assetManager);

@@ -1077,7 +1077,32 @@
           "detail": "mvn -pl meta-claw-tool -am test -Dtest=ModelCapabilityTest -Dsurefire.failIfNoSpecifiedTests=false -q BUILD SUCCESS；ModelCapabilityTest 2/2 通过；全量 ./init.sh 在修改前已通过（core 112 个测试、tool 18 个测试）。"
         }
       ],
-      "notes": "Task 7 已完成。MultimodalConfig 默认值 enabled=false，supportedMediaTypes=image/png,image/jpeg,image/webp，pdfPageImages=false，maxImageSizeBytes=5242880。下一步 Task 8：让 KnowledgeAnalyzer  multimodal-aware，注入 ModelCapability 并走多模态分析路径。"
+      "notes": "Task 7 已完成。MultimodalConfig 默认值 enabled=false，supportedMediaTypes=image/png,image/jpeg,image/webp，pdfPageImages=false，maxImageSizeBytes=5242880。"
+    },
+    {
+      "id": "multimodal-knowledge-005",
+      "priority": 33,
+      "area": "knowledge",
+      "title": "KnowledgeAnalyzer 多模态感知与回退",
+      "user_visible_behavior": "KnowledgeAnalyzer 注入 ModelCapability，当文档包含图片资源且模型/配置支持对应媒体类型时，自动将图片作为 MediaPart 随分析 prompt 一起发送给 LLM；解析响应后标记 multimodal_used=true。多模态路径失败时自动回退到纯文本分析。",
+      "status": "passing",
+      "verification": [
+        "修改 KnowledgeAnalyzer 构造方法，注入 ModelCapability。",
+        "实现 analyze(ExtractedDocument, List<KnowledgeEntry>, String)，根据 modelCapability.supportsMultimodal() / hasVisualAssets(doc) / modelCapability.supportsMediaType(doc.getMediaType()) 判定是否走多模态路径。",
+        "实现 hasVisualAssets(doc)：embeddedAssets 中存在 image/ 前缀媒体类型即视为含视觉资源。",
+        "实现 analyzeWithMultimodal：将图片资产转为 MediaPart（最多 5 个），使用 SpiMessage.user(prompt, mediaParts) 调用 LLM，解析结果后设置 multimodalUsed=true；异常时回退到文本分析。",
+        "实现 analyzeTextFallback：复用现有文本 prompt 路径。",
+        "更新 KnowledgeToolTest.setUp，构造 MultimodalConfig / ModelCapability 并传入 KnowledgeAnalyzer。",
+        "运行 mvn -pl meta-claw-tool -am test -Dtest=KnowledgeToolTest -Dsurefire.failIfNoSpecifiedTests=false -q 并通过；全量 ./init.sh 仍通过。"
+      ],
+      "evidence": [
+        {
+          "date": "2026-06-30",
+          "result": "passing",
+          "detail": "mvn -pl meta-claw-tool -am test -Dtest=KnowledgeToolTest -Dsurefire.failIfNoSpecifiedTests=false -q BUILD SUCCESS；KnowledgeToolTest 14/14 通过；全量 ./init.sh BUILD SUCCESS，9 个 reactor 模块全部 SUCCESS，core 112 个测试、tool 18 个测试全部通过。"
+        }
+      ],
+      "notes": "Task 8 已完成。当前 MultimodalConfig 默认 enabled=false，因此文本知识 acquisitions 仍走文本路径；启用多模态并配置支持媒体类型后，图片资源将自动进入多模态分析。"
     }
   ]
 }
