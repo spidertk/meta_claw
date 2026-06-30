@@ -20,28 +20,28 @@
 
 ### meta-claw-tool (knowledge subsystem)
 
-- `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/source/KnowledgeSource.java`
-- `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/source/ExtractedDocument.java`
-- `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/source/AssetRef.java`
-- `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/extract/ContentExtractor.java`
-- `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/extract/ExtractionContext.java`
-- `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/extract/ContentExtractorService.java`
-- `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/extract/TextExtractor.java`
-- `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/extract/ImageExtractor.java`
-- `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/extract/PdfExtractor.java`
-- `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/extract/video/VideoExtractor.java`
-- `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/extract/video/YtDlpVideoExtractor.java`
-- `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/extract/video/DouyinVideoExtractor.java`
-- `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/asset/AssetManager.java`
-- `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/asset/LocalAssetManager.java`
-- `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/multimodal/ModelCapability.java`
-- `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/multimodal/MultimodalConfig.java`
-- `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/KnowledgeAnalyzer.java` — refactor to accept `ExtractedDocument`, add multimodal path.
-- `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/KnowledgeManager.java` — change `acquire` signature to `KnowledgeSource`.
-- `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/GitManager.java` — extend grep to include extracted markdown under assets.
-- `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/model/KnowledgeEntry.java` — add asset reference fields.
+- `meta-claw-core/src/main/java/meta/claw/core/knowledge/source/KnowledgeSource.java`
+- `meta-claw-core/src/main/java/meta/claw/core/knowledge/source/ExtractedDocument.java`
+- `meta-claw-core/src/main/java/meta/claw/core/knowledge/source/AssetRef.java`
+- `meta-claw-core/src/main/java/meta/claw/core/knowledge/extract/ContentExtractor.java`
+- `meta-claw-core/src/main/java/meta/claw/core/knowledge/extract/ExtractionContext.java`
+- `meta-claw-core/src/main/java/meta/claw/core/knowledge/extract/ContentExtractorService.java`
+- `meta-claw-core/src/main/java/meta/claw/core/knowledge/extract/TextExtractor.java`
+- `meta-claw-core/src/main/java/meta/claw/core/knowledge/extract/ImageExtractor.java`
+- `meta-claw-core/src/main/java/meta/claw/core/knowledge/extract/PdfExtractor.java`
+- `meta-claw-core/src/main/java/meta/claw/core/knowledge/extract/video/VideoExtractor.java`
+- `meta-claw-core/src/main/java/meta/claw/core/knowledge/extract/video/YtDlpVideoExtractor.java`
+- `meta-claw-core/src/main/java/meta/claw/core/knowledge/extract/video/DouyinVideoExtractor.java`
+- `meta-claw-core/src/main/java/meta/claw/core/knowledge/asset/AssetManager.java`
+- `meta-claw-core/src/main/java/meta/claw/core/knowledge/asset/LocalAssetManager.java`
+- `meta-claw-core/src/main/java/meta/claw/core/knowledge/multimodal/ModelCapability.java`
+- `meta-claw-core/src/main/java/meta/claw/core/knowledge/multimodal/MultimodalConfig.java`
+- `meta-claw-core/src/main/java/meta/claw/core/knowledge/KnowledgeAnalyzer.java` — refactor to accept `ExtractedDocument`, add multimodal path.
+- `meta-claw-core/src/main/java/meta/claw/core/knowledge/KnowledgeManager.java` — change `acquire` signature to `KnowledgeSource`.
+- `meta-claw-core/src/main/java/meta/claw/core/knowledge/GitManager.java` — extend grep to include extracted markdown under assets.
+- `meta-claw-core/src/main/java/meta/claw/core/knowledge/model/KnowledgeEntry.java` — add asset reference fields.
 - `meta-claw-tool/src/main/java/meta/claw/tool/KnowledgeTool.java` — add file/URL tool methods.
-- `meta-claw-tool/src/test/java/meta/claw/tool/knowledge/...` — new unit tests for extractors and asset manager.
+- `meta-claw-core/src/test/java/meta/claw/core/knowledge/...` — new unit tests for extractors and asset manager.
 - `meta-claw-tool/src/test/java/meta/claw/tool/KnowledgeToolTest.java` — update existing tests.
 - `meta-claw-tool/pom.xml` — add PDFBox/Tika dependency.
 
@@ -242,14 +242,14 @@ git commit -m "feat(core): convert MediaPart to Spring AI Media in user messages
 ## Task 3: Create source/extraction data models
 
 **Files:**
-- Create: `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/source/KnowledgeSource.java`
-- Create: `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/source/ExtractedDocument.java`
-- Create: `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/source/AssetRef.java`
+- Create: `meta-claw-core/src/main/java/meta/claw/core/knowledge/source/KnowledgeSource.java`
+- Create: `meta-claw-core/src/main/java/meta/claw/core/knowledge/source/ExtractedDocument.java`
+- Create: `meta-claw-core/src/main/java/meta/claw/core/knowledge/source/AssetRef.java`
 
 - [ ] **Step 1: Write `KnowledgeSource`**
 
 ```java
-package meta.claw.tool.knowledge.source;
+package meta.claw.core.knowledge.source;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -282,7 +282,7 @@ public class KnowledgeSource {
 - [ ] **Step 2: Write `AssetRef`**
 
 ```java
-package meta.claw.tool.knowledge.source;
+package meta.claw.core.knowledge.source;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -306,7 +306,7 @@ public class AssetRef {
 - [ ] **Step 3: Write `ExtractedDocument`**
 
 ```java
-package meta.claw.tool.knowledge.source;
+package meta.claw.core.knowledge.source;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -339,7 +339,7 @@ Expected: BUILD SUCCESS
 - [ ] **Step 5: Commit**
 
 ```bash
-git add meta-claw-tool/src/main/java/meta/claw/tool/knowledge/source/
+git add meta-claw-core/src/main/java/meta/claw/core/knowledge/source/
 git commit -m "feat(knowledge): add KnowledgeSource, ExtractedDocument, AssetRef models"
 ```
 
@@ -348,18 +348,18 @@ git commit -m "feat(knowledge): add KnowledgeSource, ExtractedDocument, AssetRef
 ## Task 4: Create `ContentExtractor` SPI, context, service, and `TextExtractor`
 
 **Files:**
-- Create: `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/extract/ContentExtractor.java`
-- Create: `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/extract/ExtractionContext.java`
-- Create: `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/extract/ContentExtractorService.java`
-- Create: `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/extract/TextExtractor.java`
+- Create: `meta-claw-core/src/main/java/meta/claw/core/knowledge/extract/ContentExtractor.java`
+- Create: `meta-claw-core/src/main/java/meta/claw/core/knowledge/extract/ExtractionContext.java`
+- Create: `meta-claw-core/src/main/java/meta/claw/core/knowledge/extract/ContentExtractorService.java`
+- Create: `meta-claw-core/src/main/java/meta/claw/core/knowledge/extract/TextExtractor.java`
 
 - [ ] **Step 1: Write `ContentExtractor` interface**
 
 ```java
-package meta.claw.tool.knowledge.extract;
+package meta.claw.core.knowledge.extract;
 
-import meta.claw.tool.knowledge.source.ExtractedDocument;
-import meta.claw.tool.knowledge.source.KnowledgeSource;
+import meta.claw.core.knowledge.source.ExtractedDocument;
+import meta.claw.core.knowledge.source.KnowledgeSource;
 
 public interface ContentExtractor {
     boolean supports(KnowledgeSource source);
@@ -370,13 +370,13 @@ public interface ContentExtractor {
 - [ ] **Step 2: Write `ExtractionContext`**
 
 ```java
-package meta.claw.tool.knowledge.extract;
+package meta.claw.core.knowledge.extract;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import meta.claw.tool.knowledge.asset.AssetManager;
+import meta.claw.core.knowledge.asset.AssetManager;
 
 @Data
 @Builder
@@ -391,11 +391,11 @@ public class ExtractionContext {
 - [ ] **Step 3: Write `ContentExtractorService`**
 
 ```java
-package meta.claw.tool.knowledge.extract;
+package meta.claw.core.knowledge.extract;
 
 import lombok.extern.slf4j.Slf4j;
-import meta.claw.tool.knowledge.source.ExtractedDocument;
-import meta.claw.tool.knowledge.source.KnowledgeSource;
+import meta.claw.core.knowledge.source.ExtractedDocument;
+import meta.claw.core.knowledge.source.KnowledgeSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -427,10 +427,10 @@ public class ContentExtractorService {
 - [ ] **Step 4: Write `TextExtractor`**
 
 ```java
-package meta.claw.tool.knowledge.extract;
+package meta.claw.core.knowledge.extract;
 
-import meta.claw.tool.knowledge.source.ExtractedDocument;
-import meta.claw.tool.knowledge.source.KnowledgeSource;
+import meta.claw.core.knowledge.source.ExtractedDocument;
+import meta.claw.core.knowledge.source.KnowledgeSource;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -453,13 +453,13 @@ public class TextExtractor implements ContentExtractor {
 
 - [ ] **Step 5: Write unit test for `ContentExtractorService`**
 
-Create: `meta-claw-tool/src/test/java/meta/claw/tool/knowledge/extract/ContentExtractorServiceTest.java`
+Create: `meta-claw-core/src/test/java/meta/claw/core/knowledge/extract/ContentExtractorServiceTest.java`
 
 ```java
-package meta.claw.tool.knowledge.extract;
+package meta.claw.core.knowledge.extract;
 
-import meta.claw.tool.knowledge.source.ExtractedDocument;
-import meta.claw.tool.knowledge.source.KnowledgeSource;
+import meta.claw.core.knowledge.source.ExtractedDocument;
+import meta.claw.core.knowledge.source.KnowledgeSource;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -500,8 +500,8 @@ Expected: BUILD SUCCESS
 - [ ] **Step 7: Commit**
 
 ```bash
-git add meta-claw-tool/src/main/java/meta/claw/tool/knowledge/extract/
-"meta-claw-tool/src/test/java/meta/claw/tool/knowledge/extract/ContentExtractorServiceTest.java"
+git add meta-claw-core/src/main/java/meta/claw/core/knowledge/extract/
+"meta-claw-core/src/test/java/meta/claw/core/knowledge/extract/ContentExtractorServiceTest.java"
 git commit -m "feat(knowledge): add ContentExtractor SPI, service, and TextExtractor"
 ```
 
@@ -510,16 +510,16 @@ git commit -m "feat(knowledge): add ContentExtractor SPI, service, and TextExtra
 ## Task 5: Create `AssetManager`
 
 **Files:**
-- Create: `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/asset/AssetManager.java`
-- Create: `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/asset/LocalAssetManager.java`
+- Create: `meta-claw-core/src/main/java/meta/claw/core/knowledge/asset/AssetManager.java`
+- Create: `meta-claw-core/src/main/java/meta/claw/core/knowledge/asset/LocalAssetManager.java`
 
 - [ ] **Step 1: Write `AssetManager` interface**
 
 ```java
-package meta.claw.tool.knowledge.asset;
+package meta.claw.core.knowledge.asset;
 
-import meta.claw.tool.knowledge.source.AssetRef;
-import meta.claw.tool.knowledge.source.KnowledgeSource;
+import meta.claw.core.knowledge.source.AssetRef;
+import meta.claw.core.knowledge.source.KnowledgeSource;
 
 import java.io.InputStream;
 import java.nio.file.Path;
@@ -534,12 +534,12 @@ public interface AssetManager {
 - [ ] **Step 2: Write `LocalAssetManager`**
 
 ```java
-package meta.claw.tool.knowledge.asset;
+package meta.claw.core.knowledge.asset;
 
 import lombok.extern.slf4j.Slf4j;
 import meta.claw.core.infra.ProjectRootFinder;
-import meta.claw.tool.knowledge.source.AssetRef;
-import meta.claw.tool.knowledge.source.KnowledgeSource;
+import meta.claw.core.knowledge.source.AssetRef;
+import meta.claw.core.knowledge.source.KnowledgeSource;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
@@ -622,13 +622,13 @@ public class LocalAssetManager implements AssetManager {
 
 - [ ] **Step 3: Write unit test**
 
-Create: `meta-claw-tool/src/test/java/meta/claw/tool/knowledge/asset/LocalAssetManagerTest.java`
+Create: `meta-claw-core/src/test/java/meta/claw/core/knowledge/asset/LocalAssetManagerTest.java`
 
 ```java
-package meta.claw.tool.knowledge.asset;
+package meta.claw.core.knowledge.asset;
 
-import meta.claw.tool.knowledge.source.AssetRef;
-import meta.claw.tool.knowledge.source.KnowledgeSource;
+import meta.claw.core.knowledge.source.AssetRef;
+import meta.claw.core.knowledge.source.KnowledgeSource;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -671,8 +671,8 @@ Expected: BUILD SUCCESS
 - [ ] **Step 5: Commit**
 
 ```bash
-git add meta-claw-tool/src/main/java/meta/claw/tool/knowledge/asset/
-"meta-claw-tool/src/test/java/meta/claw/tool/knowledge/asset/LocalAssetManagerTest.java"
+git add meta-claw-core/src/main/java/meta/claw/core/knowledge/asset/
+"meta-claw-core/src/test/java/meta/claw/core/knowledge/asset/LocalAssetManagerTest.java"
 git commit -m "feat(knowledge): add LocalAssetManager for per-vessel asset storage"
 ```
 
@@ -680,8 +680,8 @@ git commit -m "feat(knowledge): add LocalAssetManager for per-vessel asset stora
 ## Task 6: Refactor `KnowledgeManager.acquire` to use `KnowledgeSource`
 
 **Files:**
-- Modify: `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/KnowledgeManager.java:56-101`
-- Modify: `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/KnowledgeManager.java:126-209`
+- Modify: `meta-claw-core/src/main/java/meta/claw/core/knowledge/KnowledgeManager.java:56-101`
+- Modify: `meta-claw-core/src/main/java/meta/claw/core/knowledge/KnowledgeManager.java:126-209`
 - Modify: `meta-claw-tool/src/main/java/meta/claw/tool/KnowledgeTool.java:39-54`
 
 - [ ] **Step 1: Inject new dependencies into `KnowledgeManager`**
@@ -904,11 +904,11 @@ tool = new KnowledgeTool(knowledgeManager, gitManager);
 Add imports:
 
 ```java
-import meta.claw.tool.knowledge.asset.AssetManager;
-import meta.claw.tool.knowledge.asset.LocalAssetManager;
-import meta.claw.tool.knowledge.extract.ContentExtractorService;
-import meta.claw.tool.knowledge.extract.TextExtractor;
-import meta.claw.tool.knowledge.source.KnowledgeSource;
+import meta.claw.core.knowledge.asset.AssetManager;
+import meta.claw.core.knowledge.asset.LocalAssetManager;
+import meta.claw.core.knowledge.extract.ContentExtractorService;
+import meta.claw.core.knowledge.extract.TextExtractor;
+import meta.claw.core.knowledge.source.KnowledgeSource;
 ```
 
 - [ ] **Step 6: Run `KnowledgeToolTest`**
@@ -919,7 +919,7 @@ Expected: BUILD SUCCESS
 - [ ] **Step 7: Commit**
 
 ```bash
-git add meta-claw-tool/src/main/java/meta/claw/tool/knowledge/KnowledgeManager.java
+git add meta-claw-core/src/main/java/meta/claw/core/knowledge/KnowledgeManager.java
 "meta-claw-tool/src/main/java/meta/claw/tool/KnowledgeTool.java"
 "meta-claw-tool/src/test/java/meta/claw/tool/KnowledgeToolTest.java"
 git commit -m "feat(knowledge): unify KnowledgeManager acquire behind KnowledgeSource"
@@ -930,13 +930,13 @@ git commit -m "feat(knowledge): unify KnowledgeManager acquire behind KnowledgeS
 ## Task 7: Add `ModelCapability` / `MultimodalConfig`
 
 **Files:**
-- Create: `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/multimodal/ModelCapability.java`
-- Create: `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/multimodal/MultimodalConfig.java`
+- Create: `meta-claw-core/src/main/java/meta/claw/core/knowledge/multimodal/ModelCapability.java`
+- Create: `meta-claw-core/src/main/java/meta/claw/core/knowledge/multimodal/MultimodalConfig.java`
 
 - [ ] **Step 1: Write `MultimodalConfig`**
 
 ```java
-package meta.claw.tool.knowledge.multimodal;
+package meta.claw.core.knowledge.multimodal;
 
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -958,7 +958,7 @@ public class MultimodalConfig {
 - [ ] **Step 2: Write `ModelCapability`**
 
 ```java
-package meta.claw.tool.knowledge.multimodal;
+package meta.claw.core.knowledge.multimodal;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -989,7 +989,7 @@ public class ModelCapability {
 
 - [ ] **Step 3: Add configuration example to `application.yml` (if present)**
 
-Find or create `meta-claw-tool/src/main/resources/application.yml` and add:
+Find or create `meta-claw-core/src/main/resources/application.yml` and add:
 
 ```yaml
 meta-claw:
@@ -1003,10 +1003,10 @@ meta-claw:
 
 - [ ] **Step 4: Write unit test**
 
-Create: `meta-claw-tool/src/test/java/meta/claw/tool/knowledge/multimodal/ModelCapabilityTest.java`
+Create: `meta-claw-core/src/test/java/meta/claw/core/knowledge/multimodal/ModelCapabilityTest.java`
 
 ```java
-package meta.claw.tool.knowledge.multimodal;
+package meta.claw.core.knowledge.multimodal;
 
 import org.junit.jupiter.api.Test;
 
@@ -1046,9 +1046,9 @@ Expected: BUILD SUCCESS
 - [ ] **Step 6: Commit**
 
 ```bash
-git add meta-claw-tool/src/main/java/meta/claw/tool/knowledge/multimodal/
-"meta-claw-tool/src/test/java/meta/claw/tool/knowledge/multimodal/"
-"meta-claw-tool/src/main/resources/application.yml"
+git add meta-claw-core/src/main/java/meta/claw/core/knowledge/multimodal/
+"meta-claw-core/src/test/java/meta/claw/core/knowledge/multimodal/"
+"meta-claw-core/src/main/resources/application.yml"
 git commit -m "feat(knowledge): add ModelCapability and MultimodalConfig"
 ```
 
@@ -1057,13 +1057,13 @@ git commit -m "feat(knowledge): add ModelCapability and MultimodalConfig"
 ## Task 8: Make `KnowledgeAnalyzer` multimodal-aware
 
 **Files:**
-- Modify: `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/KnowledgeAnalyzer.java:32-51`
-- Modify: `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/KnowledgeAnalyzer.java:53-141`
-- Modify: `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/model/AnalysisResult.java`
+- Modify: `meta-claw-core/src/main/java/meta/claw/core/knowledge/KnowledgeAnalyzer.java:32-51`
+- Modify: `meta-claw-core/src/main/java/meta/claw/core/knowledge/KnowledgeAnalyzer.java:53-141`
+- Modify: `meta-claw-core/src/main/java/meta/claw/core/knowledge/model/AnalysisResult.java`
 
 - [ ] **Step 1: Add `isMultimodalUsed` to `AnalysisResult`**
 
-In `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/model/AnalysisResult.java`, add field:
+In `meta-claw-core/src/main/java/meta/claw/core/knowledge/model/AnalysisResult.java`, add field:
 
 ```java
 @Builder.Default
@@ -1177,8 +1177,8 @@ Add imports:
 
 ```java
 import meta.claw.core.llm.MediaPart;
-import meta.claw.tool.knowledge.multimodal.ModelCapability;
-import meta.claw.tool.knowledge.source.ExtractedDocument;
+import meta.claw.core.knowledge.multimodal.ModelCapability;
+import meta.claw.core.knowledge.source.ExtractedDocument;
 ```
 
 - [ ] **Step 5: Update `KnowledgeToolTest` setup to inject `ModelCapability`**
@@ -1197,8 +1197,8 @@ Expected: BUILD SUCCESS
 - [ ] **Step 7: Commit**
 
 ```bash
-git add meta-claw-tool/src/main/java/meta/claw/tool/knowledge/KnowledgeAnalyzer.java
-"meta-claw-tool/src/main/java/meta/claw/tool/knowledge/model/AnalysisResult.java"
+git add meta-claw-core/src/main/java/meta/claw/core/knowledge/KnowledgeAnalyzer.java
+"meta-claw-core/src/main/java/meta/claw/core/knowledge/model/AnalysisResult.java"
 "meta-claw-tool/src/test/java/meta/claw/tool/KnowledgeToolTest.java"
 git commit -m "feat(knowledge): make KnowledgeAnalyzer multimodal-aware with fallback"
 ```
@@ -1207,15 +1207,15 @@ git commit -m "feat(knowledge): make KnowledgeAnalyzer multimodal-aware with fal
 ## Task 9: Implement `ImageExtractor`
 
 **Files:**
-- Create: `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/extract/ImageExtractor.java`
-- Create: `meta-claw-tool/src/test/java/meta/claw/tool/knowledge/extract/ImageExtractorTest.java`
+- Create: `meta-claw-core/src/main/java/meta/claw/core/knowledge/extract/ImageExtractor.java`
+- Create: `meta-claw-core/src/test/java/meta/claw/core/knowledge/extract/ImageExtractorTest.java`
 
 - [ ] **Step 1: Add image description helper service**
 
-Create: `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/extract/VisionDescriber.java`
+Create: `meta-claw-core/src/main/java/meta/claw/core/knowledge/extract/VisionDescriber.java`
 
 ```java
-package meta.claw.tool.knowledge.extract;
+package meta.claw.core.knowledge.extract;
 
 import meta.claw.core.llm.MediaPart;
 import meta.claw.core.llm.SpiChatRequest;
@@ -1267,11 +1267,11 @@ public class VisionDescriber {
 - [ ] **Step 2: Write `ImageExtractor`**
 
 ```java
-package meta.claw.tool.knowledge.extract;
+package meta.claw.core.knowledge.extract;
 
-import meta.claw.tool.knowledge.source.AssetRef;
-import meta.claw.tool.knowledge.source.ExtractedDocument;
-import meta.claw.tool.knowledge.source.KnowledgeSource;
+import meta.claw.core.knowledge.source.AssetRef;
+import meta.claw.core.knowledge.source.ExtractedDocument;
+import meta.claw.core.knowledge.source.KnowledgeSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -1315,12 +1315,12 @@ public class ImageExtractor implements ContentExtractor {
 - [ ] **Step 3: Write unit test with mocked `VisionDescriber`**
 
 ```java
-package meta.claw.tool.knowledge.extract;
+package meta.claw.core.knowledge.extract;
 
-import meta.claw.tool.knowledge.asset.LocalAssetManager;
-import meta.claw.tool.knowledge.source.AssetRef;
-import meta.claw.tool.knowledge.source.ExtractedDocument;
-import meta.claw.tool.knowledge.source.KnowledgeSource;
+import meta.claw.core.knowledge.asset.LocalAssetManager;
+import meta.claw.core.knowledge.source.AssetRef;
+import meta.claw.core.knowledge.source.ExtractedDocument;
+import meta.claw.core.knowledge.source.KnowledgeSource;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -1382,9 +1382,9 @@ Expected: BUILD SUCCESS
 - [ ] **Step 5: Commit**
 
 ```bash
-git add meta-claw-tool/src/main/java/meta/claw/tool/knowledge/extract/VisionDescriber.java
-"meta-claw-tool/src/main/java/meta/claw/tool/knowledge/extract/ImageExtractor.java"
-"meta-claw-tool/src/test/java/meta/claw/tool/knowledge/extract/ImageExtractorTest.java"
+git add meta-claw-core/src/main/java/meta/claw/core/knowledge/extract/VisionDescriber.java
+"meta-claw-core/src/main/java/meta/claw/core/knowledge/extract/ImageExtractor.java"
+"meta-claw-core/src/test/java/meta/claw/core/knowledge/extract/ImageExtractorTest.java"
 git commit -m "feat(knowledge): add ImageExtractor with vision description fallback"
 ```
 
@@ -1393,7 +1393,7 @@ git commit -m "feat(knowledge): add ImageExtractor with vision description fallb
 ## Task 10: Extend `KnowledgeEntry` frontmatter for asset references
 
 **Files:**
-- Modify: `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/model/KnowledgeEntry.java:60-102`
+- Modify: `meta-claw-core/src/main/java/meta/claw/core/knowledge/model/KnowledgeEntry.java:60-102`
 
 - [ ] **Step 1: Add helper getters/setters for asset fields**
 
@@ -1441,7 +1441,7 @@ Expected: BUILD SUCCESS
 - [ ] **Step 5: Commit**
 
 ```bash
-git add meta-claw-tool/src/main/java/meta/claw/tool/knowledge/model/KnowledgeEntry.java
+git add meta-claw-core/src/main/java/meta/claw/core/knowledge/model/KnowledgeEntry.java
 "meta-claw-tool/src/test/java/meta/claw/tool/KnowledgeToolTest.java"
 git commit -m "feat(knowledge): add asset reference accessors to KnowledgeEntry"
 ```
@@ -1452,8 +1452,8 @@ git commit -m "feat(knowledge): add asset reference accessors to KnowledgeEntry"
 
 **Files:**
 - Modify: `meta-claw-tool/pom.xml:57-73`
-- Create: `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/extract/PdfExtractor.java`
-- Create: `meta-claw-tool/src/test/java/meta/claw/tool/knowledge/extract/PdfExtractorTest.java`
+- Create: `meta-claw-core/src/main/java/meta/claw/core/knowledge/extract/PdfExtractor.java`
+- Create: `meta-claw-core/src/test/java/meta/claw/core/knowledge/extract/PdfExtractorTest.java`
 
 - [ ] **Step 1: Add Apache PDFBox dependency**
 
@@ -1472,11 +1472,11 @@ If parent POM has dependency management, use managed version without `<version>`
 - [ ] **Step 2: Implement `PdfExtractor`**
 
 ```java
-package meta.claw.tool.knowledge.extract;
+package meta.claw.core.knowledge.extract;
 
-import meta.claw.tool.knowledge.source.AssetRef;
-import meta.claw.tool.knowledge.source.ExtractedDocument;
-import meta.claw.tool.knowledge.source.KnowledgeSource;
+import meta.claw.core.knowledge.source.AssetRef;
+import meta.claw.core.knowledge.source.ExtractedDocument;
+import meta.claw.core.knowledge.source.KnowledgeSource;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.rendering.PDFRenderer;
@@ -1575,11 +1575,11 @@ public class PdfExtractor implements ContentExtractor {
 - [ ] **Step 3: Write unit test with a tiny PDF**
 
 ```java
-package meta.claw.tool.knowledge.extract;
+package meta.claw.core.knowledge.extract;
 
-import meta.claw.tool.knowledge.asset.LocalAssetManager;
-import meta.claw.tool.knowledge.source.ExtractedDocument;
-import meta.claw.tool.knowledge.source.KnowledgeSource;
+import meta.claw.core.knowledge.asset.LocalAssetManager;
+import meta.claw.core.knowledge.source.ExtractedDocument;
+import meta.claw.core.knowledge.source.KnowledgeSource;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
@@ -1660,8 +1660,8 @@ Expected: BUILD SUCCESS
 
 ```bash
 git add meta-claw-tool/pom.xml
-"meta-claw-tool/src/main/java/meta/claw/tool/knowledge/extract/PdfExtractor.java"
-"meta-claw-tool/src/test/java/meta/claw/tool/knowledge/extract/PdfExtractorTest.java"
+"meta-claw-core/src/main/java/meta/claw/core/knowledge/extract/PdfExtractor.java"
+"meta-claw-core/src/test/java/meta/claw/core/knowledge/extract/PdfExtractorTest.java"
 git commit -m "feat(knowledge): add PdfExtractor with text and page image description"
 ```
 
@@ -1669,18 +1669,18 @@ git commit -m "feat(knowledge): add PdfExtractor with text and page image descri
 ## Task 12: Implement video extraction for Douyin links
 
 **Files:**
-- Create: `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/extract/video/VideoExtractor.java`
-- Create: `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/extract/video/YtDlpVideoExtractor.java`
-- Create: `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/extract/video/DouyinVideoExtractor.java`
-- Create: `meta-claw-tool/src/test/java/meta/claw/tool/knowledge/extract/video/DouyinVideoExtractorTest.java`
+- Create: `meta-claw-core/src/main/java/meta/claw/core/knowledge/extract/video/VideoExtractor.java`
+- Create: `meta-claw-core/src/main/java/meta/claw/core/knowledge/extract/video/YtDlpVideoExtractor.java`
+- Create: `meta-claw-core/src/main/java/meta/claw/core/knowledge/extract/video/DouyinVideoExtractor.java`
+- Create: `meta-claw-core/src/test/java/meta/claw/core/knowledge/extract/video/DouyinVideoExtractorTest.java`
 
 - [ ] **Step 1: Write `VideoExtractor` interface**
 
 ```java
-package meta.claw.tool.knowledge.extract.video;
+package meta.claw.core.knowledge.extract.video;
 
-import meta.claw.tool.knowledge.extract.ExtractionContext;
-import meta.claw.tool.knowledge.source.ExtractedDocument;
+import meta.claw.core.knowledge.extract.ExtractionContext;
+import meta.claw.core.knowledge.source.ExtractedDocument;
 
 import java.net.URI;
 
@@ -1693,12 +1693,12 @@ public interface VideoExtractor {
 - [ ] **Step 2: Write `YtDlpVideoExtractor` adapter**
 
 ```java
-package meta.claw.tool.knowledge.extract.video;
+package meta.claw.core.knowledge.extract.video;
 
 import lombok.extern.slf4j.Slf4j;
-import meta.claw.tool.knowledge.extract.ExtractionContext;
-import meta.claw.tool.knowledge.source.AssetRef;
-import meta.claw.tool.knowledge.source.ExtractedDocument;
+import meta.claw.core.knowledge.extract.ExtractionContext;
+import meta.claw.core.knowledge.source.AssetRef;
+import meta.claw.core.knowledge.source.ExtractedDocument;
 import org.springframework.stereotype.Component;
 
 import java.io.BufferedReader;
@@ -1725,7 +1725,7 @@ public class YtDlpVideoExtractor implements VideoExtractor {
     @Override
     public ExtractedDocument extract(URI uri, ExtractionContext ctx) throws Exception {
         AssetRef asset = ctx.getAssetManager().store(
-                meta.claw.tool.knowledge.source.KnowledgeSource.builder()
+                meta.claw.core.knowledge.source.KnowledgeSource.builder()
                         .mediaType("video/url.douyin")
                         .uri(uri)
                         .originalName("douyin_video")
@@ -1822,12 +1822,12 @@ public class YtDlpVideoExtractor implements VideoExtractor {
 - [ ] **Step 3: Write `DouyinVideoExtractor` as a thin wrapper**
 
 ```java
-package meta.claw.tool.knowledge.extract.video;
+package meta.claw.core.knowledge.extract.video;
 
-import meta.claw.tool.knowledge.extract.ContentExtractor;
-import meta.claw.tool.knowledge.extract.ExtractionContext;
-import meta.claw.tool.knowledge.source.ExtractedDocument;
-import meta.claw.tool.knowledge.source.KnowledgeSource;
+import meta.claw.core.knowledge.extract.ContentExtractor;
+import meta.claw.core.knowledge.extract.ExtractionContext;
+import meta.claw.core.knowledge.source.ExtractedDocument;
+import meta.claw.core.knowledge.source.KnowledgeSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -1868,12 +1868,12 @@ public class DouyinVideoExtractor implements ContentExtractor {
 - [ ] **Step 4: Write a skipped-by-default integration test**
 
 ```java
-package meta.claw.tool.knowledge.extract.video;
+package meta.claw.core.knowledge.extract.video;
 
-import meta.claw.tool.knowledge.asset.LocalAssetManager;
-import meta.claw.tool.knowledge.extract.ExtractionContext;
-import meta.claw.tool.knowledge.source.ExtractedDocument;
-import meta.claw.tool.knowledge.source.KnowledgeSource;
+import meta.claw.core.knowledge.asset.LocalAssetManager;
+import meta.claw.core.knowledge.extract.ExtractionContext;
+import meta.claw.core.knowledge.source.ExtractedDocument;
+import meta.claw.core.knowledge.source.KnowledgeSource;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIf;
 import org.junit.jupiter.api.io.TempDir;
@@ -1928,8 +1928,8 @@ class DouyinVideoExtractorTest {
 - [ ] **Step 5: Commit**
 
 ```bash
-git add meta-claw-tool/src/main/java/meta/claw/tool/knowledge/extract/video/
-"meta-claw-tool/src/test/java/meta/claw/tool/knowledge/extract/video/"
+git add meta-claw-core/src/main/java/meta/claw/core/knowledge/extract/video/
+"meta-claw-core/src/test/java/meta/claw/core/knowledge/extract/video/"
 git commit -m "feat(knowledge): add Douyin video extraction via yt-dlp adapter"
 ```
 
@@ -2024,7 +2024,7 @@ import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import meta.claw.core.infra.ProjectRootFinder;
-import meta.claw.tool.knowledge.source.KnowledgeSource;
+import meta.claw.core.knowledge.source.KnowledgeSource;
 ```
 
 - [ ] **Step 4: Add unit tests for new tool methods**
@@ -2062,8 +2062,8 @@ git commit -m "feat(knowledge): add knowledgeAcquireFromFile and knowledgeAcquir
 ## Task 14: Extend retrieval to include extracted asset text
 
 **Files:**
-- Modify: `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/GitManager.java:134-167`
-- Modify: `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/KnowledgeManager.java:211-274`
+- Modify: `meta-claw-core/src/main/java/meta/claw/core/knowledge/GitManager.java:134-167`
+- Modify: `meta-claw-core/src/main/java/meta/claw/core/knowledge/KnowledgeManager.java:211-274`
 
 - [ ] **Step 1: Modify `GitManager.grepFiles` to accept glob patterns**
 
@@ -2173,8 +2173,8 @@ Expected: BUILD SUCCESS
 - [ ] **Step 5: Commit**
 
 ```bash
-git add meta-claw-tool/src/main/java/meta/claw/tool/knowledge/GitManager.java
-"meta-claw-tool/src/main/java/meta/claw/tool/knowledge/KnowledgeManager.java"
+git add meta-claw-core/src/main/java/meta/claw/core/knowledge/GitManager.java
+"meta-claw-core/src/main/java/meta/claw/core/knowledge/KnowledgeManager.java"
 "meta-claw-tool/src/test/java/meta/claw/tool/KnowledgeToolTest.java"
 git commit -m "feat(knowledge): extend retrieval to search extracted asset markdown"
 ```
@@ -2184,23 +2184,23 @@ git commit -m "feat(knowledge): extend retrieval to search extracted asset markd
 ## Task 15: End-to-end smoke test
 
 **Files:**
-- Create: `meta-claw-tool/src/test/java/meta/claw/tool/knowledge/KnowledgeAcquisitionSmokeTest.java`
+- Create: `meta-claw-core/src/test/java/meta/claw/core/knowledge/KnowledgeAcquisitionSmokeTest.java`
 
 - [ ] **Step 1: Write smoke test for text + image + PDF acquisition flow**
 
 ```java
-package meta.claw.tool.knowledge;
+package meta.claw.core.knowledge;
 
 import meta.claw.core.llm.SpiChatRequest;
 import meta.claw.core.llm.SpiChatResponse;
 import meta.claw.core.llm.SpiLlmClient;
 import meta.claw.core.runtime.VesselContext;
 import meta.claw.tool.KnowledgeTool;
-import meta.claw.tool.knowledge.asset.AssetManager;
-import meta.claw.tool.knowledge.asset.LocalAssetManager;
-import meta.claw.tool.knowledge.extract.*;
-import meta.claw.tool.knowledge.multimodal.ModelCapability;
-import meta.claw.tool.knowledge.multimodal.MultimodalConfig;
+import meta.claw.core.knowledge.asset.AssetManager;
+import meta.claw.core.knowledge.asset.LocalAssetManager;
+import meta.claw.core.knowledge.extract.*;
+import meta.claw.core.knowledge.multimodal.ModelCapability;
+import meta.claw.core.knowledge.multimodal.MultimodalConfig;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -2299,7 +2299,7 @@ Expected: BUILD SUCCESS
 - [ ] **Step 3: Commit**
 
 ```bash
-git add meta-claw-tool/src/test/java/meta/claw/tool/knowledge/KnowledgeAcquisitionSmokeTest.java
+git add meta-claw-core/src/test/java/meta/claw/core/knowledge/KnowledgeAcquisitionSmokeTest.java
 git commit -m "test(knowledge): add multimodal knowledge acquisition smoke test"
 ```
 

@@ -10,7 +10,6 @@ import meta.claw.core.llm.SpiStreamingCallback;
 import meta.claw.core.llm.SpiUsage;
 import meta.claw.core.llm.provider.LlmClientProviderManager;
 import meta.claw.core.tool.SpiToolCall;
-import meta.claw.core.tool.registry.ToolRegistry;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.AssistantMessage;
@@ -56,8 +55,6 @@ class LlmClientManagerStreamWithToolsTest {
         when(providerManager.createRaw(any(ProviderConfig.class)))
                 .thenReturn(ChatClient.builder(new StubChatModel()).build());
         ReflectionTestUtils.setField(manager, "llmClientProviderManager", providerManager);
-
-        ReflectionTestUtils.setField(manager, "toolRegistry", mock(ToolRegistry.class));
 
         ToolCallback toolCallback = mock(ToolCallback.class);
         ToolDefinition definition = mock(ToolDefinition.class);

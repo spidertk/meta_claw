@@ -10,7 +10,6 @@ import meta.claw.core.llm.SpiStreamingCallback;
 import meta.claw.core.llm.provider.LlmClientProviderManager;
 import meta.claw.core.memory.MemoryMessage;
 import meta.claw.core.memory.MemoryMessageConverter;
-import meta.claw.core.tool.registry.ToolRegistry;
 import meta.claw.core.config.resolver.RuntimeConfigResolver;
 import meta.claw.core.llm.SpiUsage;
 import meta.claw.core.tool.SpiToolCall;
@@ -28,7 +27,6 @@ import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.model.tool.ToolCallingChatOptions;
-import org.springframework.ai.support.ToolCallbacks;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -52,9 +50,6 @@ public class LlmClientManager implements SpiLlmClient {
     private LlmClientProviderManager llmClientProviderManager;
     @Autowired
     private RuntimeConfigResolver runtimeConfigResolver;
-
-    @Autowired
-    private ToolRegistry toolRegistry;
 
     @Autowired(required = false)
     private MetricsRecorder metricsRecorder;
@@ -95,14 +90,9 @@ public class LlmClientManager implements SpiLlmClient {
                 .map(this::toSpringMessage)
                 .collect(Collectors.toCollection(ArrayList::new));
 
-        List<Object> toolInstances = toolRegistry.getToolInstances();
-        logRequestParams(messages, toolInstances);
-
-        ToolCallingChatOptions toolOptions = buildToolOptions(toolInstances);
-
         long startTime = System.currentTimeMillis();
         ChatResponse chatResponse = buildChatClient(request.getVesselId())
-                .prompt(new Prompt(messages, toolOptions))
+                .prompt(new Prompt(messages))
                 .call()
                 .chatResponse();
         long latency = System.currentTimeMillis() - startTime;
@@ -263,14 +253,9 @@ public class LlmClientManager implements SpiLlmClient {
         java.util.Map<String, AssistantMessage.ToolCall> accumulatingToolCalls = new java.util.LinkedHashMap<>();
         ObjectMapper objectMapper = new ObjectMapper();
 
-        List<Object> toolInstances = toolRegistry.getToolInstances();
-        logRequestParams(messages, toolInstances);
-
         try {
-            ToolCallingChatOptions toolOptions = buildToolOptions(toolInstances);
-
             buildChatClient(request.getVesselId())
-                    .prompt(new Prompt(messages, toolOptions))
+                    .prompt(new Prompt(messages))
                     .advisors(spec -> spec
                             .param("vesselName", request.getVesselId())
                             .param("sessionId", request.getSessionId()))
@@ -464,16 +449,6 @@ public class LlmClientManager implements SpiLlmClient {
         return llmClientProviderManager.createRaw(providerConfig);
     }
 
-    private ToolCallingChatOptions buildToolOptions(List<Object> toolInstances) {
-        List<ToolCallback> callbacks = toolInstances.isEmpty()
-                ? List.of()
-                : Arrays.asList(ToolCallbacks.from(toolInstances.toArray()));
-        return ToolCallingChatOptions.builder()
-                .toolCallbacks(callbacks)
-                .internalToolExecutionEnabled(false)
-                .build();
-    }
-
     private static List<SpiToolCall> extractToolCalls(Generation gen) {
         List<SpiToolCall> result = new ArrayList<>();
         if (gen == null || !(gen.getOutput() instanceof AssistantMessage am) || !am.hasToolCalls()) {
@@ -489,27 +464,6 @@ public class LlmClientManager implements SpiLlmClient {
             }
         }
         return result;
-    }
-
-    private void logRequestParams(List<Message> messages, List<Object> toolInstances) {
-        if (!log.isDebugEnabled()) {
-            return;
-        }
-        try {
-            List<Map<String, Object>> msgList = new ArrayList<>();
-            for (Message m : messages) {
-                Map<String, Object> map = new LinkedHashMap<>();
-                map.put("role", m.getMessageType().getValue());
-                map.put("content", m.getText());
-                msgList.add(map);
-            }
-            String msgsJson = new com.fasterxml.jackson.databind.ObjectMapper()
-                    .writerWithDefaultPrettyPrinter()
-                    .writeValueAsString(msgList);
-            log.debug("[LLM-REQUEST] messages={}\n[LLM-REQUEST] tools count={}", msgsJson, toolInstances.size());
-        } catch (Exception e) {
-            log.error("[LLM-REQUEST] messages count={}, tools count={}, err={}", messages.size(), toolInstances.size(), e.getMessage(), e);
-        }
     }
 
     private Message toSpringMessage(SpiMessage msg) {
