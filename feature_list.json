@@ -1103,6 +1103,30 @@
         }
       ],
       "notes": "Task 8 已完成。当前 MultimodalConfig 默认 enabled=false，因此文本知识 acquisitions 仍走文本路径；启用多模态并配置支持媒体类型后，图片资源将自动进入多模态分析。"
+    },
+    {
+      "id": "multimodal-knowledge-006",
+      "priority": 34,
+      "area": "knowledge",
+      "title": "ImageExtractor：图片资源提取与视觉描述",
+      "user_visible_behavior": "meta-claw-tool 的 knowledge 子系统支持 image/* 类型的 KnowledgeSource；ImageExtractor 将图片持久化为资产，调用 VisionDescriber 获取 LLM 视觉描述，并生成包含图片描述与资产引用的 markdownBody。",
+      "status": "passing",
+      "verification": [
+        "创建 VisionDescriber，作为 @Component 注入 SpiLlmClient，提供 describe(Path, String mimeType)。",
+        "VisionDescriber 在 llmClient 为空时返回占位符；构造 image_url 类型的 MediaPart 并调用 LLM；异常时返回错误占位符。",
+        "创建 ImageExtractor 实现 ContentExtractor，supports 返回 mediaType 以 image/ 开头。",
+        "ImageExtractor.extract 调用 assetManager.store 持久化资源，再调用 visionDescriber.describe，最后生成包含 ![image](assets/{assetId}/{filename}) 的 markdownBody 与 embeddedAssets。",
+        "创建 ImageExtractorTest，mock VisionDescriber，使用内存 PNG 与 LocalAssetManager 验证描述与资产路径。",
+        "运行 mvn -pl meta-claw-tool -am test -Dtest=ImageExtractorTest -Dsurefire.failIfNoSpecifiedTests=false -q 并通过；全量 meta-claw-tool 测试仍通过。"
+      ],
+      "evidence": [
+        {
+          "date": "2026-06-29",
+          "result": "passing",
+          "detail": "mvn -pl meta-claw-tool -am test -Dtest=ImageExtractorTest -Dsurefire.failIfNoSpecifiedTests=false -q BUILD SUCCESS；ImageExtractorTest 1/1 通过；mvn -pl meta-claw-tool -am test -q BUILD SUCCESS（tool 模块全部测试通过）。"
+        }
+      ],
+      "notes": "Task 9 已完成。VisionDescriber 与 ImageExtractor 均为 Spring @Component，可被 ContentExtractorService 自动收集。"
     }
   ]
 }

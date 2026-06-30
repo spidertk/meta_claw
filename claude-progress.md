@@ -25,7 +25,8 @@
 - 最近已通过证据 17：2026-06-30 实现 multimodal knowledge extension 计划的 Task 5：创建 `LocalAssetManager`，按 `.meta-claw/vessels/<vesselId>/assets/<assetId>/original.<ext>` 持久化 `KnowledgeSource` 的 stream、uri 或 text/plain content；新增 `LocalAssetManagerTest` 覆盖 text/plain content 存储；定向测试 BUILD SUCCESS，Tests run: 1, Failures: 0, Errors: 0, Skipped: 0
 - 最近已通过证据 18：2026-06-30 实现 multimodal knowledge extension 计划的 Task 6：重构 `KnowledgeManager.acquire` 以使用 `KnowledgeSource`；`KnowledgeManager` 注入 `ContentExtractorService` 与 `AssetManager`，`acquire` 方法改为接收 `KnowledgeSource`，先 `assetManager.store` 持久化原始资源，再 `extractorService.extract` 得到 `ExtractedDocument`，使用 `doc.getMarkdownBody()` 提取关键词与分析；`executeAcquire` 写入 `source_asset`、`media_type`、`multimodal_used` 到 `KnowledgeEntry.extra`；`KnowledgeTool.knowledgeAcquire` 保持现有 `@Tool` 签名，内部将文本包装为 `text/plain` 的 `KnowledgeSource`；更新 `KnowledgeToolTest` 注入新依赖；定向测试 `mvn -pl meta-claw-tool -am test -Dtest=KnowledgeToolTest -Dsurefire.failIfNoSpecifiedTests=false -q` BUILD SUCCESS，全量 `mvn -pl meta-claw-tool -am test -q` 46 个测试全部通过
 - 最近已通过证据 19：2026-06-30 实现 multimodal knowledge extension 计划的 Task 8：让 `KnowledgeAnalyzer` multimodal-aware；`KnowledgeAnalyzer` 构造方法注入 `ModelCapability`，`analyze(ExtractedDocument,...)` 在 `supportsMultimodal() && hasVisualAssets(doc) && supportsMediaType(doc.getMediaType())` 时走多模态路径，将最多 5 张图片转为 `MediaPart` 随 prompt 发送，解析后设置 `multimodalUsed=true`，异常时回退到文本分析；更新 `KnowledgeToolTest.setUp` 构造 `MultimodalConfig` / `ModelCapability` 并传入 `KnowledgeAnalyzer`；定向测试 `mvn -pl meta-claw-tool -am test -Dtest=KnowledgeToolTest -Dsurefire.failIfNoSpecifiedTests=false -q` BUILD SUCCESS，`KnowledgeToolTest` 14 个测试全部通过；全量 `./init.sh` BUILD SUCCESS，9 个 reactor 模块全部 SUCCESS，core 112 个测试、tool 18 个测试全部通过
-- 当前最高优先级未完成功能：multimodal-knowledge-001/002/003/004/005 已完成 Task 4、Task 5、Task 6、Task 7 与 Task 8；按 `2026-06-29-multimodal-knowledge-extension-plan.md` 下一步为 Task 9：实现 `ImageExtractor`
+- 最近已通过证据 20：2026-06-29 实现 multimodal knowledge extension 计划的 Task 9：新增 `VisionDescriber` 与 `ImageExtractor`；`VisionDescriber` 作为 `@Component` 注入 `SpiLlmClient`，将图片路径转为 `image_url` 类型的 `MediaPart` 并调用 LLM 获取中文描述；`ImageExtractor` 实现 `ContentExtractor`，支持 `image/*`，先 `assetManager.store` 持久化图片，再调用 `visionDescriber.describe`，生成包含描述与 `![image](assets/{assetId}/{filename})` 的 markdownBody；新增 `ImageExtractorTest`，mock `VisionDescriber` 并用内存 PNG + `LocalAssetManager` 验证描述与资产路径；定向测试 `mvn -pl meta-claw-tool -am test -Dtest=ImageExtractorTest -Dsurefire.failIfNoSpecifiedTests=false -q` BUILD SUCCESS，`ImageExtractorTest` 1/1 通过；全量 `mvn -pl meta-claw-tool -am test -q` BUILD SUCCESS，tool 模块全部测试通过
+- 当前最高优先级未完成功能：multimodal-knowledge-001/002/003/004/005/006 已完成 Task 4、Task 5、Task 6、Task 7、Task 8 与 Task 9；按 `2026-06-29-multimodal-knowledge-extension-plan.md` 下一步为 Task 10：扩展 `KnowledgeEntry` frontmatter 以支持资产引用
 - 当前 blocker：
   1. 当前无 blocker
 
@@ -181,6 +182,42 @@
 - 下一步最佳动作：
   1. 提交本轮修改。
   2. 继续执行 Task 9：实现 `ImageExtractor`。
+
+### Session 069
+
+- 日期：2026-06-29
+- 本轮目标：实现 multimodal knowledge extension 计划的 Task 9：新增 `VisionDescriber` 与 `ImageExtractor`，使图片知识源可被持久化、描述并生成包含资产引用的 markdownBody。
+- 实现：
+  - 在 `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/extract/` 下新增 `VisionDescriber`，标记为 `@Component`，通过构造方法注入 `SpiLlmClient`。
+    - `describe(Path, String)` 在 `llmClient` 为空时返回 `[Image: filename]` 占位符。
+    - 构造 `MediaPart`（type=image_url，url=imagePath.toUri().toString()，mimeType）。
+    - 使用 prompt "请用一段简洁的中文描述这张图片的内容，提取其中的文字和关键信息。" 与上述 `MediaPart` 调用 `llmClient.chat`，返回 `response.content()`；异常时返回 `[Failed to describe image: filename]`。
+  - 新增 `ImageExtractor`，实现 `ContentExtractor`，标记为 `@Component`，通过构造方法注入 `VisionDescriber`。
+    - `supports`：mediaType 以 `image/` 开头。
+    - `extract`：调用 `ctx.getAssetManager().store(source, ctx.getVesselId())` 持久化原图；调用 `visionDescriber.describe(asset.getOriginalPath(), source.getMediaType())` 获取描述；返回 `ExtractedDocument`，markdownBody 包含描述与 `![image](assets/{assetId}/{filename})`，`embeddedAssets` 包含该资产，`metadata` 含 width/height 占位 0。
+  - 新增 `ImageExtractorTest`：
+    - 使用 `@TempDir Path tempDir` 并将 `user.dir` 定向到 tempDir，在 `tearDown` 中恢复原始 `user.dir`。
+    - 用 `ImageIO` 在内存中生成 10x10 PNG。
+    - mock `VisionDescriber`，返回 "A red square"。
+    - 构造 `LocalAssetManager` 与 `ImageExtractor`，执行 extract 后断言 markdownBody 含描述且资产路径以 `.png` 结尾。
+- 运行过的验证：
+  - `export JAVA_HOME=/Users/kai/.local/jdks/jdk-21.0.10+7/Contents/Home && /Users/kai/.local/tools/apache-maven-3.9.15/bin/mvn -pl meta-claw-tool -am test -Dtest=ImageExtractorTest -Dsurefire.failIfNoSpecifiedTests=false -q` → BUILD SUCCESS，`ImageExtractorTest` 1/1 通过。
+  - `export JAVA_HOME=/Users/kai/.local/jdks/jdk-21.0.10+7/Contents/Home && /Users/kai/.local/tools/apache-maven-3.9.15/bin/mvn -pl meta-claw-tool -am test -q` → BUILD SUCCESS，tool 模块全部测试通过。
+- 已记录证据：
+  - `feature_list.json` 已新增 `multimodal-knowledge-006` 并标记为 passing。
+  - `clean-state-checklist.md` 已更新。
+- 更新过的文件或工件：
+  - `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/extract/VisionDescriber.java`（新增）
+  - `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/extract/ImageExtractor.java`（新增）
+  - `meta-claw-tool/src/test/java/meta/claw/tool/knowledge/extract/ImageExtractorTest.java`（新增）
+  - `feature_list.json`
+  - `claude-progress.md`
+  - `clean-state-checklist.md`
+- 已知风险或未解决的问题：
+  - `VisionDescriber` 目前使用 `image_url` 形式的 `MediaPart`，依赖 LLM provider 能从本地文件 URI 或 HTTP URL 读取图片；真实多模态启用后需在真实 provider 上验证。
+- 下一步最佳动作：
+  1. 提交本轮修改。
+  2. 继续执行 Task 10：扩展 `KnowledgeEntry` frontmatter 以支持资产引用。
 
 ### Session 064
 
