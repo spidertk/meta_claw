@@ -2,6 +2,7 @@ package meta.claw.core.runtime.engine;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import meta.claw.core.llm.MediaPart;
 import meta.claw.core.llm.SpiMessage;
 import meta.claw.core.tool.SpiToolCall;
 import org.springframework.ai.chat.messages.AssistantMessage;
@@ -9,7 +10,9 @@ import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.ToolResponseMessage;
 import org.springframework.ai.chat.messages.UserMessage;
+import org.springframework.util.MimeType;
 
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -39,7 +42,17 @@ public final class SpiMessageConverter {
         String role = m.getRole() != null ? m.getRole().toLowerCase() : "";
         return switch (role) {
             case "system" -> new SystemMessage(m.getContent());
-            case "user" -> new UserMessage(m.getContent());
+            case "user" -> {
+                List<org.springframework.ai.content.Media> media = toSpringMedia(m.getMediaParts());
+                if (media.isEmpty()) {
+                    yield new UserMessage(m.getContent());
+                } else {
+                    yield UserMessage.builder()
+                            .text(m.getContent())
+                            .media(media)
+                            .build();
+                }
+            }
             case "assistant" -> {
                 java.util.Map<String, Object> properties = new java.util.HashMap<>();
                 if (m.getReasoningContent() != null && !m.getReasoningContent().isEmpty()) {
@@ -70,6 +83,20 @@ public final class SpiMessageConverter {
             }
             default -> new UserMessage(m.getContent());
         };
+    }
+
+    private static List<org.springframework.ai.content.Media> toSpringMedia(List<MediaPart> parts) {
+        if (parts == null || parts.isEmpty()) {
+            return List.of();
+        }
+        return parts.stream()
+                .map(part -> {
+                    String mimeType = part.getMimeType() != null ? part.getMimeType() : "image/png";
+                    return new org.springframework.ai.content.Media(
+                            MimeType.valueOf(mimeType),
+                            URI.create(part.getUrl()));
+                })
+                .collect(Collectors.toList());
     }
 
     private static List<AssistantMessage.ToolCall> toSpringToolCalls(List<SpiToolCall> toolCalls) {
