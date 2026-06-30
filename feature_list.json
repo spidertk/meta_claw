@@ -1004,10 +1004,33 @@
         {
           "date": "2026-06-30",
           "result": "passing",
-          "detail": "ContentExtractorServiceTest 2/2 通过；TextExtractor 将 KnowledgeSource.content 原样返回为 markdownBody；image/png 场景正确抛出 UnsupportedOperationException。"
+          "detail": "LocalAssetManagerTest 1/1 通过；text/plain content 被写入 .meta-claw/vessels/v1/assets/<assetId>/original.txt；load 与 resolvePath 按 originalPath 返回。"
         }
       ],
-      "notes": "Task 4 已完成。AssetManager 接口已提前创建以让 ExtractionContext 编译通过，具体 LocalAssetManager 实现属于 Task 5。"
+      "notes": "Task 5 已完成。LocalAssetManager 为 @Component，store 方法根据 sourceId 或 8 位 UUID 生成 assetId，并按 mediaType 选择扩展名。"
+    },
+    {
+      "id": "multimodal-knowledge-002",
+      "priority": 30,
+      "area": "knowledge",
+      "title": "LocalAssetManager：按 Vessel 持久化原始资源",
+      "user_visible_behavior": "meta-claw-tool 的 knowledge 子系统能够将 KnowledgeSource 中的文本、流或 URI 资源持久化到 `.meta-claw/vessels/<vesselId>/assets/<assetId>/original.<ext>`，并提供 load 与 resolvePath 能力。",
+      "status": "passing",
+      "verification": [
+        "创建 LocalAssetManager 实现 AssetManager 接口，标记为 @Component。",
+        "按 ProjectRootFinder.getMetaClawDir()/vessels/<vesselId>/assets/<assetId> 目录结构存储资源。",
+        "根据 mediaType 决定扩展名；支持 stream、uri、text/plain content 三种来源。",
+        "创建 LocalAssetManagerTest 覆盖 text/plain content 的存储与读取。",
+        "运行 mvn -pl meta-claw-tool -am test -Dtest=LocalAssetManagerTest -Dsurefire.failIfNoSpecifiedTests=false -q 并通过。"
+      ],
+      "evidence": [
+        {
+          "date": "2026-06-30",
+          "result": "passing",
+          "detail": "LocalAssetManagerTest 1/1 通过；text/plain content 被写入 .meta-claw/vessels/v1/assets/<assetId>/original.txt；load 与 resolvePath 按 originalPath 返回。"
+        }
+      ],
+      "notes": "Task 5 已完成。LocalAssetManager 为 @Component，store 方法根据 sourceId 或 8 位 UUID 生成 assetId，并按 mediaType 选择扩展名。"
     }
   ]
 }

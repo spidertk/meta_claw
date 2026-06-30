@@ -22,7 +22,8 @@
 - 最近已通过证据 14：2026-06-25 修复 Moonshot 流式调用偶发 `Connection prematurely closed BEFORE response`：根因是连接池 `maxIdleTime` 过长（5 分钟），复用到已被 Moonshot 服务端关闭的 stale connection；将 `OpenAiWebClientFactory` 的 `maxIdleTime` 缩短为 45 秒、`evictInBackground` 缩短为 15 秒，并开启 `SO_KEEPALIVE`；`OpenAiLlmClientProvider` 将 provider 配置的 `timeout` 透传给 WebClient/RestClient 的 response/read timeout；重新执行 `./init.sh` 通过，core 107 个测试全部通过，tool 模块 18 个测试全部通过
 - 最近已通过证据 15：2026-06-26 修复 Spring AI 1.1.8 `OpenAiChatModel` 硬编码 `reasoningContent = null` 导致的 OpenAI 兼容 provider 请求丢失真实 reasoning_content 的问题：参考 Spring AI Alibaba Playground 的 `ReasoningContentAdvisor` 模式，新增 `OpenAiReasoningContentAdvisor` 在 `before()` 阶段从 outgoing `Prompt` 的 `AssistantMessage.metadata` 提取 reasoningContent 并写入 `OpenAiReasoningContentContext`，`OpenAiReasoningContentModule` 在序列化 `OpenAiApi.ChatCompletionMessage` 时从上下文读取并回填 `reasoning_content` 字段；将原 `MoonshotSerializerModule` 重命名为通用 `OpenAiReasoningContentModule`；在 `OpenAiLlmClientProvider` 的 `buildChatClient()` 与 `createRaw()` 中统一注册 Advisor 与 Module（`streamWithTools`/`chatWithTools` 使用 `createRaw`，最初漏注册导致真实 CLI 日志中仍为空字符串，已补齐）；新增 `OpenAiReasoningContentContextTest`、`OpenAiReasoningContentModuleTest`、`OpenAiReasoningContentAdvisorTest`；重新执行 `./init.sh` 通过，core 107 个测试全部通过，tool 模块 18 个测试全部通过
 - 最近已通过证据 16：2026-06-26 进一步彻底解决跨线程丢失问题：用同包 subclass `ReasoningAwareOpenAiChatModel` 重写 package-private 的 `OpenAiChatModel.createRequest(Prompt, boolean)`，在父类构造完 `ChatCompletionRequest` 后通过 Jackson 直接修改 messages，从原始 Prompt 的 `AssistantMessage.metadata` 回填真实 `reasoning_content`；删除不再需要的 ThreadLocal 桥（`OpenAiReasoningContentContext`、`OpenAiReasoningContentAdvisor`、`OpenAiReasoningContentModule` 及其测试）；`OpenAiLlmClientProvider.buildChatModel()` 改为返回 `ReasoningAwareOpenAiChatModel`；新增 `ReasoningAwareOpenAiChatModelTest`（2 个用例）验证 assistant tool-call 消息的真实 reasoning_content 被回填；将新测试纳入 `init.sh` P0 基线；重新执行 `./init.sh` 通过，core 112 个测试全部通过，tool 模块 18 个测试全部通过
-- 当前最高优先级未完成功能：agent-engine-001（Agent 执行引擎抽象：native / alibaba 双实现设计）Phase 0+1+2+3+4+5+6 已全部实现完成；下一步为真实 LLM 端到端验证或处理其他优先级功能
+- 最近已通过证据 17：2026-06-30 实现 multimodal knowledge extension 计划的 Task 5：创建 `LocalAssetManager`，按 `.meta-claw/vessels/<vesselId>/assets/<assetId>/original.<ext>` 持久化 `KnowledgeSource` 的 stream、uri 或 text/plain content；新增 `LocalAssetManagerTest` 覆盖 text/plain content 存储；定向测试 BUILD SUCCESS，Tests run: 1, Failures: 0, Errors: 0, Skipped: 0
+- 当前最高优先级未完成功能：multimodal-knowledge-001/002 已完成 Task 4 与 Task 5；按 `2026-06-29-multimodal-knowledge-extension-plan.md` 下一步为 Task 6：重构 `KnowledgeManager.acquire` 以使用 `KnowledgeSource`
 - 当前 blocker：
   1. 当前无 blocker
 
@@ -50,6 +51,34 @@
 - `serve/start/stop/restart/status/logs`、工具引擎、MCP、Skill 系统仍未实现
 
 ## 会话记录
+
+### Session 065
+
+- 日期：2026-06-30
+- 本轮目标：实现 multimodal knowledge extension 计划的 Task 5：创建 `LocalAssetManager`，补充单元测试，并更新状态文件。
+- 实现：
+  - 在 `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/asset/` 下新增 `LocalAssetManager`，实现 `AssetManager` 接口并标记为 `@Component`。
+  - `store(KnowledgeSource, vesselId)` 根据 `sourceId` 或 8 位 UUID 生成 `assetId`，目录为 `ProjectRootFinder.getMetaClawDir().resolve("vessels").resolve(vesselId).resolve("assets").resolve(assetId)`。
+  - 按 `mediaType` 选择扩展名（`.txt`、`.png`、`.jpg`、`.webp`、`.pdf`、`.mp4`），将原始资源写入 `original<ext>`。
+  - 支持三种来源：优先 `InputStream`，其次 `URI`，再次 text/plain 的 `content`。
+  - 实现 `load(AssetRef)` 与 `resolvePath(AssetRef)`，均基于 `AssetRef.originalPath`。
+  - 新增 `LocalAssetManagerTest`，使用 `@TempDir Path tempDir` 并将 `user.dir` 设置为 tempDir，验证 text/plain content 能正确落盘并回读。
+- 运行过的验证：
+  - `export JAVA_HOME=/Users/kai/.local/jdks/jdk-21.0.10+7/Contents/Home && /Users/kai/.local/tools/apache-maven-3.9.15/bin/mvn -pl meta-claw-tool -am test -Dtest=LocalAssetManagerTest -Dsurefire.failIfNoSpecifiedTests=false -q` → BUILD SUCCESS，Tests run: 1, Failures: 0, Errors: 0, Skipped: 0。
+- 已记录证据：
+  - `feature_list.json` 已新增 `multimodal-knowledge-002` 并标记为 passing。
+  - `clean-state-checklist.md` 已更新。
+- 更新过的文件或工件：
+  - `meta-claw-tool/src/main/java/meta/claw/tool/knowledge/asset/LocalAssetManager.java`（新增）
+  - `meta-claw-tool/src/test/java/meta/claw/tool/knowledge/asset/LocalAssetManagerTest.java`（新增）
+  - `feature_list.json`
+  - `claude-progress.md`
+  - `clean-state-checklist.md`
+- 已知风险或未解决的问题：
+  - 当前完成 Task 5；下一步按实施计划执行 Task 6：重构 `KnowledgeManager.acquire` 以使用 `KnowledgeSource`，并接入 `ContentExtractorService` / `AssetManager`。
+- 下一步最佳动作：
+  1. 提交本轮修改。
+  2. 继续执行 Task 6：重构 `KnowledgeManager.acquire`。
 
 ### Session 064
 
