@@ -1,8 +1,11 @@
 package meta.claw.tool.knowledge.extract;
 
-import meta.claw.tool.knowledge.asset.LocalAssetManager;
-import meta.claw.tool.knowledge.source.ExtractedDocument;
-import meta.claw.tool.knowledge.source.KnowledgeSource;
+import meta.claw.core.knowledge.asset.LocalAssetManager;
+import meta.claw.core.knowledge.extract.ExtractionContext;
+import meta.claw.core.knowledge.extract.PdfExtractor;
+import meta.claw.core.knowledge.extract.VisionDescriber;
+import meta.claw.core.knowledge.source.ExtractedDocument;
+import meta.claw.core.knowledge.source.KnowledgeSource;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;

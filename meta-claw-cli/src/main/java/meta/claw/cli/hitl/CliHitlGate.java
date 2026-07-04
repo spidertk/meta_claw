@@ -5,6 +5,7 @@ import org.jline.reader.LineReader;
 import org.jline.terminal.Terminal;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
 
 import java.util.HashMap;
@@ -15,6 +16,7 @@ import java.util.Map;
  * <p>直接在控制台打印待审批工具并通过共享的 {@link LineReader} 读取用户输入。</p>
  */
 @Component
+@Primary
 @ConditionalOnProperty(name = "meta.claw.channel", havingValue = "cli", matchIfMissing = true)
 public class CliHitlGate implements HitlGate {
 

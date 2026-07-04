@@ -125,11 +125,16 @@ public class AgentExecutor {
             ctx.getMessages().add(SpiMessage.assistant(response.content(), response.reasoningContent(), response.toolCalls()));
 
             // 执行 tool calls 并将结果回注到消息列表
-            for (SpiToolCall tc : response.toolCalls()) {
-                String result = executeToolCall(toolMap.get(tc.getName()), tc);
-                recordToolCall(ctx, tc.getName());
-                messages.add(SpiMessage.tool(result, tc.getId(), tc.getName()));
-                ctx.getMessages().add(SpiMessage.tool(result, tc.getId(), tc.getName()));
+            VesselContext.setVesselId(request.getVesselId());
+            try {
+                for (SpiToolCall tc : response.toolCalls()) {
+                    String result = executeToolCall(toolMap.get(tc.getName()), tc);
+                    recordToolCall(ctx, tc.getName());
+                    messages.add(SpiMessage.tool(result, tc.getId(), tc.getName()));
+                    ctx.getMessages().add(SpiMessage.tool(result, tc.getId(), tc.getName()));
+                }
+            } finally {
+                VesselContext.clear();
             }
         }
 

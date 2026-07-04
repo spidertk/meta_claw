@@ -1,9 +1,11 @@
 package meta.claw.tool.knowledge.extract.video;
 
-import meta.claw.tool.knowledge.asset.LocalAssetManager;
-import meta.claw.tool.knowledge.extract.ExtractionContext;
-import meta.claw.tool.knowledge.source.ExtractedDocument;
-import meta.claw.tool.knowledge.source.KnowledgeSource;
+import meta.claw.core.knowledge.asset.LocalAssetManager;
+import meta.claw.core.knowledge.extract.ExtractionContext;
+import meta.claw.core.knowledge.extract.video.DouyinVideoExtractor;
+import meta.claw.core.knowledge.extract.video.YtDlpVideoExtractor;
+import meta.claw.core.knowledge.source.ExtractedDocument;
+import meta.claw.core.knowledge.source.KnowledgeSource;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIf;
 import org.junit.jupiter.api.io.TempDir;

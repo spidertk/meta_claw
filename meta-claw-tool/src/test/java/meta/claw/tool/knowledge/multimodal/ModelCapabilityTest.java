@@ -1,5 +1,7 @@
 package meta.claw.tool.knowledge.multimodal;
 
+import meta.claw.core.knowledge.multimodal.ModelCapability;
+import meta.claw.core.knowledge.multimodal.MultimodalConfig;
 import org.junit.jupiter.api.Test;
 
 import java.util.Set;

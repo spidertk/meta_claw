@@ -1,7 +1,8 @@
 package meta.claw.tool.knowledge.asset;
 
-import meta.claw.tool.knowledge.source.AssetRef;
-import meta.claw.tool.knowledge.source.KnowledgeSource;
+import meta.claw.core.knowledge.asset.LocalAssetManager;
+import meta.claw.core.knowledge.source.AssetRef;
+import meta.claw.core.knowledge.source.KnowledgeSource;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 

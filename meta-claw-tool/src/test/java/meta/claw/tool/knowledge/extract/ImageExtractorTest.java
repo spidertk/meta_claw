@@ -1,8 +1,11 @@
 package meta.claw.tool.knowledge.extract;
 
-import meta.claw.tool.knowledge.asset.LocalAssetManager;
-import meta.claw.tool.knowledge.source.ExtractedDocument;
-import meta.claw.tool.knowledge.source.KnowledgeSource;
+import meta.claw.core.knowledge.asset.LocalAssetManager;
+import meta.claw.core.knowledge.extract.ExtractionContext;
+import meta.claw.core.knowledge.extract.ImageExtractor;
+import meta.claw.core.knowledge.extract.VisionDescriber;
+import meta.claw.core.knowledge.source.ExtractedDocument;
+import meta.claw.core.knowledge.source.KnowledgeSource;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

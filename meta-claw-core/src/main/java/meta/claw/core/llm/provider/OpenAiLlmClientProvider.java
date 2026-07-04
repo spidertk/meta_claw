@@ -3,7 +3,11 @@ package meta.claw.core.llm.provider;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import meta.claw.core.config.ProviderConfig;
+import meta.claw.core.llm.advisor.MetaClawResponseCallAdvisor;
 import meta.claw.core.llm.advisor.ShortMemoryAdvisor;
+import meta.claw.core.llm.advisor.ToolRegistryAdvisor;
+import meta.claw.core.runtime.metrics.MetricsRecorder;
+import meta.claw.core.tool.registry.ToolRegistry;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.ToolCallAdvisor;
 import org.springframework.ai.chat.model.ChatModel;
@@ -11,6 +15,7 @@ import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.ai.openai.ReasoningAwareOpenAiChatModel;
 import org.springframework.ai.openai.api.OpenAiApi;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -33,6 +38,8 @@ import java.util.concurrent.ConcurrentHashMap;
 @Primary
 public class OpenAiLlmClientProvider implements LlmClientProvider {
 
+    @Autowired
+    private ApplicationContext applicationContext;
     @Autowired
     private ObjectMapper objectMapper;
     @Autowired
@@ -80,8 +87,12 @@ public class OpenAiLlmClientProvider implements LlmClientProvider {
 
     private ChatClient buildChatClient(ProviderConfig providerConfig) {
         ChatClient chatClient = ChatClient.builder(buildChatModel(providerConfig)).defaultAdvisors(
-                        ToolCallAdvisor.builder().build(),  // 外层：自动处理 tool calling 循环
-                        shortMemoryAdvisor                     // 内层：流式响应持久化到 ShortMemory
+                        ToolCallAdvisor.builder().build(),       // 外层：自动处理 tool calling 循环
+                        shortMemoryAdvisor,                        // 流式响应持久化到 ShortMemory
+                        new ToolRegistryAdvisor(applicationContext.getBean(ToolRegistry.class)),
+                        new MetaClawResponseCallAdvisor(
+                                applicationContext.getBeanProvider(MetricsRecorder.class).getIfAvailable(),
+                                objectMapper)
                 )
                 .build();
 

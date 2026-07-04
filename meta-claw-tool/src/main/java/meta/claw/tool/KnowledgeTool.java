@@ -1,14 +1,13 @@
 package meta.claw.tool;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import meta.claw.core.infra.ProjectRootFinder;
 import meta.claw.core.runtime.VesselContext;
 import meta.claw.core.tool.annotation.ToolService;
-import meta.claw.tool.knowledge.GitManager;
-import meta.claw.tool.knowledge.KnowledgeManager;
-import meta.claw.tool.knowledge.source.KnowledgeSource;
+import meta.claw.core.knowledge.GitManager;
+import meta.claw.core.knowledge.KnowledgeManager;
+import meta.claw.core.knowledge.source.KnowledgeSource;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -315,7 +314,7 @@ public class KnowledgeTool {
         String status = String.valueOf(result.getOrDefault("status", "unknown"));
         sb.append("Status: ").append(status).append("\n");
 
-        if ("needs_review".equals(status)) {
+                                                                                                                                                                if ("needs_review".equals(status)) {
             sb.append("Manual review required\n");
         }
 

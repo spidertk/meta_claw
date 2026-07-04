@@ -1,7 +1,10 @@
 package meta.claw.tool.knowledge.extract;
 
-import meta.claw.tool.knowledge.source.ExtractedDocument;
-import meta.claw.tool.knowledge.source.KnowledgeSource;
+import meta.claw.core.knowledge.extract.ContentExtractorService;
+import meta.claw.core.knowledge.extract.ExtractionContext;
+import meta.claw.core.knowledge.extract.TextExtractor;
+import meta.claw.core.knowledge.source.ExtractedDocument;
+import meta.claw.core.knowledge.source.KnowledgeSource;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;

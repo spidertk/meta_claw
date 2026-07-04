@@ -1,15 +1,18 @@
 package meta.claw.tool.knowledge;
 
+import meta.claw.core.knowledge.GitManager;
+import meta.claw.core.knowledge.KnowledgeAnalyzer;
+import meta.claw.core.knowledge.KnowledgeManager;
+import meta.claw.core.knowledge.asset.AssetManager;
+import meta.claw.core.knowledge.extract.*;
 import meta.claw.core.llm.SpiChatRequest;
 import meta.claw.core.llm.SpiChatResponse;
 import meta.claw.core.llm.SpiLlmClient;
 import meta.claw.core.runtime.VesselContext;
 import meta.claw.tool.KnowledgeTool;
-import meta.claw.tool.knowledge.asset.AssetManager;
-import meta.claw.tool.knowledge.asset.LocalAssetManager;
-import meta.claw.tool.knowledge.extract.*;
-import meta.claw.tool.knowledge.multimodal.ModelCapability;
-import meta.claw.tool.knowledge.multimodal.MultimodalConfig;
+import meta.claw.core.knowledge.asset.LocalAssetManager;
+import meta.claw.core.knowledge.multimodal.ModelCapability;
+import meta.claw.core.knowledge.multimodal.MultimodalConfig;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

@@ -1,6 +1,6 @@
 {
   "project": "meta-claw",
-  "last_updated": "2026-06-30",
+  "last_updated": "2026-07-04",
   "package_structure": {
     "config": "meta.claw.core.config — 所有配置模型 + 加载器 + 解析器",
     "vessel": "meta.claw.core.vessel — Vessel 用户域（Profile + Initializer）",
@@ -1299,6 +1299,29 @@
         }
       ],
       "notes": "Task 2 已完成。映射时默认 mimeType 为 image/png，可在 MediaPart 中显式指定。"
+    },
+    {
+      "id": "spring-wiring-002",
+      "priority": 43,
+      "area": "core-architecture",
+      "title": "解除 LlmClientManager ↔ ToolRegistry Spring 循环依赖",
+      "user_visible_behavior": "meta-claw-bootstrap 与 meta-claw-cli 启动时不再因 `LlmClientManager → ToolRegistry → KnowledgeTool → KnowledgeManager → KnowledgeAnalyzer → LlmClientManager` 循环依赖而失败。",
+      "status": "passing",
+      "verification": [
+        "移除 LlmClientManager 对 ToolRegistry 的字段依赖。",
+        "通过 Advisor 化把工具注入、响应提取、Metrics 记录下沉到 OpenAiLlmClientProvider 构建的 ChatClient Advisor 链。",
+        "修复 bootstrap 模式下 InMemoryHitlGate 未注入导致的启动失败（移除 @ConditionalOnMissingBean，CliHitlGate 加 @Primary）。",
+        "运行 ./init.sh 全量编译与 P0 测试通过。",
+        "验证 meta-claw-bootstrap 能启动 Tomcat 且不再报循环依赖。"
+      ],
+      "evidence": [
+        {
+          "date": "2026-07-04",
+          "result": "passing",
+          "detail": "./init.sh BUILD SUCCESS，9 个 reactor 模块全部 SUCCESS，core 112 个 P0 测试全部通过，tool 20 个 P0 测试全部通过；meta-claw-bootstrap spring-boot:run 成功启动 Tomcat on 8080，无循环依赖报错。"
+        }
+      ],
+      "notes": "核心改动：新增 ToolRegistryAdvisor / MetaClawResponseCallAdvisor / MetaClawCallContext；OpenAiLlmClientProvider.buildChatClient() 运行时通过 applicationContext.getBean(ToolRegistry.class) 获取工具注册表；LlmClientManager.chat() 从 Advisor 写入的共享上下文读取结果；chatStream() 委托给 streamWithTools()。设计文档位于 docs/superpowers/specs/2026-07-02-break-llmclientmanager-toolregistry-cycle-design.md。"
     }
   ]
 }

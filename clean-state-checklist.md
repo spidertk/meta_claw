@@ -1,20 +1,20 @@
 # 干净状态检查清单
 
-> 最后核对：2026-06-30
-> 结论：multimodal knowledge extension 计划 Task 1~15 已全部完成。全量 `./init.sh` 通过，全量 `meta-claw-tool` 测试通过；`feature_list.json`、`claude-progress.md` 与本清单已更新。
+> 最后核对：2026-07-04
+> 结论：LlmClientManager ↔ ToolRegistry Spring 循环依赖已解除，bootstrap 与 CLI 启动路径恢复；`spring-wiring-002` 已完成并通过验证。
 
 - [x] 标准启动路径仍然可用
-  证据：`./init.sh` 在当前环境（Java 21 + Maven 3.9.15）真实跑通；9 个 reactor 模块全部 SUCCESS，core 112 个测试全部通过，tool 模块 18 个 P0 测试全部通过。
+  证据：`./init.sh` 在当前环境（Java 21 + Maven 3.9.15）真实跑通；9 个 reactor 模块全部 SUCCESS，core 112 个 P0 测试全部通过，tool 模块 20 个 P0 测试全部通过。
 - [x] 标准验证路径仍然可运行
-  证据：`mvn -pl meta-claw-tool -am test -q` BUILD SUCCESS，tool 模块 57 个测试全部通过（1 个跳过）；`KnowledgeAcquisitionSmokeTest` 1/1 通过。
+  证据：`mvn spring-boot:run -pl meta-claw-bootstrap -DskipTests -q` 成功启动 Tomcat on 8080，无循环依赖报错。
 - [x] 当前进度已经记录到进度日志
-  证据：`claude-progress.md` 已新增证据 21 与 Session 070，记录 Task 10~15 实现、验证命令与结果。
+  证据：`claude-progress.md` 已新增证据 22 与 Session 071，记录循环依赖解除的实现、验证命令与结果。
 - [x] 功能状态真实反映了 passing 和未验证的边界
-  证据：`feature_list.json` 已新增 `multimodal-knowledge-007~012` 与 `multimodal-core-001/002` 并标记为 passing；multimodal knowledge extension 计划暂无未完成功能。
+  证据：`feature_list.json` 已新增 `spring-wiring-002` 并标记为 passing；上一轮 multimodal knowledge extension 计划相关功能仍保持 passing。
 - [x] 没有任何半成品步骤处于未记录状态
-  证据：Task 10~15 对应的代码、测试、文档与状态文件均已完成并通过验证。
+  证据：ToolRegistryAdvisor、MetaClawResponseCallAdvisor、MetaClawCallContext 等新增代码与对应状态文件均已完成并通过验证。
 - [x] 下一轮会话无需人工修复即可继续
-  证据：下一轮可直接运行 `./init.sh`； multimodal knowledge extension 的端到端冒烟测试已纳入日常验证范围。
+  证据：下一轮可直接运行 `./init.sh`；bootstrap 启动路径已验证可用。
 
 ## 进入下一轮前必须先确认
 

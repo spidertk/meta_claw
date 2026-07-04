@@ -27,7 +27,8 @@
 - 最近已通过证据 19：2026-06-30 实现 multimodal knowledge extension 计划的 Task 8：让 `KnowledgeAnalyzer` multimodal-aware；`KnowledgeAnalyzer` 构造方法注入 `ModelCapability`，`analyze(ExtractedDocument,...)` 在 `supportsMultimodal() && hasVisualAssets(doc) && supportsMediaType(doc.getMediaType())` 时走多模态路径，将最多 5 张图片转为 `MediaPart` 随 prompt 发送，解析后设置 `multimodalUsed=true`，异常时回退到文本分析；更新 `KnowledgeToolTest.setUp` 构造 `MultimodalConfig` / `ModelCapability` 并传入 `KnowledgeAnalyzer`；定向测试 `mvn -pl meta-claw-tool -am test -Dtest=KnowledgeToolTest -Dsurefire.failIfNoSpecifiedTests=false -q` BUILD SUCCESS，`KnowledgeToolTest` 14 个测试全部通过；全量 `./init.sh` BUILD SUCCESS，9 个 reactor 模块全部 SUCCESS，core 112 个测试、tool 18 个测试全部通过
 - 最近已通过证据 20：2026-06-29 实现 multimodal knowledge extension 计划的 Task 9：新增 `VisionDescriber` 与 `ImageExtractor`；`VisionDescriber` 作为 `@Component` 注入 `SpiLlmClient`，将图片路径转为 `image_url` 类型的 `MediaPart` 并调用 LLM 获取中文描述；`ImageExtractor` 实现 `ContentExtractor`，支持 `image/*`，先 `assetManager.store` 持久化图片，再调用 `visionDescriber.describe`，生成包含描述与 `![image](assets/{assetId}/{filename})` 的 markdownBody；新增 `ImageExtractorTest`，mock `VisionDescriber` 并用内存 PNG + `LocalAssetManager` 验证描述与资产路径；定向测试 `mvn -pl meta-claw-tool -am test -Dtest=ImageExtractorTest -Dsurefire.failIfNoSpecifiedTests=false -q` BUILD SUCCESS，`ImageExtractorTest` 1/1 通过；全量 `mvn -pl meta-claw-tool -am test -q` BUILD SUCCESS，tool 模块全部测试通过
 - 最近已通过证据 21：2026-06-30 完成 multimodal knowledge extension 计划 Task 10~15：扩展 `KnowledgeEntry` frontmatter 资产引用字段（asset_id / media_type / multimodal_used）；新增 `PdfExtractor`（PDFBox 文本抽取 + 可选页面图片描述）；新增 `DouyinVideoExtractor`（通过 `YtDlpVideoExtractor` 调用 yt-dlp，30 秒同步超时）；在 `KnowledgeTool` 新增 `knowledgeAcquireFromFile` 与 `knowledgeAcquireFromUrl`；扩展 `GitManager.grepFiles` 同时搜索 `knowledge/**/*.md` 与 `assets/**/extracted.md`，结果返回 `media_type` 与 `asset_id`；新增端到端 `KnowledgeAcquisitionSmokeTest` 覆盖图片+文本采集与检索；修复 `ImageExtractorTest.tearDown` 因 `originalUserDir` 可能为 null 导致的 NPE；全量 `./init.sh` BUILD SUCCESS，9 个 reactor 模块全部 SUCCESS，core 112 个测试全部通过，tool 模块 P0 18 个测试全部通过；全量 `mvn -pl meta-claw-tool -am test -q` BUILD SUCCESS，tool 模块 57 个测试全部通过（1 个跳过）
-- 当前最高优先级未完成功能：multimodal knowledge extension 计划 Task 1~15 已全部完成；feature_list.json 已补充 multimodal-knowledge-007~012 与 multimodal-core-001/002 并标记为 passing；下一步为整体收尾与提交，或按路线图开始后续功能。
+- 最近已通过证据 22：2026-07-04 解除 `LlmClientManager ↔ ToolRegistry` Spring 循环依赖并修复 bootstrap 启动：采用全 Advisor 化方案，新增 `ToolRegistryAdvisor` / `MetaClawResponseCallAdvisor` / `MetaClawCallContext`，`OpenAiLlmClientProvider.buildChatClient()` 运行时通过 `applicationContext.getBean(ToolRegistry.class)` 获取工具注册表并注入 Advisor 链，`LlmClientManager.chat()` 从共享上下文读取 Advisor 提取的 content/reasoningContent/usage/toolCalls，`chatStream()` 委托给 `streamWithTools()`；同时修复 bootstrap 模式因 `InMemoryHitlGate` 的 `@ConditionalOnMissingBean` 未生效导致的 `HitlGate` 缺失问题（移除该注解，为 `CliHitlGate` 加 `@Primary`）；全量 `./init.sh` BUILD SUCCESS，9 个 reactor 模块全部 SUCCESS，core 112 个 P0 测试全部通过，tool 20 个 P0 测试全部通过；`mvn spring-boot:run -pl meta-claw-bootstrap -DskipTests` 成功启动 Tomcat on 8080，无循环依赖报错。
+- 当前最高优先级未完成功能：multimodal knowledge extension 计划 Task 1~15 与 LlmClientManager 循环依赖修复均已完成；feature_list.json 已补充 multimodal-knowledge-007~012、multimodal-core-001/002 与 spring-wiring-002 并标记为 passing；下一步为整体收尾与提交，或按路线图开始后续功能。
 - 当前 blocker：
   1. 当前无 blocker
 
@@ -55,6 +56,48 @@
 - `serve/start/stop/restart/status/logs`、工具引擎、MCP、Skill 系统仍未实现
 
 ## 会话记录
+
+### Session 071
+
+- 日期：2026-07-04
+- 本轮目标：解除 `LlmClientManager ↔ ToolRegistry` Spring 循环依赖，使 `meta-claw-bootstrap` 与 `meta-claw-cli` 能正常启动。
+- 实现：
+  - 输出设计文档 `docs/superpowers/specs/2026-07-02-break-llmclientmanager-toolregistry-cycle-design.md`，分析循环根因并确定全 Advisor 化方案。
+  - 新增 `meta.claw.core.llm.advisor.MetaClawCallContext`：单次 LLM 调用共享上下文，承载 vesselId/sessionId 与提取结果。
+  - 新增 `meta.claw.core.llm.advisor.ToolRegistryAdvisor`：`CallAdvisor` + `StreamAdvisor`，从 `ToolRegistry` 拉取工具并注入 `ToolCallingChatOptions`。
+  - 新增 `meta.claw.core.llm.advisor.MetaClawResponseCallAdvisor`：测量 latency，从 `ChatResponse` 提取 content/reasoningContent/usage/toolCalls，记录 Metrics，并写回 `MetaClawCallContext`。
+  - 改造 `OpenAiLlmClientProvider.buildChatClient()`：运行时通过 `applicationContext.getBean(ToolRegistry.class)` 获取工具注册表，注册 `ToolRegistryAdvisor` 与 `MetaClawResponseCallAdvisor`；`MetricsRecorder` 通过 `getBeanProvider(...).getIfAvailable()` 可选获取。
+  - 简化 `LlmClientManager.chat()`：仅做消息转换、创建共享上下文、触发调用，最后从上下文组装 `SpiChatResponse`。
+  - 改造 `LlmClientManager.chatStream()`：委托给 `streamWithTools(request, new ToolCallback[0], callback)`，复用现有流式逻辑并移除 `ToolRegistry` 依赖。
+  - 删除 `LlmClientManager` 中不再使用的 `ToolRegistry` 字段、`buildToolOptions()`、`logRequestParams()` 及 `chatStream()` 内重复流式逻辑。
+  - 修复 `LlmClientManagerStreamWithToolsTest`：移除通过反射设置已不存在的 `toolRegistry` 字段。
+  - 修复 bootstrap 模式启动失败：`InMemoryHitlGate` 移除 `@ConditionalOnMissingBean(HitlGate.class)` 作为无条件兜底实现；`CliHitlGate` 增加 `@Primary`，确保 CLI 场景优先注入。
+- 运行过的验证：
+  - `export JAVA_HOME=/Users/kai/.local/jdks/jdk-21.0.10+7/Contents/Home && /Users/kai/.local/tools/apache-maven-3.9.15/bin/mvn -pl meta-claw-core -am compile -q` → BUILD SUCCESS。
+  - `export JAVA_HOME=/Users/kai/.local/jdks/jdk-21.0.10+7/Contents/Home && /Users/kai/.local/tools/apache-maven-3.9.15/bin/mvn -pl meta-claw-core test -q` → BUILD SUCCESS，112 个测试全部通过。
+  - `./init.sh`（真实环境，Java 21）→ BUILD SUCCESS；9 个 reactor 模块全部 SUCCESS，core 112 个 P0 测试全部通过，tool 20 个 P0 测试全部通过。
+  - `export JAVA_HOME=/Users/kai/.local/jdks/jdk-21.0.10+7/Contents/Home && /Users/kai/.local/tools/apache-maven-3.9.15/bin/mvn install -DskipTests -q` 后执行 `mvn spring-boot:run -pl meta-claw-bootstrap -DskipTests -q` → Tomcat 成功启动于 8080，无循环依赖报错。
+- 已记录证据：
+  - `feature_list.json` 已新增 `spring-wiring-002` 并标记为 passing。
+  - `claude-progress.md` 已补充证据 22 与本 Session 071。
+  - `clean-state-checklist.md` 已更新。
+- 更新过的文件或工件：
+  - `docs/superpowers/specs/2026-07-02-break-llmclientmanager-toolregistry-cycle-design.md`（新增并更新）
+  - `meta-claw-core/src/main/java/meta/claw/core/llm/advisor/MetaClawCallContext.java`（新增）
+  - `meta-claw-core/src/main/java/meta/claw/core/llm/advisor/ToolRegistryAdvisor.java`（新增）
+  - `meta-claw-core/src/main/java/meta/claw/core/llm/advisor/MetaClawResponseCallAdvisor.java`（新增）
+  - `meta-claw-core/src/main/java/meta/claw/core/llm/provider/OpenAiLlmClientProvider.java`（修改）
+  - `meta-claw-core/src/main/java/meta/claw/core/runtime/LlmClientManager.java`（修改）
+  - `meta-claw-core/src/main/java/meta/claw/core/runtime/hitl/InMemoryHitlGate.java`（修改）
+  - `meta-claw-cli/src/main/java/meta/claw/cli/hitl/CliHitlGate.java`（修改）
+  - `meta-claw-core/src/test/java/meta/claw/core/runtime/LlmClientManagerStreamWithToolsTest.java`（修改）
+  - `feature_list.json`
+  - `claude-progress.md`
+  - `clean-state-checklist.md`
+- 已知风险或未解决的问题：
+  - `chatStream()` 改为委托给 `streamWithTools()` 后，不再通过 Advisor 向 `ShortMemoryAdvisor` 传递 vesselName/sessionId；由于 `VesselRuntime.chatStream()` 主链路已走 `AgentEngine.executeStream()` → `StreamingAgentExecutor.streamWithTools()`（使用 `buildRawChatClient()`，无 Advisor），此行为变化对当前主链路无影响。
+- 下一步最佳动作：
+  1. 提交本轮修改。
 
 ### Session 065
 

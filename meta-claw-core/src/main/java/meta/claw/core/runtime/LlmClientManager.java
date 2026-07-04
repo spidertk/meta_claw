@@ -10,9 +10,9 @@ import meta.claw.core.llm.SpiStreamingCallback;
 import meta.claw.core.llm.provider.LlmClientProviderManager;
 import meta.claw.core.memory.MemoryMessage;
 import meta.claw.core.memory.MemoryMessageConverter;
-import meta.claw.core.tool.registry.ToolRegistry;
 import meta.claw.core.config.resolver.RuntimeConfigResolver;
 import meta.claw.core.llm.SpiUsage;
+import meta.claw.core.llm.advisor.MetaClawCallContext;
 import meta.claw.core.tool.SpiToolCall;
 import meta.claw.core.runtime.metrics.MetricsRecorder;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -28,7 +28,7 @@ import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.model.tool.ToolCallingChatOptions;
-import org.springframework.ai.support.ToolCallbacks;
+
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -52,9 +52,6 @@ public class LlmClientManager implements SpiLlmClient {
     private LlmClientProviderManager llmClientProviderManager;
     @Autowired
     private RuntimeConfigResolver runtimeConfigResolver;
-
-    @Autowired
-    private ToolRegistry toolRegistry;
 
     @Autowired(required = false)
     private MetricsRecorder metricsRecorder;
@@ -95,31 +92,21 @@ public class LlmClientManager implements SpiLlmClient {
                 .map(this::toSpringMessage)
                 .collect(Collectors.toCollection(ArrayList::new));
 
-        List<Object> toolInstances = toolRegistry.getToolInstances();
-        logRequestParams(messages, toolInstances);
+        MetaClawCallContext ctx = new MetaClawCallContext();
+        ctx.setVesselId(request.getVesselId());
+        ctx.setSessionId(request.getSessionId());
 
-        ToolCallingChatOptions toolOptions = buildToolOptions(toolInstances);
-
-        long startTime = System.currentTimeMillis();
-        ChatResponse chatResponse = buildChatClient(request.getVesselId())
-                .prompt(new Prompt(messages, toolOptions))
+        buildChatClient(request.getVesselId())
+                .prompt(new Prompt(messages))
+                .advisors(spec -> spec.param("metaClawCallContext", ctx))
                 .call()
                 .chatResponse();
-        long latency = System.currentTimeMillis() - startTime;
-
-        Generation gen = chatResponse.getResult();
-        String content = gen != null && gen.getOutput() != null ? gen.getOutput().getText() : "";
-        String reasoningContent = extractReasoningContent(gen);
-        SpiUsage usage = extractUsage(chatResponse);
-        List<SpiToolCall> toolCalls = extractToolCalls(gen);
-
-        recordLlmMetrics(request.getVesselId(), latency, usage);
 
         return SpiChatResponse.builder()
-                .content(content != null ? content : "")
-                .reasoningContent(reasoningContent)
-                .toolCalls(toolCalls)
-                .usage(usage)
+                .content(ctx.getContent() != null ? ctx.getContent() : "")
+                .reasoningContent(ctx.getReasoningContent())
+                .toolCalls(ctx.getToolCalls() != null ? ctx.getToolCalls() : List.of())
+                .usage(ctx.getUsage())
                 .build();
     }
 
@@ -245,129 +232,8 @@ public class LlmClientManager implements SpiLlmClient {
 
     @Override
     public void chatStream(SpiChatRequest request, SpiStreamingCallback callback) {
-        long startTime = System.currentTimeMillis();
-        callback.onStart();
-
-        List<Message> messages = request.getMessages().stream()
-                .map(this::toSpringMessage)
-                .collect(Collectors.toCollection(ArrayList::new));
-
-        StringBuilder contentBuilder = new StringBuilder();
-        StringBuilder reasoningBuilder = new StringBuilder();
-        long[] firstChunkTime = {-1};
-        int[] chunkCount = {0};
-        long[] lastChunkTime = {startTime};
-        AtomicReference<SpiUsage> usageRef = new AtomicReference<>();
-        java.util.Set<String> notifiedToolCallIds = new java.util.HashSet<>();
-        java.util.Map<String, StringBuilder> accumulatingToolArgs = new java.util.LinkedHashMap<>();
-        java.util.Map<String, AssistantMessage.ToolCall> accumulatingToolCalls = new java.util.LinkedHashMap<>();
-        ObjectMapper objectMapper = new ObjectMapper();
-
-        List<Object> toolInstances = toolRegistry.getToolInstances();
-        logRequestParams(messages, toolInstances);
-
-        try {
-            ToolCallingChatOptions toolOptions = buildToolOptions(toolInstances);
-
-            buildChatClient(request.getVesselId())
-                    .prompt(new Prompt(messages, toolOptions))
-                    .advisors(spec -> spec
-                            .param("vesselName", request.getVesselId())
-                            .param("sessionId", request.getSessionId()))
-                    .stream()
-                    .chatResponse()
-                    .doOnNext(response -> {
-                        chunkCount[0]++;
-                        long elapsed = System.currentTimeMillis() - startTime;
-                        long gap = elapsed - lastChunkTime[0];
-                        lastChunkTime[0] = elapsed;
-
-                        if (firstChunkTime[0] == -1) {
-                            firstChunkTime[0] = elapsed;
-                        }
-
-                        Generation gen = response.getResult();
-                        if (gen != null && gen.getOutput() != null) {
-                            String content = gen.getOutput().getText();
-                            String reasoningChunk = extractReasoningContent(gen);
-
-                            // 注意：Spring AI 1.1.7 将 reasoningContent 存入 AssistantMessage.metadata (properties map)
-
-                            if (reasoningChunk != null && !reasoningChunk.isEmpty()) {
-                                reasoningBuilder.append(reasoningChunk);
-                                callback.onReasoningChunk(reasoningChunk);
-                            }
-                            if (content != null && !content.isEmpty()) {
-                                contentBuilder.append(content);
-                                callback.onChunk(content);
-                            }
-
-                            // 检测 tool calls（流式参数分段到达，需累积后解析）
-                            if (gen.getOutput() instanceof AssistantMessage am && am.hasToolCalls()) {
-                                log.debug("[STREAM] chunk hasToolCalls=true, count={}, content={}",
-                                        am.getToolCalls().size(), abbreviate(am.getText(), 80));
-                                accumulateToolCalls(am, accumulatingToolCalls, accumulatingToolArgs);
-                            }
-                            String finishReason = gen.getMetadata() != null ? gen.getMetadata().getFinishReason() : null;
-                            boolean isToolCallFinish = finishReason != null
-                                    && (finishReason.equalsIgnoreCase("tool_calls") || finishReason.equalsIgnoreCase("tool_call"));
-                            if (isToolCallFinish && !accumulatingToolCalls.isEmpty()) {
-                                log.debug("[STREAM] finishReason={}, accumulated {} tool call(s)",
-                                        finishReason, accumulatingToolCalls.size());
-                                for (AssistantMessage.ToolCall tc : accumulatingToolCalls.values()) {
-                                    if (notifiedToolCallIds.add(tc.id())) {
-                                        try {
-                                            String fullArgs = accumulatingToolArgs.get(tc.id()).toString();
-                                            Map<String, Object> args = objectMapper.readValue(
-                                                    fullArgs, new TypeReference<>() {});
-                                            SpiToolCall spiToolCall = SpiToolCall.builder()
-                                                    .id(tc.id())
-                                                    .name(tc.name())
-                                                    .arguments(args)
-                                                    .build();
-                                            callback.onToolCall(spiToolCall);
-                                        } catch (Exception e) {
-                                            log.warn("Failed to parse tool call arguments: {}", accumulatingToolArgs.get(tc.id()), e);
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        // usage 通常在最后一个 chunk 中返回
-                        SpiUsage usage = extractUsage(response);
-                        if (usage != null) {
-                            usageRef.set(usage);
-                            callback.onUsage(usage);
-                        }
-                    })
-                    .doOnError(error -> {
-                        long totalTime = System.currentTimeMillis() - startTime;
-                        if (error instanceof org.springframework.web.reactive.function.client.WebClientResponseException wex) {
-                            log.error("[STREAM] HTTP Error after {}ms: status={}, body={}",
-                                    totalTime, wex.getStatusCode(), wex.getResponseBodyAsString());
-                        } else {
-                            log.error("[STREAM] Error occurred after {}ms: {}", totalTime, error.getMessage(), error);
-                        }
-                        callback.onError(error);
-                    })
-                    .doOnComplete(() -> {
-                        long totalTime = System.currentTimeMillis() - startTime;
-                        recordLlmMetrics(request.getVesselId(), totalTime, usageRef.get());
-
-                        SpiChatResponse spiResponse = SpiChatResponse.builder()
-                                .content(contentBuilder.toString())
-                                .reasoningContent(reasoningBuilder.toString())
-                                .usage(usageRef.get())
-                                .build();
-                        callback.onComplete(spiResponse);
-                    })
-                    .blockLast();
-        } catch (Exception e) {
-            long totalTime = System.currentTimeMillis() - startTime;
-            log.error("[STREAM] Exception after {}ms: {}", totalTime, e.getMessage(), e);
-            callback.onError(e);
-        }
+        // 复用 streamWithTools 的流式累积/回调逻辑，无工具场景传空数组
+        streamWithTools(request, new ToolCallback[0], callback);
     }
 
     @Override
@@ -464,16 +330,6 @@ public class LlmClientManager implements SpiLlmClient {
         return llmClientProviderManager.createRaw(providerConfig);
     }
 
-    private ToolCallingChatOptions buildToolOptions(List<Object> toolInstances) {
-        List<ToolCallback> callbacks = toolInstances.isEmpty()
-                ? List.of()
-                : Arrays.asList(ToolCallbacks.from(toolInstances.toArray()));
-        return ToolCallingChatOptions.builder()
-                .toolCallbacks(callbacks)
-                .internalToolExecutionEnabled(false)
-                .build();
-    }
-
     private static List<SpiToolCall> extractToolCalls(Generation gen) {
         List<SpiToolCall> result = new ArrayList<>();
         if (gen == null || !(gen.getOutput() instanceof AssistantMessage am) || !am.hasToolCalls()) {
@@ -489,27 +345,6 @@ public class LlmClientManager implements SpiLlmClient {
             }
         }
         return result;
-    }
-
-    private void logRequestParams(List<Message> messages, List<Object> toolInstances) {
-        if (!log.isDebugEnabled()) {
-            return;
-        }
-        try {
-            List<Map<String, Object>> msgList = new ArrayList<>();
-            for (Message m : messages) {
-                Map<String, Object> map = new LinkedHashMap<>();
-                map.put("role", m.getMessageType().getValue());
-                map.put("content", m.getText());
-                msgList.add(map);
-            }
-            String msgsJson = new com.fasterxml.jackson.databind.ObjectMapper()
-                    .writerWithDefaultPrettyPrinter()
-                    .writeValueAsString(msgList);
-            log.debug("[LLM-REQUEST] messages={}\n[LLM-REQUEST] tools count={}", msgsJson, toolInstances.size());
-        } catch (Exception e) {
-            log.error("[LLM-REQUEST] messages count={}, tools count={}, err={}", messages.size(), toolInstances.size(), e.getMessage(), e);
-        }
     }
 
     private Message toSpringMessage(SpiMessage msg) {
