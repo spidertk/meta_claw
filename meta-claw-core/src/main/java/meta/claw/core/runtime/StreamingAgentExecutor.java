@@ -6,7 +6,6 @@ import meta.claw.core.llm.SpiChatRequest;
 import meta.claw.core.llm.SpiChatResponse;
 import meta.claw.core.llm.SpiMessage;
 import meta.claw.core.llm.SpiStreamingCallback;
-import meta.claw.core.llm.SpiUsage;
 import meta.claw.core.message.Reply;
 import meta.claw.core.message.ReplyType;
 import meta.claw.core.runtime.hitl.*;
@@ -63,16 +62,16 @@ public class StreamingAgentExecutor {
                     .description("Calling LLM stream at step " + step)
                     .build());
 
-            // 使用 callback 透传 content/reasoning，但由本类控制 tool-call 循环
-            AccumulatingCallback accumulatingCallback = new AccumulatingCallback(callback);
+            // callback 透传给 streaming advisor，由 advisor 实时输出 chunk/reasoning/toolCall
             SpiChatResponse response = llmClient.streamWithTools(
                     SpiChatRequest.builder()
                             .vesselId(request.getVesselId())
                             .sessionId(request.getSessionId())
                             .messages(messages)
                             .build(),
+                    ctx,
                     tools.toArray(new ToolCallback[0]),
-                    accumulatingCallback
+                    callback
             );
             ctx.addTokenUsage(response != null ? response.usage() : null);
 
@@ -199,58 +198,4 @@ public class StreamingAgentExecutor {
         }
     }
 
-    /**
-     * 透传 callback，同时收集完整响应内容。
-     */
-    private static class AccumulatingCallback implements SpiStreamingCallback {
-        private final SpiStreamingCallback delegate;
-        private final StringBuilder contentBuilder = new StringBuilder();
-        private final StringBuilder reasoningBuilder = new StringBuilder();
-
-        AccumulatingCallback(SpiStreamingCallback delegate) {
-            this.delegate = delegate;
-        }
-
-        @Override
-        public void onStart() {
-            delegate.onStart();
-        }
-
-        @Override
-        public void onChunk(String chunk) {
-            contentBuilder.append(chunk);
-            delegate.onChunk(chunk);
-        }
-
-        @Override
-        public void onReasoningChunk(String chunk) {
-            reasoningBuilder.append(chunk);
-            delegate.onReasoningChunk(chunk);
-        }
-
-        @Override
-        public void onToolCall(SpiToolCall toolCall) {
-            delegate.onToolCall(toolCall);
-        }
-
-        @Override
-        public ApprovalResolution onHitlSuspend(ApprovalTicket ticket) {
-            return delegate.onHitlSuspend(ticket);
-        }
-
-        @Override
-        public void onUsage(SpiUsage usage) {
-            delegate.onUsage(usage);
-        }
-
-        @Override
-        public void onComplete(SpiChatResponse response) {
-            delegate.onComplete(response);
-        }
-
-        @Override
-        public void onError(Throwable error) {
-            delegate.onError(error);
-        }
-    }
 }

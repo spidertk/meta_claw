@@ -11,18 +11,19 @@ import org.springframework.ai.chat.client.advisor.api.StreamAdvisorChain;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.model.tool.ToolCallingChatOptions;
 import org.springframework.ai.support.ToolCallbacks;
-
+import org.springframework.ai.tool.ToolCallback;
 import reactor.core.publisher.Flux;
 
+import java.util.Arrays;
 import java.util.List;
 
 /**
  * 工具注入 Advisor。
  * <p>
- * 从 {@link ToolRegistry} 拉取所有已注册的工具实例，构造 {@link ToolCallingChatOptions}
- * 并注入到 outgoing {@link Prompt} 中。由于该 Advisor 位于 Spring AI
- * {@code ToolCallAdvisor} 内侧，ToolCallAdvisor 能看到这些工具但不会执行它们
- * （因为 {@code internalToolExecutionEnabled=false}），最终由 meta-claw 自己的
+ * 从 {@link ToolRegistry} 拉取所有已注册的工具实例，或从请求上下文中读取显式传入的
+ * {@link ToolCallback} 数组，构造 {@link ToolCallingChatOptions} 并注入到 outgoing {@link Prompt} 中。
+ * 由于该 Advisor 位于 Spring AI {@code ToolCallAdvisor} 内侧，ToolCallAdvisor 能看到这些工具
+ * 但不会执行它们（因为 {@code internalToolExecutionEnabled=false}），最终由 meta-claw 自己的
  * ReAct 循环负责工具执行。
  * </p>
  */
@@ -46,15 +47,23 @@ public class ToolRegistryAdvisor implements CallAdvisor, StreamAdvisor {
     }
 
     private ChatClientRequest addTools(ChatClientRequest request) {
-        List<Object> toolInstances = toolRegistry.getToolInstances();
-        log.debug("[ToolRegistryAdvisor] injecting {} tool(s)", toolInstances.size());
+        ToolCallback[] explicitCallbacks = (ToolCallback[]) request.context().get(MetaClawCallContext.EXPLICIT_TOOL_CALLBACKS_KEY);
 
-        if (toolInstances.isEmpty()) {
-            return request;
+        List<ToolCallback> toolCallbacks;
+        if (explicitCallbacks != null && explicitCallbacks.length > 0) {
+            toolCallbacks = Arrays.asList(explicitCallbacks);
+            log.debug("[ToolRegistryAdvisor] injecting {} explicit tool callback(s)", toolCallbacks.size());
+        } else {
+            List<Object> toolInstances = toolRegistry.getToolInstances();
+            log.debug("[ToolRegistryAdvisor] injecting {} tool(s) from registry", toolInstances.size());
+            if (toolInstances.isEmpty()) {
+                return request;
+            }
+            toolCallbacks = Arrays.asList(ToolCallbacks.from(toolInstances.toArray()));
         }
 
         ToolCallingChatOptions toolOptions = ToolCallingChatOptions.builder()
-                .toolCallbacks(ToolCallbacks.from(toolInstances.toArray()))
+                .toolCallbacks(toolCallbacks)
                 .internalToolExecutionEnabled(false)
                 .build();
 

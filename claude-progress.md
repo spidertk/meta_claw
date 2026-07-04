@@ -28,7 +28,8 @@
 - 最近已通过证据 20：2026-06-29 实现 multimodal knowledge extension 计划的 Task 9：新增 `VisionDescriber` 与 `ImageExtractor`；`VisionDescriber` 作为 `@Component` 注入 `SpiLlmClient`，将图片路径转为 `image_url` 类型的 `MediaPart` 并调用 LLM 获取中文描述；`ImageExtractor` 实现 `ContentExtractor`，支持 `image/*`，先 `assetManager.store` 持久化图片，再调用 `visionDescriber.describe`，生成包含描述与 `![image](assets/{assetId}/{filename})` 的 markdownBody；新增 `ImageExtractorTest`，mock `VisionDescriber` 并用内存 PNG + `LocalAssetManager` 验证描述与资产路径；定向测试 `mvn -pl meta-claw-tool -am test -Dtest=ImageExtractorTest -Dsurefire.failIfNoSpecifiedTests=false -q` BUILD SUCCESS，`ImageExtractorTest` 1/1 通过；全量 `mvn -pl meta-claw-tool -am test -q` BUILD SUCCESS，tool 模块全部测试通过
 - 最近已通过证据 21：2026-06-30 完成 multimodal knowledge extension 计划 Task 10~15：扩展 `KnowledgeEntry` frontmatter 资产引用字段（asset_id / media_type / multimodal_used）；新增 `PdfExtractor`（PDFBox 文本抽取 + 可选页面图片描述）；新增 `DouyinVideoExtractor`（通过 `YtDlpVideoExtractor` 调用 yt-dlp，30 秒同步超时）；在 `KnowledgeTool` 新增 `knowledgeAcquireFromFile` 与 `knowledgeAcquireFromUrl`；扩展 `GitManager.grepFiles` 同时搜索 `knowledge/**/*.md` 与 `assets/**/extracted.md`，结果返回 `media_type` 与 `asset_id`；新增端到端 `KnowledgeAcquisitionSmokeTest` 覆盖图片+文本采集与检索；修复 `ImageExtractorTest.tearDown` 因 `originalUserDir` 可能为 null 导致的 NPE；全量 `./init.sh` BUILD SUCCESS，9 个 reactor 模块全部 SUCCESS，core 112 个测试全部通过，tool 模块 P0 18 个测试全部通过；全量 `mvn -pl meta-claw-tool -am test -q` BUILD SUCCESS，tool 模块 57 个测试全部通过（1 个跳过）
 - 最近已通过证据 22：2026-07-04 解除 `LlmClientManager ↔ ToolRegistry` Spring 循环依赖并修复 bootstrap 启动：采用全 Advisor 化方案，新增 `ToolRegistryAdvisor` / `MetaClawResponseCallAdvisor` / `MetaClawCallContext`，`OpenAiLlmClientProvider.buildChatClient()` 运行时通过 `applicationContext.getBean(ToolRegistry.class)` 获取工具注册表并注入 Advisor 链，`LlmClientManager.chat()` 从共享上下文读取 Advisor 提取的 content/reasoningContent/usage/toolCalls，`chatStream()` 委托给 `streamWithTools()`；同时修复 bootstrap 模式因 `InMemoryHitlGate` 的 `@ConditionalOnMissingBean` 未生效导致的 `HitlGate` 缺失问题（移除该注解，为 `CliHitlGate` 加 `@Primary`）；全量 `./init.sh` BUILD SUCCESS，9 个 reactor 模块全部 SUCCESS，core 112 个 P0 测试全部通过，tool 20 个 P0 测试全部通过；`mvn spring-boot:run -pl meta-claw-bootstrap -DskipTests` 成功启动 Tomcat on 8080，无循环依赖报错。
-- 当前最高优先级未完成功能：multimodal knowledge extension 计划 Task 1~15 与 LlmClientManager 循环依赖修复均已完成；feature_list.json 已补充 multimodal-knowledge-007~012、multimodal-core-001/002 与 spring-wiring-002 并标记为 passing；下一步为整体收尾与提交，或按路线图开始后续功能。
+- 最近已通过证据 23：2026-07-05 完成 TaskContext 复用与 Advisor 注入集中化重构：`MetaClawCallContext` 绑定 `TaskContext`，`setUsage`/`setToolCalls` 自动同步到任务上下文；`AgentExecutor`/`StreamingAgentExecutor` 将 `TaskContext` 传入 `LlmClientManager`，避免 ReAct 循环每次迭代新建上下文；`LlmClientProviderManager` 通过 `ChatClient.mutate().defaultAdvisors(...)` 统一装配 `ToolCallAdvisor` / `ShortMemoryAdvisor` / `ToolRegistryAdvisor` / `MetaClawResponseCallAdvisor` / `MetaClawResponseStreamAdvisor`，`OpenAiLlmClientProvider` 不再负责 Advisor 装配；新增 `MetaClawResponseStreamAdvisor` 替代 `LlmClientManager.streamWithTools()` 中的 `accumulateToolCalls()` 手工累积；删除 `LlmClientManagerStreamWithToolsTest`，新增 `MetaClawResponseStreamAdvisorTest` 覆盖分段 arguments + 大写 finishReason 场景；全量 `./init.sh` BUILD SUCCESS，9 个 reactor 模块全部 SUCCESS，core 112 个 P0 测试全部通过，tool 20 个 P0 测试全部通过；`mvn spring-boot:run -pl meta-claw-bootstrap -DskipTests` 成功启动 Tomcat on 8080。
+- 当前最高优先级未完成功能：multimodal knowledge extension 计划 Task 1~15、LlmClientManager 循环依赖修复与 TaskContext 复用 / Advisor 集中化重构均已完成；feature_list.json 已补充 multimodal-knowledge-007~012、multimodal-core-001/002、spring-wiring-002 与 spring-wiring-003 并标记为 passing；下一步为整体收尾与提交，或按路线图开始后续功能。
 - 当前 blocker：
   1. 当前无 blocker
 
@@ -96,6 +97,50 @@
   - `clean-state-checklist.md`
 - 已知风险或未解决的问题：
   - `chatStream()` 改为委托给 `streamWithTools()` 后，不再通过 Advisor 向 `ShortMemoryAdvisor` 传递 vesselName/sessionId；由于 `VesselRuntime.chatStream()` 主链路已走 `AgentEngine.executeStream()` → `StreamingAgentExecutor.streamWithTools()`（使用 `buildRawChatClient()`，无 Advisor），此行为变化对当前主链路无影响。
+- 下一步最佳动作：
+  1. 提交本轮修改。
+
+### Session 072
+
+- 日期：2026-07-05
+- 本轮目标：复用 `TaskContext`/VesselContext，集中 Advisor 注入到 `LlmClientProviderManager`，并将流式 tool-call 累积逻辑迁移到 Advisor。
+- 实现：
+  - 重构 `meta.claw.core.llm.advisor.MetaClawCallContext`：新增 `TaskContext` 绑定，`setUsage` 自动调用 `taskContext.addTokenUsage()`，`setToolCalls` 自动同步 `taskContext.incrementToolCallCount()`；保留无 TaskContext 的降级构造方法供非 Agent 链路使用。
+  - 新增 `meta.claw.core.llm.advisor.MetaClawResponseStreamAdvisor`：实现 `StreamAdvisor`，在流式响应中累积 content/reasoningContent/usage/toolCalls，处理分段 arguments，在 finishReason 为 tool_calls 或流结束时触发 callback.onToolCall()，最终将结果写回 `MetaClawCallContext` 并记录 metrics。
+  - 改造 `meta.claw.core.llm.advisor.ToolRegistryAdvisor`：支持从请求上下文读取显式 `ToolCallback[]`（`explicitToolCallbacks`），优先使用显式工具，否则回退到 `ToolRegistry`。
+  - 重构 `meta.claw.core.llm.provider.LlmClientProviderManager`：在 `ContextRefreshedEvent` 中初始化公共 Advisor 栈；`create(ProviderConfig)` 先获取 provider 创建的基础 `ChatClient`，再通过 `ChatClient.mutate().defaultAdvisors(...)` 统一装配 `ToolCallAdvisor`、`ShortMemoryAdvisor`、`ToolRegistryAdvisor`、`MetaClawResponseCallAdvisor`、`MetaClawResponseStreamAdvisor`；按配置缓存装配后的 `ChatClient`。
+  - 简化 `meta.claw.core.llm.provider.OpenAiLlmClientProvider`：`create()` 仅返回基础 `ChatClient`，不再装配 Advisors；移除 `ApplicationContext`、`MetricsRecorder` 依赖。
+  - 重构 `meta.claw.core.runtime.LlmClientManager`：新增带 `TaskContext` 的 `chat`/`chatWithTools`/`streamWithTools`/`chatStream` 重载；原接口方法委托给新重载；`streamWithTools` 不再手写累积逻辑，改由 `MetaClawResponseStreamAdvisor` 处理；移除 `MetricsRecorder` 字段、`recordLlmMetrics()`、`accumulateToolCalls()`。
+  - 更新 `meta.claw.core.runtime.AgentExecutor` / `StreamingAgentExecutor`：将 `TaskContext` 传入 `LlmClientManager` 的新重载，复用同一上下文；移除 `StreamingAgentExecutor` 中不再需要的 `AccumulatingCallback`。
+  - 更新测试：`LlmClientProviderManagerTest` 改为验证 `createRaw()` 路由；`AgentExecutorHitlTest` 与 `StreamingAgentExecutorTest` 更新 mock 签名；删除 `LlmClientManagerStreamWithToolsTest`，新增 `MetaClawResponseStreamAdvisorTest` 覆盖分段 arguments + 大写 finishReason 场景；更新 `init.sh` P0 基线测试列表。
+- 运行过的验证：
+  - `export JAVA_HOME=/Users/kai/.local/jdks/jdk-21.0.10+7/Contents/Home && /Users/kai/.local/tools/apache-maven-3.9.15/bin/mvn -pl meta-claw-core -am compile -q` → BUILD SUCCESS。
+  - `export JAVA_HOME=/Users/kai/.local/jdks/jdk-21.0.10+7/Contents/Home && /Users/kai/.local/tools/apache-maven-3.9.15/bin/mvn -pl meta-claw-core test -q` → BUILD SUCCESS，112 个测试全部通过。
+  - `./init.sh`（真实环境，Java 21）→ BUILD SUCCESS；9 个 reactor 模块全部 SUCCESS，core 112 个 P0 测试全部通过，tool 20 个 P0 测试全部通过。
+  - `mvn spring-boot:run -pl meta-claw-bootstrap -DskipTests` → Tomcat 成功启动于 8080，无循环依赖报错。
+- 已记录证据：
+  - `feature_list.json` 已新增 `spring-wiring-003` 并标记为 passing，更新日期为 2026-07-05。
+  - `claude-progress.md` 已补充证据 23 与本 Session 072。
+- 更新过的文件或工件：
+  - `meta-claw-core/src/main/java/meta/claw/core/llm/advisor/MetaClawCallContext.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/llm/advisor/MetaClawResponseCallAdvisor.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/llm/advisor/MetaClawResponseStreamAdvisor.java`（新增）
+  - `meta-claw-core/src/main/java/meta/claw/core/llm/advisor/ToolRegistryAdvisor.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/llm/provider/LlmClientProviderManager.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/llm/provider/OpenAiLlmClientProvider.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/runtime/LlmClientManager.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/runtime/AgentExecutor.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/runtime/StreamingAgentExecutor.java`
+  - `meta-claw-core/src/test/java/meta/claw/core/llm/provider/LlmClientProviderManagerTest.java`
+  - `meta-claw-core/src/test/java/meta/claw/core/runtime/AgentExecutorHitlTest.java`
+  - `meta-claw-core/src/test/java/meta/claw/core/runtime/StreamingAgentExecutorTest.java`
+  - `meta-claw-core/src/test/java/meta/claw/core/runtime/LlmClientManagerStreamWithToolsTest.java`（删除）
+  - `meta-claw-core/src/test/java/meta/claw/core/llm/advisor/MetaClawResponseStreamAdvisorTest.java`（新增）
+  - `init.sh`
+  - `feature_list.json`
+  - `claude-progress.md`
+- 已知风险或未解决的问题：
+  - 当前无 blocker。流式累积逻辑从 `LlmClientManager` 迁移到 `MetaClawResponseStreamAdvisor` 后，callback.onChunk/onReasoningChunk/onToolCall 由 Advisor 在流式过程中触发；`LlmClientManager.streamWithTools()` 的 `doOnNext` 已清空，仅保留 `doOnError`/`doOnComplete` 用于整体生命周期控制。
 - 下一步最佳动作：
   1. 提交本轮修改。
 

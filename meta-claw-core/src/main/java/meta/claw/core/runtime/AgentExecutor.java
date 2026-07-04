@@ -103,6 +103,7 @@ public class AgentExecutor {
                             .sessionId(request.getSessionId())
                             .messages(messages)
                             .build(),
+                    ctx,
                     tools.toArray(new ToolCallback[0])
             );
             ctx.addTokenUsage(response != null ? response.usage() : null);

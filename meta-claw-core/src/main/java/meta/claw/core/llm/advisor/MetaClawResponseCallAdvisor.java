@@ -42,12 +42,11 @@ public class MetaClawResponseCallAdvisor implements CallAdvisor {
 
     @Override
     public ChatClientResponse adviseCall(ChatClientRequest request, CallAdvisorChain chain) {
-        MetaClawCallContext ctx = (MetaClawCallContext) request.context().get("metaClawCallContext");
-        long startTime = System.currentTimeMillis();
+        MetaClawCallContext ctx = (MetaClawCallContext) request.context().get(MetaClawCallContext.CONTEXT_KEY);
 
         ChatClientResponse response = chain.nextCall(request);
 
-        long latency = System.currentTimeMillis() - startTime;
+        long latency = System.currentTimeMillis() - (ctx != null ? ctx.getStartTime() : System.currentTimeMillis());
         ChatResponse chatResponse = response != null ? response.chatResponse() : null;
 
         if (ctx != null && chatResponse != null) {
@@ -62,12 +61,12 @@ public class MetaClawResponseCallAdvisor implements CallAdvisor {
 
             log.debug("[MetaClawResponseCallAdvisor] vessel={}, latency={}ms, contentLen={}, toolCalls={}",
                     ctx.getVesselId(), latency,
-                    ctx.getContent() != null ? ctx.getContent().length() : 0,
-                    ctx.getToolCalls() != null ? ctx.getToolCalls().size() : 0);
+                    ctx.getContentOrEmpty().length(),
+                    ctx.getToolCallsOrEmpty().size());
         }
 
         if (ctx != null) {
-            recordMetrics(ctx.getVesselId(), latency, ctx.getUsage());
+            ctx.recordLlmMetrics(metricsRecorder, latency);
         }
 
         return response;
@@ -133,13 +132,5 @@ public class MetaClawResponseCallAdvisor implements CallAdvisor {
             }
         }
         return result;
-    }
-
-    private void recordMetrics(String vesselId, long latencyMs, SpiUsage usage) {
-        if (metricsRecorder == null) {
-            return;
-        }
-        metricsRecorder.recordLlmLatency(vesselId, latencyMs);
-        metricsRecorder.recordTokenUsage(vesselId, usage);
     }
 }

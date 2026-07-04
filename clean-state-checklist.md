@@ -1,18 +1,18 @@
 # 干净状态检查清单
 
-> 最后核对：2026-07-04
-> 结论：LlmClientManager ↔ ToolRegistry Spring 循环依赖已解除，bootstrap 与 CLI 启动路径恢复；`spring-wiring-002` 已完成并通过验证。
+> 最后核对：2026-07-05
+> 结论：TaskContext 复用与 Advisor 注入集中化重构已完成；`spring-wiring-003` 已通过验证。
 
 - [x] 标准启动路径仍然可用
   证据：`./init.sh` 在当前环境（Java 21 + Maven 3.9.15）真实跑通；9 个 reactor 模块全部 SUCCESS，core 112 个 P0 测试全部通过，tool 模块 20 个 P0 测试全部通过。
 - [x] 标准验证路径仍然可运行
-  证据：`mvn spring-boot:run -pl meta-claw-bootstrap -DskipTests -q` 成功启动 Tomcat on 8080，无循环依赖报错。
+  证据：`mvn spring-boot:run -pl meta-claw-bootstrap -DskipTests` 成功启动 Tomcat on 8080，无循环依赖报错。
 - [x] 当前进度已经记录到进度日志
-  证据：`claude-progress.md` 已新增证据 22 与 Session 071，记录循环依赖解除的实现、验证命令与结果。
+  证据：`claude-progress.md` 已新增证据 23 与 Session 072，记录 TaskContext 复用、Advisor 集中化、流式 tool-call 累积迁移的实现、验证命令与结果。
 - [x] 功能状态真实反映了 passing 和未验证的边界
-  证据：`feature_list.json` 已新增 `spring-wiring-002` 并标记为 passing；上一轮 multimodal knowledge extension 计划相关功能仍保持 passing。
+  证据：`feature_list.json` 已新增 `spring-wiring-003` 并标记为 passing；上一轮功能仍保持 passing。
 - [x] 没有任何半成品步骤处于未记录状态
-  证据：ToolRegistryAdvisor、MetaClawResponseCallAdvisor、MetaClawCallContext 等新增代码与对应状态文件均已完成并通过验证。
+  证据：MetaClawCallContext、MetaClawResponseStreamAdvisor、LlmClientProviderManager 等改动与对应状态文件均已完成并通过验证。
 - [x] 下一轮会话无需人工修复即可继续
   证据：下一轮可直接运行 `./init.sh`；bootstrap 启动路径已验证可用。
 

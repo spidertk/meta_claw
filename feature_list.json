@@ -1,6 +1,6 @@
 {
   "project": "meta-claw",
-  "last_updated": "2026-07-04",
+  "last_updated": "2026-07-05",
   "package_structure": {
     "config": "meta.claw.core.config — 所有配置模型 + 加载器 + 解析器",
     "vessel": "meta.claw.core.vessel — Vessel 用户域（Profile + Initializer）",
@@ -1322,6 +1322,30 @@
         }
       ],
       "notes": "核心改动：新增 ToolRegistryAdvisor / MetaClawResponseCallAdvisor / MetaClawCallContext；OpenAiLlmClientProvider.buildChatClient() 运行时通过 applicationContext.getBean(ToolRegistry.class) 获取工具注册表；LlmClientManager.chat() 从 Advisor 写入的共享上下文读取结果；chatStream() 委托给 streamWithTools()。设计文档位于 docs/superpowers/specs/2026-07-02-break-llmclientmanager-toolregistry-cycle-design.md。"
+    },
+    {
+      "id": "spring-wiring-003",
+      "priority": 44,
+      "area": "core-architecture",
+      "title": "TaskContext 复用与 Advisor 注入集中化",
+      "user_visible_behavior": "一次 Agent Task 内的多轮 LLM 调用共享同一 TaskContext，token usage 与 tool call 计数自然累积；公共 Advisor 栈由 LlmClientProviderManager 统一装配，新增 provider 无需重复开发；流式 tool-call 分段累积逻辑也迁移到 Advisor。",
+      "status": "passing",
+      "verification": [
+        "MetaClawCallContext 绑定 TaskContext，setUsage/setToolCalls 自动同步到 TaskContext。",
+        "AgentExecutor/StreamingAgentExecutor 将 TaskContext 传入 LlmClientManager，避免每次迭代新建上下文。",
+        "LlmClientProviderManager 通过 ChatClient.mutate().defaultAdvisors(...) 统一装配 ToolCallAdvisor / ShortMemoryAdvisor / ToolRegistryAdvisor / MetaClawResponseCallAdvisor / MetaClawResponseStreamAdvisor。",
+        "OpenAiLlmClientProvider 不再负责 Advisor 装配，仅创建基础 ChatClient/ChatModel。",
+        "新增 MetaClawResponseStreamAdvisor，替代 LlmClientManager.streamWithTools() 中的 accumulateToolCalls() 手工累积。",
+        "运行 ./init.sh 全量编译与 P0 测试通过，验证 bootstrap 能正常启动。"
+      ],
+      "evidence": [
+        {
+          "date": "2026-07-05",
+          "result": "passing",
+          "detail": "./init.sh BUILD SUCCESS，9 个 reactor 模块全部 SUCCESS，core 112 个 P0 测试全部通过，tool 20 个 P0 测试全部通过；meta-claw-bootstrap spring-boot:run 成功启动 Tomcat on 8080，无循环依赖报错。新增 MetaClawResponseStreamAdvisorTest 覆盖分段 arguments + 大写 finishReason 场景。"
+        }
+      ],
+      "notes": "核心改动：MetaClawCallContext 新增 TaskContext 绑定；LlmClientManager 新增带 TaskContext 的重载；AgentExecutor/StreamingAgentExecutor 复用 TaskContext；LlmClientProviderManager 集中装配 Advisors；OpenAiLlmClientProvider 减负；新增 MetaClawResponseStreamAdvisor；删除 LlmClientManagerStreamWithToolsTest，由 MetaClawResponseStreamAdvisorTest 替代。"
     }
   ]
 }

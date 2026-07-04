@@ -49,7 +49,7 @@ class LlmClientProviderManagerTest {
     }
 
     @Test
-    void routesCreateToProvider() {
+    void routesCreateRawToProvider() {
         LlmClientProviderManager manager = new LlmClientProviderManager();
 
         ProviderConfig config = new ProviderConfig();
@@ -58,11 +58,11 @@ class LlmClientProviderManagerTest {
         ChatClient chatClient = mock(ChatClient.class);
         LlmClientProvider provider = mock(LlmClientProvider.class);
         when(provider.providerName()).thenReturn("openai");
-        when(provider.create(config)).thenReturn(chatClient);
+        when(provider.createRaw(config)).thenReturn(chatClient);
 
         ReflectionTestUtils.setField(manager, "allProviders", Map.of("openai", provider));
 
-        ChatClient result = manager.create(config);
+        ChatClient result = manager.createRaw(config);
 
         assertSame(chatClient, result);
     }

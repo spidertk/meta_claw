@@ -33,9 +33,9 @@ class StreamingAgentExecutorTest {
         ReflectionTestUtils.setField(executor, "maxSteps", 10);
 
         LlmClientManager llmClient = mock(LlmClientManager.class);
-        when(llmClient.streamWithTools(any(SpiChatRequest.class), any(ToolCallback[].class), any(SpiStreamingCallback.class)))
+        when(llmClient.streamWithTools(any(SpiChatRequest.class), any(TaskContext.class), any(ToolCallback[].class), any(SpiStreamingCallback.class)))
                 .thenAnswer(invocation -> {
-                    SpiStreamingCallback cb = invocation.getArgument(2);
+                    SpiStreamingCallback cb = invocation.getArgument(3);
                     cb.onStart();
                     cb.onChunk("hello");
                     cb.onComplete(SpiChatResponse.builder().content("hello").build());
@@ -72,9 +72,9 @@ class StreamingAgentExecutorTest {
         ReflectionTestUtils.setField(executor, "maxSteps", 10);
 
         LlmClientManager llmClient = mock(LlmClientManager.class);
-        when(llmClient.streamWithTools(any(SpiChatRequest.class), any(ToolCallback[].class), any(SpiStreamingCallback.class)))
+        when(llmClient.streamWithTools(any(SpiChatRequest.class), any(TaskContext.class), any(ToolCallback[].class), any(SpiStreamingCallback.class)))
                 .thenAnswer(invocation -> {
-                    SpiStreamingCallback cb = invocation.getArgument(2);
+                    SpiStreamingCallback cb = invocation.getArgument(3);
                     cb.onToolCall(SpiToolCall.builder().id("c1").name("calc").arguments(Map.of("x", 1)).build());
                     return SpiChatResponse.builder()
                             .content("")
@@ -82,7 +82,7 @@ class StreamingAgentExecutorTest {
                             .build();
                 })
                 .thenAnswer(invocation -> {
-                    SpiStreamingCallback cb = invocation.getArgument(2);
+                    SpiStreamingCallback cb = invocation.getArgument(3);
                     cb.onChunk("result is 2");
                     return SpiChatResponse.builder().content("result is 2").build();
                 });
@@ -127,9 +127,9 @@ class StreamingAgentExecutorTest {
         ReflectionTestUtils.setField(executor, "maxSteps", 10);
 
         LlmClientManager llmClient = mock(LlmClientManager.class);
-        when(llmClient.streamWithTools(any(SpiChatRequest.class), any(ToolCallback[].class), any(SpiStreamingCallback.class)))
+        when(llmClient.streamWithTools(any(SpiChatRequest.class), any(TaskContext.class), any(ToolCallback[].class), any(SpiStreamingCallback.class)))
                 .thenAnswer(invocation -> {
-                    SpiStreamingCallback cb = invocation.getArgument(2);
+                    SpiStreamingCallback cb = invocation.getArgument(3);
                     cb.onToolCall(SpiToolCall.builder().id("c1").name("dangerous").arguments(Map.of("x", 1)).build());
                     return SpiChatResponse.builder()
                             .content("")
@@ -137,7 +137,7 @@ class StreamingAgentExecutorTest {
                             .build();
                 })
                 .thenAnswer(invocation -> {
-                    SpiStreamingCallback cb = invocation.getArgument(2);
+                    SpiStreamingCallback cb = invocation.getArgument(3);
                     cb.onChunk("approved result");
                     return SpiChatResponse.builder().content("approved result").build();
                 });
@@ -199,9 +199,9 @@ class StreamingAgentExecutorTest {
 
         AtomicReference<List<SpiMessage>> secondCallMessages = new AtomicReference<>();
         LlmClientManager llmClient = mock(LlmClientManager.class);
-        when(llmClient.streamWithTools(any(SpiChatRequest.class), any(ToolCallback[].class), any(SpiStreamingCallback.class)))
+        when(llmClient.streamWithTools(any(SpiChatRequest.class), any(TaskContext.class), any(ToolCallback[].class), any(SpiStreamingCallback.class)))
                 .thenAnswer(invocation -> {
-                    SpiStreamingCallback cb = invocation.getArgument(2);
+                    SpiStreamingCallback cb = invocation.getArgument(3);
                     cb.onReasoningChunk("let me think");
                     cb.onToolCall(SpiToolCall.builder().id("c1").name("dangerous").arguments(Map.of("x", 1)).build());
                     return SpiChatResponse.builder()
@@ -212,7 +212,7 @@ class StreamingAgentExecutorTest {
                 })
                 .thenAnswer(invocation -> {
                     secondCallMessages.set(new ArrayList<>(invocation.getArgument(0, SpiChatRequest.class).getMessages()));
-                    SpiStreamingCallback cb = invocation.getArgument(2);
+                    SpiStreamingCallback cb = invocation.getArgument(3);
                     cb.onChunk("approved result");
                     return SpiChatResponse.builder().content("approved result").build();
                 });

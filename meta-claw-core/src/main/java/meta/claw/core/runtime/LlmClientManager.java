@@ -7,59 +7,45 @@ import meta.claw.core.llm.SpiChatResponse;
 import meta.claw.core.llm.SpiLlmClient;
 import meta.claw.core.llm.SpiMessage;
 import meta.claw.core.llm.SpiStreamingCallback;
+import meta.claw.core.llm.advisor.MetaClawCallContext;
 import meta.claw.core.llm.provider.LlmClientProviderManager;
 import meta.claw.core.memory.MemoryMessage;
 import meta.claw.core.memory.MemoryMessageConverter;
 import meta.claw.core.config.resolver.RuntimeConfigResolver;
-import meta.claw.core.llm.SpiUsage;
-import meta.claw.core.llm.advisor.MetaClawCallContext;
 import meta.claw.core.tool.SpiToolCall;
-import meta.claw.core.runtime.metrics.MetricsRecorder;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.AssistantMessage;
-import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.ToolResponseMessage;
 import org.springframework.ai.chat.messages.UserMessage;
-import org.springframework.ai.chat.model.ChatResponse;
-import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.prompt.Prompt;
-import org.springframework.ai.model.tool.ToolCallingChatOptions;
-
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 /**
  * 基于 Spring AI ChatClient 的 SpiLlmClient 实现。
+ * <p>
+ * 作为纯适配器：将 {@link SpiMessage} 转换为 Spring AI {@link Message}，通过
+ * {@link LlmClientProviderManager} 获取带公共 Advisor 栈的 {@link ChatClient}，
+ * 最后从 {@link MetaClawCallContext} 读取 Advisors 写入的结果并组装 {@link SpiChatResponse}。
+ * </p>
  */
 @Slf4j
 @Component
 public class LlmClientManager implements SpiLlmClient {
+
     @Autowired
     private LlmClientProviderManager llmClientProviderManager;
     @Autowired
     private RuntimeConfigResolver runtimeConfigResolver;
-
-    @Autowired(required = false)
-    private MetricsRecorder metricsRecorder;
-
-    private ChatClient buildChatClient(String vesselName) {
-        ProviderConfig providerConfig = runtimeConfigResolver.resolve(vesselName).getProviderConfig();
-        return llmClientProviderManager.create(providerConfig);
-    }
 
     public List<SpiMessage> toSpiMessages(List<MemoryMessage> entries) {
         List<SpiMessage> restored = new ArrayList<>();
@@ -82,158 +68,111 @@ public class LlmClientManager implements SpiLlmClient {
         return restored;
     }
 
-
-
     @Override
     public SpiChatResponse chat(SpiChatRequest request) {
+        return chat(request, null);
+    }
+
+    /**
+     * 同步 chat，支持与 {@link TaskContext} 绑定以复用上下文。
+     */
+    public SpiChatResponse chat(SpiChatRequest request, TaskContext taskContext) {
         log.debug("LlmClientManager chat vessel={}, messages={}", request.getVesselId(), request.getMessages().size());
 
         List<Message> messages = request.getMessages().stream()
                 .map(this::toSpringMessage)
                 .collect(Collectors.toCollection(ArrayList::new));
 
-        MetaClawCallContext ctx = new MetaClawCallContext();
-        ctx.setVesselId(request.getVesselId());
-        ctx.setSessionId(request.getSessionId());
+        MetaClawCallContext ctx = createCallContext(request, taskContext);
 
         buildChatClient(request.getVesselId())
                 .prompt(new Prompt(messages))
-                .advisors(spec -> spec.param("metaClawCallContext", ctx))
+                .advisors(spec -> spec.param(MetaClawCallContext.CONTEXT_KEY, ctx))
                 .call()
                 .chatResponse();
 
-        return SpiChatResponse.builder()
-                .content(ctx.getContent() != null ? ctx.getContent() : "")
-                .reasoningContent(ctx.getReasoningContent())
-                .toolCalls(ctx.getToolCalls() != null ? ctx.getToolCalls() : List.of())
-                .usage(ctx.getUsage())
-                .build();
+        return buildResponse(ctx);
     }
 
     /**
-     * 单次 tool-aware 流式调用，返回最终响应（含 toolCalls），不执行 tool-call 循环。
-     * <p>内容 chunk 通过 callback 实时输出。</p>
+     * 单次 tool-aware 调用，返回的 SpiChatResponse 可能携带 toolCalls。
+     * 由 AgentExecutor 手动控制 tool-call 循环。
      */
-    public SpiChatResponse streamWithTools(SpiChatRequest request, ToolCallback[] toolCallbacks,
-                                           SpiStreamingCallback callback) {
-        long startTime = System.currentTimeMillis();
-        callback.onStart();
+    public SpiChatResponse chatWithTools(SpiChatRequest request, TaskContext taskContext, ToolCallback... toolCallbacks) {
+        log.debug("LlmClientManager chatWithTools vessel={}, messages={}", request.getVesselId(), request.getMessages().size());
 
         List<Message> messages = request.getMessages().stream()
                 .map(this::toSpringMessage)
                 .collect(Collectors.toCollection(ArrayList::new));
 
-        StringBuilder contentBuilder = new StringBuilder();
-        StringBuilder reasoningBuilder = new StringBuilder();
-        AtomicReference<SpiUsage> usageRef = new AtomicReference<>();
-        AtomicReference<List<SpiToolCall>> toolCallsRef = new AtomicReference<>(List.of());
-        java.util.Set<String> notifiedToolCallIds = new java.util.HashSet<>();
-        java.util.Map<String, StringBuilder> accumulatingToolArgs = new java.util.LinkedHashMap<>();
-        java.util.Map<String, AssistantMessage.ToolCall> accumulatingToolCalls = new java.util.LinkedHashMap<>();
-        ObjectMapper objectMapper = new ObjectMapper();
+        MetaClawCallContext ctx = createCallContext(request, taskContext);
 
-        ToolCallingChatOptions toolOptions = ToolCallingChatOptions.builder()
-                .toolCallbacks(Arrays.asList(toolCallbacks))
-                .internalToolExecutionEnabled(false)
-                .build();
+        buildChatClient(request.getVesselId())
+                .prompt(new Prompt(messages))
+                .advisors(spec -> spec
+                        .param(MetaClawCallContext.CONTEXT_KEY, ctx)
+                        .param(MetaClawCallContext.EXPLICIT_TOOL_CALLBACKS_KEY, toolCallbacks))
+                .call()
+                .chatResponse();
 
+        return buildResponse(ctx);
+    }
+
+    /**
+     * 单次 tool-aware 流式调用，返回最终响应（含 toolCalls），不执行 tool-call 循环。
+     * <p>内容 chunk 通过 callback 实时输出，tool-call 累积由 {@link meta.claw.core.llm.advisor.MetaClawResponseStreamAdvisor} 处理。</p>
+     */
+    public SpiChatResponse streamWithTools(SpiChatRequest request, TaskContext taskContext,
+                                           ToolCallback[] toolCallbacks, SpiStreamingCallback callback) {
+        log.debug("LlmClientManager streamWithTools vessel={}, messages={}", request.getVesselId(), request.getMessages().size());
+
+        List<Message> messages = request.getMessages().stream()
+                .map(this::toSpringMessage)
+                .collect(Collectors.toCollection(ArrayList::new));
+
+        MetaClawCallContext ctx = createCallContext(request, taskContext);
+        ctx.setStreamingCallback(callback);
+
+        callback.onStart();
         try {
-            buildRawChatClient(request.getVesselId())
-                    .prompt(new Prompt(messages, toolOptions))
+            buildChatClient(request.getVesselId())
+                    .prompt(new Prompt(messages))
+                    .advisors(spec -> spec
+                            .param(MetaClawCallContext.CONTEXT_KEY, ctx)
+                            .param(MetaClawCallContext.EXPLICIT_TOOL_CALLBACKS_KEY, toolCallbacks))
                     .stream()
                     .chatResponse()
                     .doOnNext(response -> {
-                        Generation gen = response.getResult();
-                        if (gen != null && gen.getOutput() != null) {
-                            String content = gen.getOutput().getText();
-                            String reasoningChunk = extractReasoningContent(gen);
-
-                            if (reasoningChunk != null && !reasoningChunk.isEmpty()) {
-                                reasoningBuilder.append(reasoningChunk);
-                                callback.onReasoningChunk(reasoningChunk);
-                            }
-                            if (content != null && !content.isEmpty()) {
-                                contentBuilder.append(content);
-                                callback.onChunk(content);
-                            }
-
-                            if (gen.getOutput() instanceof AssistantMessage am && am.hasToolCalls()) {
-                                log.debug("[STREAM-WITH-TOOLS] chunk hasToolCalls=true, count={}, content={}",
-                                        am.getToolCalls().size(), abbreviate(am.getText(), 80));
-                                accumulateToolCalls(am, accumulatingToolCalls, accumulatingToolArgs);
-                            }
-                            String finishReason = gen.getMetadata() != null ? gen.getMetadata().getFinishReason() : null;
-                            boolean isToolCallFinish = finishReason != null
-                                    && (finishReason.equalsIgnoreCase("tool_calls") || finishReason.equalsIgnoreCase("tool_call"));
-                            if (isToolCallFinish && !accumulatingToolCalls.isEmpty()) {
-                                log.debug("[STREAM-WITH-TOOLS] finishReason={}, accumulated {} tool call(s)",
-                                        finishReason, accumulatingToolCalls.size());
-                                List<SpiToolCall> calls = new ArrayList<>();
-                                for (AssistantMessage.ToolCall tc : accumulatingToolCalls.values()) {
-                                    if (notifiedToolCallIds.add(tc.id())) {
-                                        try {
-                                            String fullArgs = accumulatingToolArgs.get(tc.id()).toString();
-                                            Map<String, Object> args = objectMapper.readValue(
-                                                    fullArgs, new TypeReference<>() {});
-                                            SpiToolCall spiToolCall = SpiToolCall.builder()
-                                                    .id(tc.id())
-                                                    .name(tc.name())
-                                                    .arguments(args)
-                                                    .build();
-                                            calls.add(spiToolCall);
-                                            callback.onToolCall(spiToolCall);
-                                        } catch (Exception e) {
-                                            log.warn("Failed to parse tool call arguments: {}", accumulatingToolArgs.get(tc.id()), e);
-                                        }
-                                    }
-                                }
-                                toolCallsRef.set(calls);
-                            }
-                        }
-
-                        SpiUsage usage = extractUsage(response);
-                        if (usage != null) {
-                            usageRef.set(usage);
-                            callback.onUsage(usage);
-                        }
+                        // callback.onChunk/onReasoningChunk 由 streaming advisor 触发
                     })
                     .doOnError(error -> {
-                        long totalTime = System.currentTimeMillis() - startTime;
-                        log.error("[STREAM-WITH-TOOLS] Error after {}ms: {}", totalTime, error.getMessage(), error);
+                        log.error("[STREAM-WITH-TOOLS] Error: {}", error.getMessage(), error);
                         callback.onError(error);
                     })
                     .doOnComplete(() -> {
-                        SpiChatResponse spiResponse = SpiChatResponse.builder()
-                                .content(contentBuilder.toString())
-                                .reasoningContent(reasoningBuilder.toString())
-                                .toolCalls(toolCallsRef.get())
-                                .usage(usageRef.get())
-                                .build();
-                        callback.onComplete(spiResponse);
+                        SpiChatResponse response = buildResponse(ctx);
+                        callback.onComplete(response);
                     })
                     .blockLast();
         } catch (Exception e) {
-            long totalTime = System.currentTimeMillis() - startTime;
-            log.error("[STREAM-WITH-TOOLS] Exception after {}ms: {}", totalTime, e.getMessage(), e);
+            log.error("[STREAM-WITH-TOOLS] Exception: {}", e.getMessage(), e);
             callback.onError(e);
             throw new RuntimeException("Stream with tools failed", e);
         }
 
-        long totalLatency = System.currentTimeMillis() - startTime;
-        recordLlmMetrics(request.getVesselId(), totalLatency, usageRef.get());
-
-        return SpiChatResponse.builder()
-                .content(contentBuilder.toString())
-                .reasoningContent(reasoningBuilder.toString())
-                .toolCalls(toolCallsRef.get())
-                .usage(usageRef.get())
-                .build();
+        return buildResponse(ctx);
     }
 
     @Override
     public void chatStream(SpiChatRequest request, SpiStreamingCallback callback) {
-        // 复用 streamWithTools 的流式累积/回调逻辑，无工具场景传空数组
-        streamWithTools(request, new ToolCallback[0], callback);
+        chatStream(request, null, callback);
+    }
+
+    /**
+     * 流式 chat，复用 streamWithTools 的流式逻辑，无工具场景传空数组。
+     */
+    public void chatStream(SpiChatRequest request, TaskContext taskContext, SpiStreamingCallback callback) {
+        streamWithTools(request, taskContext, new ToolCallback[0], callback);
     }
 
     @Override
@@ -241,110 +180,25 @@ public class LlmClientManager implements SpiLlmClient {
         return CompletableFuture.supplyAsync(() -> chat(request));
     }
 
-    private static String extractReasoningContent(Generation gen) {
-        if (gen == null) {
-            return null;
+    private MetaClawCallContext createCallContext(SpiChatRequest request, TaskContext taskContext) {
+        if (taskContext != null) {
+            return new MetaClawCallContext(taskContext);
         }
-        // Spring AI 1.1.7 将 reasoningContent 存入 AssistantMessage.metadata (properties map)
-        // 而非 ChatGenerationMetadata。需要同时检查两处。
-        String reasoningContent = null;
-        if (gen.getOutput() instanceof AssistantMessage am && am.getMetadata() != null) {
-            Object rc = am.getMetadata().get("reasoningContent");
-            if (rc instanceof String s && !s.isEmpty()) {
-                reasoningContent = s;
-            }
-        }
-        if (reasoningContent == null && gen.getMetadata() != null) {
-            Object rc = gen.getMetadata().get("reasoningContent");
-            if (rc instanceof String s && !s.isEmpty()) {
-                reasoningContent = s;
-            }
-        }
-        return reasoningContent;
+        return new MetaClawCallContext(request.getVesselId(), request.getSessionId());
     }
 
-    private static SpiUsage extractUsage(ChatResponse chatResponse) {
-        if (chatResponse == null || chatResponse.getMetadata() == null) {
-            return null;
-        }
-        org.springframework.ai.chat.metadata.Usage usage = chatResponse.getMetadata().getUsage();
-        if (usage == null) {
-            return null;
-        }
-        return SpiUsage.builder()
-                .promptTokens(usage.getPromptTokens())
-                .completionTokens(usage.getCompletionTokens())
-                .totalTokens(usage.getTotalTokens())
-                .build();
-    }
-
-    /**
-     * 单次 tool-aware 调用，返回的 SpiChatResponse 可能携带 toolCalls。
-     * 由 AgentExecutor 手动控制 tool-call 循环。
-     */
-    public SpiChatResponse chatWithTools(SpiChatRequest request, ToolCallback... toolCallbacks) {
-        log.debug("LlmClientManager chatWithTools vessel={}, messages={}", request.getVesselId(), request.getMessages().size());
-
-        List<Message> messages = request.getMessages().stream()
-                .map(this::toSpringMessage)
-                .collect(Collectors.toCollection(ArrayList::new));
-
-        long startTime = System.currentTimeMillis();
-        ToolCallingChatOptions toolOptions = ToolCallingChatOptions.builder()
-                .toolCallbacks(Arrays.asList(toolCallbacks))
-                .internalToolExecutionEnabled(false)
-                .build();
-
-        ChatResponse chatResponse = buildRawChatClient(request.getVesselId())
-                .prompt(new Prompt(messages, toolOptions))
-                .call()
-                .chatResponse();
-        long latency = System.currentTimeMillis() - startTime;
-
-        Generation gen = chatResponse.getResult();
-        String content = gen != null && gen.getOutput() != null ? gen.getOutput().getText() : "";
-        String reasoningContent = extractReasoningContent(gen);
-        SpiUsage usage = extractUsage(chatResponse);
-        List<SpiToolCall> toolCalls = extractToolCalls(gen);
-
-        recordLlmMetrics(request.getVesselId(), latency, usage);
-
+    private SpiChatResponse buildResponse(MetaClawCallContext ctx) {
         return SpiChatResponse.builder()
-                .content(content != null ? content : "")
-                .reasoningContent(reasoningContent)
-                .toolCalls(toolCalls)
-                .usage(usage)
+                .content(ctx.getContentOrEmpty())
+                .reasoningContent(ctx.getReasoningContent())
+                .toolCalls(ctx.getToolCallsOrEmpty())
+                .usage(ctx.getUsage())
                 .build();
     }
 
-    private void recordLlmMetrics(String vesselId, long latencyMs, SpiUsage usage) {
-        if (metricsRecorder == null) {
-            return;
-        }
-        metricsRecorder.recordLlmLatency(vesselId, latencyMs);
-        metricsRecorder.recordTokenUsage(vesselId, usage);
-    }
-
-    private ChatClient buildRawChatClient(String vesselId) {
+    private ChatClient buildChatClient(String vesselId) {
         ProviderConfig providerConfig = runtimeConfigResolver.resolve(vesselId).getProviderConfig();
-        return llmClientProviderManager.createRaw(providerConfig);
-    }
-
-    private static List<SpiToolCall> extractToolCalls(Generation gen) {
-        List<SpiToolCall> result = new ArrayList<>();
-        if (gen == null || !(gen.getOutput() instanceof AssistantMessage am) || !am.hasToolCalls()) {
-            return result;
-        }
-        ObjectMapper mapper = new ObjectMapper();
-        for (AssistantMessage.ToolCall tc : am.getToolCalls()) {
-            try {
-                Map<String, Object> args = mapper.readValue(tc.arguments(), new TypeReference<>() {});
-                result.add(SpiToolCall.builder().id(tc.id()).name(tc.name()).arguments(args).build());
-            } catch (Exception e) {
-                log.warn("Failed to parse tool call arguments: {}", tc.arguments(), e);
-            }
-        }
-        return result;
+        return llmClientProviderManager.create(providerConfig);
     }
 
     private Message toSpringMessage(SpiMessage msg) {
@@ -395,7 +249,7 @@ public class LlmClientManager implements SpiLlmClient {
         if (toolCalls == null || toolCalls.isEmpty()) {
             return List.of();
         }
-        ObjectMapper mapper = new ObjectMapper();
+        com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
         return toolCalls.stream()
                 .map(tc -> new AssistantMessage.ToolCall(
                         tc.getId(),
@@ -405,7 +259,7 @@ public class LlmClientManager implements SpiLlmClient {
                 .collect(Collectors.toList());
     }
 
-    private static String toArgumentsJson(ObjectMapper mapper, Map<String, Object> arguments) {
+    private static String toArgumentsJson(com.fasterxml.jackson.databind.ObjectMapper mapper, Map<String, Object> arguments) {
         if (arguments == null) {
             return "{}";
         }
@@ -416,34 +270,6 @@ public class LlmClientManager implements SpiLlmClient {
         }
     }
 
-    private static void accumulateToolCalls(AssistantMessage am,
-                                            java.util.Map<String, AssistantMessage.ToolCall> accumulatingToolCalls,
-                                            java.util.Map<String, StringBuilder> accumulatingToolArgs) {
-        for (AssistantMessage.ToolCall tc : am.getToolCalls()) {
-            String id = tc.id();
-            if (id == null && accumulatingToolCalls.size() == 1) {
-                id = accumulatingToolCalls.keySet().iterator().next();
-            }
-            if (id == null) {
-                log.warn("Ignoring tool call chunk without id: {}", tc);
-                continue;
-            }
-            AssistantMessage.ToolCall existing = accumulatingToolCalls.get(id);
-            String name = tc.name() != null ? tc.name() : (existing != null ? existing.name() : null);
-            String type = tc.type() != null ? tc.type() : (existing != null ? existing.type() : "function");
-            String args = tc.arguments() != null ? tc.arguments() : "";
-            accumulatingToolCalls.put(id, new AssistantMessage.ToolCall(id, type, name, args));
-            accumulatingToolArgs.computeIfAbsent(id, k -> new StringBuilder()).append(args);
-        }
-    }
-
-    private static String abbreviate(String s, int maxLen) {
-        if (s == null) {
-            return "";
-        }
-        return s.length() <= maxLen ? s : s.substring(0, maxLen) + "...";
-    }
-
     private record LegacyToolResult(String toolCallId, String toolName, String result) {}
 
     private static LegacyToolResult parseLegacyToolResultJson(String json) {
@@ -451,7 +277,8 @@ public class LlmClientManager implements SpiLlmClient {
             return new LegacyToolResult(null, null, "");
         }
         try {
-            Map<String, Object> map = new ObjectMapper().readValue(json, new TypeReference<>() {});
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            Map<String, Object> map = mapper.readValue(json, new com.fasterxml.jackson.core.type.TypeReference<>() {});
             return new LegacyToolResult(
                     String.valueOf(map.getOrDefault("toolCallId", "tool")),
                     String.valueOf(map.getOrDefault("toolName", "tool")),

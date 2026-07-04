@@ -29,7 +29,7 @@ class AgentExecutorHitlTest {
         ReflectionTestUtils.setField(executor, "maxSteps", 10);
 
         LlmClientManager llmClient = mock(LlmClientManager.class);
-        when(llmClient.chatWithTools(any(SpiChatRequest.class), any(ToolCallback[].class)))
+        when(llmClient.chatWithTools(any(SpiChatRequest.class), any(TaskContext.class), any(ToolCallback[].class)))
                 .thenReturn(SpiChatResponse.builder()
                         .content("")
                         .toolCalls(List.of(SpiToolCall.builder()
@@ -93,7 +93,7 @@ class AgentExecutorHitlTest {
         }
 
         LlmClientManager llmClient = mock(LlmClientManager.class);
-        when(llmClient.chatWithTools(any(SpiChatRequest.class), any(ToolCallback[].class)))
+        when(llmClient.chatWithTools(any(SpiChatRequest.class), any(TaskContext.class), any(ToolCallback[].class)))
                 .thenReturn(SpiChatResponse.builder()
                         .content("final answer")
                         .toolCalls(List.of())

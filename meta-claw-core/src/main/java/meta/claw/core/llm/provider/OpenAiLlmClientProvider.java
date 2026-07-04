@@ -3,35 +3,29 @@ package meta.claw.core.llm.provider;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import meta.claw.core.config.ProviderConfig;
-import meta.claw.core.llm.advisor.MetaClawResponseCallAdvisor;
-import meta.claw.core.llm.advisor.ShortMemoryAdvisor;
-import meta.claw.core.llm.advisor.ToolRegistryAdvisor;
-import meta.claw.core.runtime.metrics.MetricsRecorder;
-import meta.claw.core.tool.registry.ToolRegistry;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.client.advisor.ToolCallAdvisor;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.ai.openai.ReasoningAwareOpenAiChatModel;
 import org.springframework.ai.openai.api.OpenAiApi;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.time.Duration;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * OpenAI 兼容协议的 ChatClient 工厂实现。
  * <p>
- * 支持所有兼容 OpenAI API 协议的 provider：
- * OpenAI、Moonshot、DeepSeek、Azure OpenAI、GitHub Models 等。
+ * 支持所有兼容 OpenAI API 协议的 provider：OpenAI、Moonshot、DeepSeek、Azure OpenAI、GitHub Models 等。
  * </p>
  *
- * 基于 Spring AI 1.1.8 稳定版 API，通过编程方式动态创建 ChatClient。
+ * <p>
+ * 本类只负责创建基础 {@link ChatClient} 与 {@link ChatModel}；公共 Advisor 栈由
+ * {@link LlmClientProviderManager} 统一装配，避免每个 provider 重复开发。
+ * </p>
  */
 @Slf4j
 @Component
@@ -39,32 +33,16 @@ import java.util.concurrent.ConcurrentHashMap;
 public class OpenAiLlmClientProvider implements LlmClientProvider {
 
     @Autowired
-    private ApplicationContext applicationContext;
-    @Autowired
     private ObjectMapper objectMapper;
-    @Autowired
-    private ShortMemoryAdvisor shortMemoryAdvisor;
-//    @Autowired
-//    private ObservationRegistry observationRegistry;
-//    @Autowired
-//    private ToolCallTraceAdvisor toolCallTraceAdvisor;
-
-    /**
-     * ChatClient 缓存：相同配置（baseUrl + model + temperature + apiKeyHash）复用已创建的实例，
-     * 避免重复创建连接池和序列化器。
-     */
-    private final ConcurrentHashMap<String, ChatClient> clientCache = new ConcurrentHashMap<>();
-
 
     @Override
     public ChatClient create(ProviderConfig providerConfig) {
-        String cacheKey = buildCacheKey(providerConfig);
-        return clientCache.computeIfAbsent(cacheKey, k -> buildChatClient(providerConfig));
+        return ChatClient.builder(buildChatModel(providerConfig)).build();
     }
 
     @Override
     public ChatClient createRaw(ProviderConfig providerConfig) {
-        return ChatClient.builder(buildChatModel(providerConfig)).build();
+        return create(providerConfig);
     }
 
     @Override
@@ -72,38 +50,7 @@ public class OpenAiLlmClientProvider implements LlmClientProvider {
         return buildChatModel(providerConfig);
     }
 
-    /**
-     * 构建缓存 key：baseUrl + model + temperature + timeout + apiKeyHash。
-     * 任一配置项变化都会创建新的 ChatClient。
-     */
-    private String buildCacheKey(ProviderConfig config) {
-        return String.join("#",
-                String.valueOf(config.getBaseUrl()),
-                String.valueOf(config.getModel()),
-                String.valueOf(config.getTemperature()),
-                String.valueOf(config.getTimeout()),
-                String.valueOf(config.getApiKey() != null ? config.getApiKey().hashCode() : 0));
-    }
-
-    private ChatClient buildChatClient(ProviderConfig providerConfig) {
-        ChatClient chatClient = ChatClient.builder(buildChatModel(providerConfig)).defaultAdvisors(
-                        ToolCallAdvisor.builder().build(),       // 外层：自动处理 tool calling 循环
-                        shortMemoryAdvisor,                        // 流式响应持久化到 ShortMemory
-                        new ToolRegistryAdvisor(applicationContext.getBean(ToolRegistry.class)),
-                        new MetaClawResponseCallAdvisor(
-                                applicationContext.getBeanProvider(MetricsRecorder.class).getIfAvailable(),
-                                objectMapper)
-                )
-                .build();
-
-        if (log.isDebugEnabled()) {
-            log.debug("ChatClient created successfully for model: {}", providerConfig.getModel());
-        }
-
-        return chatClient;
-    }
-
-    public org.springframework.ai.chat.model.ChatModel buildChatModel(ProviderConfig providerConfig) {
+    public ChatModel buildChatModel(ProviderConfig providerConfig) {
         String apiKey = providerConfig.getApiKey();
         String baseUrl = normalizeBaseUrl(providerConfig.getBaseUrl());
         String model = providerConfig.getModel();
@@ -161,6 +108,4 @@ public class OpenAiLlmClientProvider implements LlmClientProvider {
     public String providerName() {
         return "openai";
     }
-
-
 }

@@ -1,10 +1,20 @@
 package meta.claw.core.llm.provider;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import meta.claw.core.config.ProviderConfig;
+import meta.claw.core.llm.advisor.MetaClawResponseCallAdvisor;
+import meta.claw.core.llm.advisor.MetaClawResponseStreamAdvisor;
+import meta.claw.core.llm.advisor.ShortMemoryAdvisor;
+import meta.claw.core.llm.advisor.ToolRegistryAdvisor;
+import meta.claw.core.runtime.metrics.MetricsRecorder;
+import meta.claw.core.tool.registry.ToolRegistry;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.advisor.ToolCallAdvisor;
+import org.springframework.ai.chat.client.advisor.api.Advisor;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.beans.BeansException;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
 import org.springframework.context.ApplicationListener;
@@ -13,12 +23,14 @@ import org.springframework.stereotype.Component;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * LLM 客户端代理工厂管理器。
  * <p>
- * 根据 provider 名称路由到对应的 {@link LlmClientProviderManager} 实现。
- * 收集所有 Spring 容器中注册的工厂实现，按优先级选择第一个匹配的工厂。
+ * 根据 provider 名称路由到对应的 {@link LlmClientProvider} 实现，并在基础 {@link ChatClient}
+ * 上统一装配公共 Advisor 栈（tool registry、response extraction、metrics、short memory 等）。
+ * 各 provider 实现只需关心如何创建基础 ChatClient/ChatModel，无需重复装配 cross-cutting Advisors。
  * </p>
  */
 @Slf4j
@@ -29,6 +41,13 @@ public class LlmClientProviderManager implements ApplicationContextAware, Applic
     private Map<String, LlmClientProvider> allProviders = new HashMap<>();
     private boolean initialized = false;
 
+    /**
+     * ChatClient 缓存：相同配置（baseUrl + model + temperature + apiKeyHash）复用已创建的实例。
+     */
+    private final ConcurrentHashMap<String, ChatClient> clientCache = new ConcurrentHashMap<>();
+
+    private Advisor[] defaultAdvisors;
+
     @Override
     public void setApplicationContext(ApplicationContext ctx) throws BeansException {
         this.applicationContext = ctx;
@@ -36,7 +55,7 @@ public class LlmClientProviderManager implements ApplicationContextAware, Applic
 
     /**
      * 监听 ContextRefreshedEvent 事件，在 Spring 容器刷新完成后执行。
-     * 此时所有 bean 都已初始化完成，可以安全地获取所有 ShortMemoryStore 实现。
+     * 此时所有 bean 都已初始化完成，可以安全地获取所有 LlmClientProvider 实现并装配公共 Advisors。
      */
     @Override
     public void onApplicationEvent(ContextRefreshedEvent event) {
@@ -47,20 +66,21 @@ public class LlmClientProviderManager implements ApplicationContextAware, Applic
 
         // 只处理根容器的刷新事件
         if (event.getApplicationContext().getParent() == null) {
-            initializeStores();
+            initializeProviders();
+            initializeAdvisors();
             initialized = true;
         }
     }
 
-    private void initializeStores() {
+    private void initializeProviders() {
         // 从 Spring 上下文中获取所有 LlmClientProvider 实现
         Map<String, LlmClientProvider> allProviders = applicationContext.getBeansOfType(LlmClientProvider.class);
 
         log.info("Found {} LlmClientProvider implementation(s): {}", allProviders.size(), allProviders.keySet());
 
-        // 构建 type -> store 的映射，并检查 type 重名
+        // 构建 type -> provider 的映射，并检查 type 重名
         this.allProviders = new HashMap<>();
-        Map<String, String> typeToBeanName = new HashMap<>(); // 用于检测 type 重名
+        Map<String, String> typeToBeanName = new HashMap<>();
 
         for (Map.Entry<String, LlmClientProvider> entry : allProviders.entrySet()) {
             String beanName = entry.getKey();
@@ -69,7 +89,6 @@ public class LlmClientProviderManager implements ApplicationContextAware, Applic
 
             log.debug("Registering LlmClientProvider: beanName={}, providerName={}", beanName, providerName);
 
-            // 检查 type 是否已经存在
             if (typeToBeanName.containsKey(providerName)) {
                 String existingBeanName = typeToBeanName.get(providerName);
                 String errorMsg = String.format(
@@ -89,23 +108,50 @@ public class LlmClientProviderManager implements ApplicationContextAware, Applic
                 allProviders.size(), allProviders.keySet());
     }
 
+    private void initializeAdvisors() {
+        ToolRegistry toolRegistry = applicationContext.getBean(ToolRegistry.class);
+        ObjectProvider<MetricsRecorder> metricsRecorderProvider = applicationContext.getBeanProvider(MetricsRecorder.class);
+        ObjectMapper objectMapper = applicationContext.getBean(ObjectMapper.class);
+        ShortMemoryAdvisor shortMemoryAdvisor = applicationContext.getBean(ShortMemoryAdvisor.class);
 
+        this.defaultAdvisors = new Advisor[] {
+                ToolCallAdvisor.builder().build(),                    // 外层：自动处理 tool calling 循环
+                shortMemoryAdvisor,                                    // 流式响应持久化到 ShortMemory
+                new ToolRegistryAdvisor(toolRegistry),                 // 注入可用工具定义
+                new MetaClawResponseCallAdvisor(                       // 同步响应提取与指标
+                        metricsRecorderProvider.getIfAvailable(), objectMapper),
+                new MetaClawResponseStreamAdvisor(                     // 流式响应提取与指标
+                        metricsRecorderProvider.getIfAvailable(), objectMapper)
+        };
+
+        log.info("Initialized default ChatClient advisor stack with {} advisor(s)", defaultAdvisors.length);
+    }
 
     /**
-     * 根据 provider 名称创建 ChatClient
+     * 根据 provider 名称创建带公共 Advisor 栈的 ChatClient。
      *
      * @param providerConfig provider 配置
      * @return ChatClient 实例
      * @throws IllegalArgumentException 如果没有找到支持该 provider 的工厂
      */
     public ChatClient create(ProviderConfig providerConfig) {
+        String cacheKey = buildCacheKey(providerConfig);
+        return clientCache.computeIfAbsent(cacheKey, k -> buildAdvisedChatClient(providerConfig));
+    }
+
+    private ChatClient buildAdvisedChatClient(ProviderConfig providerConfig) {
         LlmClientProvider provider = resolveProvider(providerConfig);
-        log.debug("Routing provider '{}' to factory: {}", provider.providerName(), provider.getClass().getSimpleName());
-        return provider.create(providerConfig);
+        ChatClient baseClient = provider.create(providerConfig);
+        ChatClient advisedClient = baseClient.mutate()
+                .defaultAdvisors(defaultAdvisors)
+                .build();
+        log.debug("Built advised ChatClient for provider '{}' with {} default advisor(s)",
+                provider.providerName(), defaultAdvisors.length);
+        return advisedClient;
     }
 
     /**
-     * 根据 provider 名称创建不带自动 tool-call advisor 的 ChatClient
+     * 根据 provider 名称创建不带公共 Advisor 栈的 ChatClient，供测试或需要完全手动控制的场景使用。
      *
      * @param providerConfig provider 配置
      * @return ChatClient 实例
@@ -152,4 +198,16 @@ public class LlmClientProviderManager implements ApplicationContextAware, Applic
         return provider;
     }
 
+    /**
+     * 构建缓存 key：baseUrl + model + temperature + timeout + apiKeyHash。
+     * 任一配置项变化都会创建新的 ChatClient。
+     */
+    private String buildCacheKey(ProviderConfig config) {
+        return String.join("#",
+                String.valueOf(config.getBaseUrl()),
+                String.valueOf(config.getModel()),
+                String.valueOf(config.getTemperature()),
+                String.valueOf(config.getTimeout()),
+                String.valueOf(config.getApiKey() != null ? config.getApiKey().hashCode() : 0));
+    }
 }
