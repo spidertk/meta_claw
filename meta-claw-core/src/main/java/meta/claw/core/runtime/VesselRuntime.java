@@ -26,7 +26,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
 
-import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
@@ -34,7 +33,6 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 /**
  * Vessel 核心运行时类 — 子系统编排器。
@@ -122,57 +120,57 @@ public class VesselRuntime implements InitializingBean {
     // ========== 对话入口 ==========
 
     public Reply chat(String sessionId, String userMessage) {
-        return execute(newTask(sessionId, userMessage));
+        return execute(sessionId, userMessage);
     }
 
     /**
      * 从 HITL 挂起状态恢复，继续完成 ReAct 循环。
      */
-    public Reply resume(VesselTask task, ApprovalTicket ticket, ApprovalResolution resolution) {
+    public Reply resume(String sessionId, String userMessage, ApprovalTicket ticket, ApprovalResolution resolution) {
         String systemPrompt = renderSystemPrompt();
-        TaskContext ctx = new TaskContext(task, getProfile(), registry);
+        TaskContext ctx = TaskContext.create(vesselId, sessionId, userMessage, getProfile(), registry);
         registry.listAll().forEach(sub -> sub.onTaskStart(ctx));
         try {
-            List<SpiMessage> messages = buildLlmRequest(task, systemPrompt);
+            List<SpiMessage> messages = buildLlmRequest(ctx, systemPrompt);
             messages.add(SpiMessage.assistant(null, rebuildToolCalls(ticket)));
 
             SpiChatRequest request = SpiChatRequest.builder()
-                    .vesselId(task.getVesselId())
+                    .vesselId(ctx.getVesselId())
                     .messages(messages)
-                    .sessionId(task.getSessionId())
+                    .sessionId(ctx.getSessionId())
                     .build();
 
             Reply reply = currentEngine().resume(ctx, request, ticket, resolution);
-            saveAssistantMessage(task, reply.getContent());
+            saveAssistantMessage(ctx, reply.getContent());
             return reply;
         } finally {
             registry.listAll().forEach(sub -> sub.onTaskEnd(ctx));
         }
     }
 
-    public Reply execute(VesselTask task) {
+    public Reply execute(String sessionId, String userMessage) {
         // ① 渲染 system prompt
         String systemPrompt = renderSystemPrompt();
 
         // ② 构造任务上下文
-        TaskContext ctx = new TaskContext(task, getProfile(), registry);
+        TaskContext ctx = TaskContext.create(vesselId, sessionId, userMessage, getProfile(), registry);
 
         // ③ 任务开始生命周期
         registry.listAll().forEach(sub -> sub.onTaskStart(ctx));
 
         try {
             // ④ 构建 LLM 请求并执行
-            List<SpiMessage> messages = buildLlmRequest(task, systemPrompt);
+            List<SpiMessage> messages = buildLlmRequest(ctx, systemPrompt);
             SpiChatRequest request = SpiChatRequest.builder()
-                    .vesselId(task.getVesselId())
+                    .vesselId(ctx.getVesselId())
                     .messages(messages)
-                    .sessionId(task.getSessionId())
+                    .sessionId(ctx.getSessionId())
                     .build();
 
             Reply reply = currentEngine().execute(ctx, request);
 
             // 保存 assistant 消息到短期记忆
-            saveAssistantMessage(task, reply.getContent());
+            saveAssistantMessage(ctx, reply.getContent());
 
             return reply;
         } finally {
@@ -183,18 +181,17 @@ public class VesselRuntime implements InitializingBean {
 
     public void chatStream(String sessionId, String userMessage, SpiStreamingCallback callback) {
         String systemPrompt = renderSystemPrompt();
-        VesselTask task = newTask(sessionId, userMessage);
-        TaskContext ctx = new TaskContext(task, getProfile(), registry);
+        TaskContext ctx = TaskContext.create(vesselId, sessionId, userMessage, getProfile(), registry);
         registry.listAll().forEach(sub -> sub.onTaskStart(ctx));
         try {
-            List<SpiMessage> messages = buildLlmRequest(task, systemPrompt);
+            List<SpiMessage> messages = buildLlmRequest(ctx, systemPrompt);
             SpiChatRequest request = SpiChatRequest.builder()
-                    .vesselId(task.getVesselId())
+                    .vesselId(ctx.getVesselId())
                     .messages(messages)
-                    .sessionId(task.getSessionId())
+                    .sessionId(ctx.getSessionId())
                     .build();
             Reply reply = currentEngine().executeStream(ctx, request, callback);
-            saveAssistantMessage(task, reply.getContent());
+            saveAssistantMessage(ctx, reply.getContent());
         } finally {
             registry.listAll().forEach(sub -> sub.onTaskEnd(ctx));
         }
@@ -217,43 +214,33 @@ public class VesselRuntime implements InitializingBean {
 
     // ========== 内部 ==========
 
-    private VesselTask newTask(String sessionId, String userMessage) {
-        return VesselTask.builder()
-                .taskId(UUID.randomUUID().toString())
-                .vesselId(this.vesselId)
-                .sessionId(sessionId)
-                .userMessage(userMessage)
-                .createdAt(Instant.now())
-                .build();
-    }
-
-    private List<SpiMessage> buildLlmRequest(VesselTask task, String systemPrompt) {
+    private List<SpiMessage> buildLlmRequest(TaskContext ctx, String systemPrompt) {
         List<SpiMessage> messages = new ArrayList<>();
         if (systemPrompt != null && !systemPrompt.isBlank()) {
             messages.add(SpiMessage.system(systemPrompt));
         }
 
-        String sessionId = task.getSessionId();
+        String sessionId = ctx.getSessionId();
         ShortMemory shortMem = getShortMemory();
         if (StringUtils.isNotBlank(sessionId) && shortMem != null) {
             int maxRounds = getProfile().getBundle().getMaxHistoryRounds();
             messages.addAll(toSpiMessages(shortMem.loadMessages(vesselId, sessionId, maxRounds)));
         }
 
-        messages.add(SpiMessage.user(task.getUserMessage()));
+        messages.add(SpiMessage.user(ctx.getUserMessage()));
 
         if (shortMem != null) {
             shortMem.appendMessage(vesselId, sessionId,
-                    MemoryMessageConverter.fromSpiMessage(SpiMessage.user(task.getUserMessage())));
+                    MemoryMessageConverter.fromSpiMessage(SpiMessage.user(ctx.getUserMessage())));
         }
 
         return messages;
     }
 
-    private void saveAssistantMessage(VesselTask task, String content) {
+    private void saveAssistantMessage(TaskContext ctx, String content) {
         ShortMemory shortMem = getShortMemory();
         if (shortMem != null) {
-            shortMem.appendMessage(vesselId, task.getSessionId(),
+            shortMem.appendMessage(vesselId, ctx.getSessionId(),
                     MemoryMessageConverter.fromSpiMessage(SpiMessage.assistant(content, null, null)));
         }
     }

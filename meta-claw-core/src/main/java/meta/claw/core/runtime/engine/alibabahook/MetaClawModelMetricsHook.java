@@ -44,7 +44,7 @@ public class MetaClawModelMetricsHook extends ModelHook {
     public CompletableFuture<Map<String, Object>> afterModel(OverAllState state, RunnableConfig config) {
         if (metricsRecorder != null) {
             long latencyMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - modelStartNanos);
-            String vesselId = ctx.getTask().getVesselId();
+            String vesselId = ctx.getVesselId();
             metricsRecorder.recordLlmLatency(vesselId, latencyMs);
 
             AssistantMessage assistant = extractLastAssistantMessage(state);
@@ -72,6 +72,7 @@ public class MetaClawModelMetricsHook extends ModelHook {
     private void recordTokenUsage(AssistantMessage assistant, String vesselId) {
         SpiUsage usage = extractUsage(assistant);
         if (usage != null) {
+            ctx.accumulateTokenUsage(usage);
             metricsRecorder.recordTokenUsage(vesselId, usage);
         }
     }
@@ -96,10 +97,15 @@ public class MetaClawModelMetricsHook extends ModelHook {
         if (!assistant.hasToolCalls()) {
             return;
         }
+        List<meta.claw.core.tool.SpiToolCall> spiToolCalls = new java.util.ArrayList<>();
         for (AssistantMessage.ToolCall tc : assistant.getToolCalls()) {
             metricsRecorder.recordToolCall(vesselId, tc.name());
-            ctx.incrementToolCallCount();
+            spiToolCalls.add(meta.claw.core.tool.SpiToolCall.builder()
+                    .id(tc.id())
+                    .name(tc.name())
+                    .build());
         }
+        ctx.accumulateToolCalls(spiToolCalls);
     }
 
     @Override

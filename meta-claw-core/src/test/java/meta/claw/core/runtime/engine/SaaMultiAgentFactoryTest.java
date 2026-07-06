@@ -15,7 +15,6 @@ import meta.claw.core.config.bundle.VesselConfigBundle;
 import meta.claw.core.llm.provider.LlmClientProviderManager;
 import meta.claw.core.runtime.TaskContext;
 import meta.claw.core.runtime.VesselProfile;
-import meta.claw.core.runtime.VesselTask;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -119,13 +118,7 @@ class SaaMultiAgentFactoryTest {
     }
 
     private TaskContext dummyContext(List<VesselAgentConfig> agents, AgentFlowMode mode, AgentFlowConfig flowOverride) {
-        VesselTask task = VesselTask.builder()
-                .taskId("t1")
-                .vesselId("multi-agent-vessel")
-                .sessionId("s1")
-                .userMessage("hi")
-                .build();
-
+        
         VesselConfig vesselConfig = new VesselConfig();
         vesselConfig.setAgentEngine("alibaba");
         vesselConfig.setAgents(agents);
@@ -151,6 +144,13 @@ class SaaMultiAgentFactoryTest {
         VesselProfile profile = mock(VesselProfile.class);
         when(profile.getBundle()).thenReturn(bundle);
 
-        return new TaskContext(task, profile, null);
+        return TaskContext.builder()
+                .taskId("t1")
+                .vesselId("multi-agent-vessel")
+                .sessionId("s1")
+                .userMessage("hi")
+                .profile(profile)
+                .registry(null)
+                .build();
     }
 }

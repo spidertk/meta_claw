@@ -1,6 +1,7 @@
 package meta.claw.core.llm.advisor;
 
 import lombok.extern.slf4j.Slf4j;
+import meta.claw.core.runtime.TaskContext;
 import meta.claw.core.tool.registry.ToolRegistry;
 import org.springframework.ai.chat.client.ChatClientRequest;
 import org.springframework.ai.chat.client.ChatClientResponse;
@@ -47,7 +48,7 @@ public class ToolRegistryAdvisor implements CallAdvisor, StreamAdvisor {
     }
 
     private ChatClientRequest addTools(ChatClientRequest request) {
-        ToolCallback[] explicitCallbacks = (ToolCallback[]) request.context().get(MetaClawCallContext.EXPLICIT_TOOL_CALLBACKS_KEY);
+        ToolCallback[] explicitCallbacks = (ToolCallback[]) request.context().get(TaskContext.LlmCallContext.EXPLICIT_TOOL_CALLBACKS_KEY);
 
         List<ToolCallback> toolCallbacks;
         if (explicitCallbacks != null && explicitCallbacks.length > 0) {

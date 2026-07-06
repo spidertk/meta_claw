@@ -106,8 +106,8 @@ public class HitlSubSystem implements VesselSubSystem {
             ToolCallContext toolCtx = ToolCallContext.builder()
                     .toolName(tc.getName())
                     .arguments(tc.getArguments())
-                    .vesselId(ctx.getTask().getVesselId())
-                    .taskId(ctx.getTask().getTaskId())
+                    .vesselId(ctx.getVesselId())
+                    .taskId(ctx.getTaskId())
                     .stepNumber(ctx.getSteps().size() + 1)
                     .build();
 
@@ -127,7 +127,7 @@ public class HitlSubSystem implements VesselSubSystem {
         if (!pendingItems.isEmpty()) {
             ApprovalTicket ticket = ApprovalTicket.builder()
                     .ticketId(UUID.randomUUID().toString())
-                    .taskId(ctx.getTask().getTaskId())
+                    .taskId(ctx.getTaskId())
                     .items(pendingItems)
                     .createdAt(Instant.now())
                     .build();

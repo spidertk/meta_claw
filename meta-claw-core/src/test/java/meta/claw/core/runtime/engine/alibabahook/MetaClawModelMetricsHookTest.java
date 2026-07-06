@@ -7,7 +7,6 @@ import meta.claw.core.config.ProviderConfig;
 import meta.claw.core.config.bundle.VesselConfigBundle;
 import meta.claw.core.runtime.TaskContext;
 import meta.claw.core.runtime.VesselProfile;
-import meta.claw.core.runtime.VesselTask;
 import meta.claw.core.runtime.metrics.MetricsRecorder;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.messages.AssistantMessage;
@@ -100,12 +99,6 @@ class MetaClawModelMetricsHookTest {
     }
 
     private TaskContext dummyContext() {
-        VesselTask task = VesselTask.builder()
-                .taskId("t1")
-                .vesselId("v1")
-                .sessionId("s1")
-                .userMessage("hi")
-                .build();
         VesselProfile profile = mock(VesselProfile.class);
         meta.claw.core.config.RuntimeConfig runtimeConfig = new meta.claw.core.config.RuntimeConfig();
         runtimeConfig.setProviderConfig(new ProviderConfig());
@@ -113,6 +106,13 @@ class MetaClawModelMetricsHookTest {
                 .runtimeConfig(runtimeConfig)
                 .build();
         when(profile.getBundle()).thenReturn(bundle);
-        return new TaskContext(task, profile, null);
+        return TaskContext.builder()
+                .taskId("t1")
+                .vesselId("v1")
+                .sessionId("s1")
+                .userMessage("hi")
+                .profile(profile)
+                .registry(null)
+                .build();
     }
 }

@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import meta.claw.core.tool.SpiToolCall;
 import meta.claw.core.llm.SpiUsage;
+import meta.claw.core.runtime.TaskContext;
 import meta.claw.core.runtime.metrics.MetricsRecorder;
 import org.springframework.ai.chat.client.ChatClientRequest;
 import org.springframework.ai.chat.client.ChatClientResponse;
@@ -25,7 +26,7 @@ import java.util.Map;
  * <ul>
  *   <li>测量本次 LLM 调用 latency；</li>
  *   <li>从 {@link ChatResponse} 提取 content、reasoningContent、usage、toolCalls；</li>
- *   <li>将提取结果写入共享 {@link MetaClawCallContext}；</li>
+ *   <li>将提取结果写入 {@link TaskContext.LlmCallContext}；</li>
  *   <li>调用 {@link MetricsRecorder} 记录 latency 与 token usage。</li>
  * </ul>
  */
@@ -42,7 +43,7 @@ public class MetaClawResponseCallAdvisor implements CallAdvisor {
 
     @Override
     public ChatClientResponse adviseCall(ChatClientRequest request, CallAdvisorChain chain) {
-        MetaClawCallContext ctx = (MetaClawCallContext) request.context().get(MetaClawCallContext.CONTEXT_KEY);
+        TaskContext.LlmCallContext ctx = (TaskContext.LlmCallContext) request.context().get(TaskContext.LlmCallContext.CONTEXT_KEY);
 
         ChatClientResponse response = chain.nextCall(request);
 

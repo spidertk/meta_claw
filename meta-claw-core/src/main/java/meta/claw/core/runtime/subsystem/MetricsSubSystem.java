@@ -45,7 +45,7 @@ public class MetricsSubSystem implements VesselSubSystem {
 
     @Override
     public void onTaskEnd(TaskContext ctx) {
-        String vesselId = ctx.getTask().getVesselId();
+        String vesselId = ctx.getVesselId();
         int steps = ctx.getSteps().size();
 
         if (metricsRecorder != null) {
@@ -59,7 +59,7 @@ public class MetricsSubSystem implements VesselSubSystem {
 
         MetricSnapshot snapshot = MetricSnapshot.builder()
                 .vesselId(vesselId)
-                .taskId(ctx.getTask().getTaskId())
+                .taskId(ctx.getTaskId())
                 .stepCount(steps)
                 .toolCallCount(ctx.getToolCallCount())
                 .durationMs(ctx.getDurationMs())

@@ -4,7 +4,6 @@ import meta.claw.core.config.GlobalConfig;
 import meta.claw.core.config.HitlConfig;
 import meta.claw.core.config.loader.GlobalConfigLoader;
 import meta.claw.core.runtime.TaskContext;
-import meta.claw.core.runtime.VesselTask;
 import meta.claw.core.runtime.subsystem.HitlSubSystem;
 import meta.claw.core.runtime.subsystem.SubSystemRegistry;
 import meta.claw.core.tool.SpiToolCall;
@@ -28,11 +27,12 @@ class HitlSubSystemTest {
         ReflectionTestUtils.setField(hitl, "hitlPolicy", policy);
         ReflectionTestUtils.setField(hitl, "hitlGate", new InMemoryHitlGate());
 
-        TaskContext ctx = new TaskContext(
-                VesselTask.builder().taskId("t1").vesselId("v1").build(),
-                null,
-                new SubSystemRegistry()
-        );
+        TaskContext ctx = TaskContext.builder()
+                .taskId("t1")
+                .vesselId("v1")
+                .profile(null)
+                .registry(new SubSystemRegistry())
+                .build();
         SpiToolCall tc = SpiToolCall.builder().id("c1").name("calculator").arguments(Map.of("a", 1)).build();
         HitlEvaluation eval = hitl.evaluate(List.of(tc), ctx);
         assertFalse(eval.hasSuspensions());
@@ -47,11 +47,12 @@ class HitlSubSystemTest {
         ReflectionTestUtils.setField(hitl, "hitlPolicy", policy);
         ReflectionTestUtils.setField(hitl, "hitlGate", new InMemoryHitlGate());
 
-        TaskContext ctx = new TaskContext(
-                VesselTask.builder().taskId("t1").vesselId("v1").build(),
-                null,
-                new SubSystemRegistry()
-        );
+        TaskContext ctx = TaskContext.builder()
+                .taskId("t1")
+                .vesselId("v1")
+                .profile(null)
+                .registry(new SubSystemRegistry())
+                .build();
         SpiToolCall tc = SpiToolCall.builder().id("c1").name("dangerous").arguments(Map.of("x", 1)).build();
         HitlEvaluation eval = hitl.evaluate(List.of(tc), ctx);
         assertTrue(eval.hasSuspensions());
@@ -81,11 +82,12 @@ class HitlSubSystemTest {
 
         hitl.loadGlobalHitlConfig();
 
-        TaskContext ctx = new TaskContext(
-                VesselTask.builder().taskId("t1").vesselId("v2").build(),
-                null,
-                new SubSystemRegistry()
-        );
+        TaskContext ctx = TaskContext.builder()
+                .taskId("t1")
+                .vesselId("v2")
+                .profile(null)
+                .registry(new SubSystemRegistry())
+                .build();
         assertTrue(hitl.evaluate(List.of(SpiToolCall.builder().id("c1").name("execute").arguments(Map.of()).build()), ctx).hasSuspensions());
         assertFalse(hitl.evaluate(List.of(SpiToolCall.builder().id("c2").name("readFile").arguments(Map.of()).build()), ctx).hasSuspensions());
         assertFalse(hitl.evaluate(List.of(SpiToolCall.builder().id("c3").name("calculate").arguments(Map.of()).build()), ctx).hasSuspensions());

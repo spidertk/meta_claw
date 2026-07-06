@@ -27,7 +27,7 @@ public class MetaClawAgentMetricsHook extends AgentHook {
     @Override
     public CompletableFuture<Map<String, Object>> afterAgent(OverAllState state, RunnableConfig config) {
         if (metricsRecorder != null) {
-            String vesselId = ctx.getTask().getVesselId();
+            String vesselId = ctx.getVesselId();
             metricsRecorder.recordTaskCompleted(vesselId);
             metricsRecorder.recordSteps(vesselId, ctx.getSteps().size());
             metricsRecorder.recordTaskDuration(vesselId, ctx.getDurationMs());

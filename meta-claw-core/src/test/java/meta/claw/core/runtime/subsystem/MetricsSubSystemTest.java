@@ -3,10 +3,11 @@ package meta.claw.core.runtime.subsystem;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import meta.claw.core.llm.SpiUsage;
 import meta.claw.core.runtime.TaskContext;
-import meta.claw.core.runtime.VesselTask;
 import meta.claw.core.runtime.metrics.MetricsRecorder;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
+
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -18,11 +19,14 @@ class MetricsSubSystemTest {
         SimpleMeterRegistry registry = new SimpleMeterRegistry();
         ReflectionTestUtils.setField(metricsSub, "meterRegistry", registry);
 
-        TaskContext ctx = new TaskContext(
-                VesselTask.builder().taskId("t1").vesselId("v1").sessionId("s1").userMessage("hi").build(),
-                null,
-                new SubSystemRegistry()
-        );
+        TaskContext ctx = TaskContext.builder()
+                .taskId("t1")
+                .vesselId("v1")
+                .sessionId("s1")
+                .userMessage("hi")
+                .profile(null)
+                .registry(new SubSystemRegistry())
+                .build();
         ctx.getSteps().add(meta.claw.core.runtime.StepRecord.builder().stepNumber(1).build());
         ctx.getSteps().add(meta.claw.core.runtime.StepRecord.builder().stepNumber(2).build());
 
@@ -40,14 +44,17 @@ class MetricsSubSystemTest {
         ReflectionTestUtils.setField(recorder, "meterRegistry", registry);
         ReflectionTestUtils.setField(metricsSub, "metricsRecorder", recorder);
 
-        TaskContext ctx = new TaskContext(
-                VesselTask.builder().taskId("t1").vesselId("v1").sessionId("s1").userMessage("hi").build(),
-                null,
-                new SubSystemRegistry()
-        );
+        TaskContext ctx = TaskContext.builder()
+                .taskId("t1")
+                .vesselId("v1")
+                .sessionId("s1")
+                .userMessage("hi")
+                .profile(null)
+                .registry(new SubSystemRegistry())
+                .build();
         ctx.getSteps().add(meta.claw.core.runtime.StepRecord.builder().stepNumber(1).build());
-        ctx.incrementToolCallCount();
-        ctx.addTokenUsage(SpiUsage.builder().promptTokens(10).completionTokens(5).totalTokens(15).build());
+        ctx.accumulateToolCalls(List.of(meta.claw.core.tool.SpiToolCall.builder().id("c1").name("calc").build()));
+        ctx.accumulateTokenUsage(SpiUsage.builder().promptTokens(10).completionTokens(5).totalTokens(15).build());
 
         metricsSub.onTaskEnd(ctx);
 

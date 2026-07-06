@@ -51,9 +51,9 @@ public class AgentExecutor {
         List<ToolCallback> tools = toolSub != null ? toolSub.getToolCallbacks() : List.of();
         Map<String, ToolCallback> toolMap = buildToolMap(tools);
 
-        List<SpiMessage> messages = new ArrayList<>(request.getMessages());
+        ctx.getMessages().addAll(request.getMessages());
 
-        return reactLoop(ctx, request, messages, tools, toolMap, hitlSub, 1);
+        return reactLoop(ctx, request, tools, toolMap, hitlSub, 1);
     }
 
     /**
@@ -69,7 +69,7 @@ public class AgentExecutor {
         List<ToolCallback> tools = toolSub != null ? toolSub.getToolCallbacks() : List.of();
         Map<String, ToolCallback> toolMap = buildToolMap(tools);
 
-        List<SpiMessage> messages = new ArrayList<>(request.getMessages());
+        ctx.getMessages().addAll(request.getMessages());
 
         // 根据决议执行被挂起的 tool calls
         for (ApprovalItem item : ticket.getItems()) {
@@ -79,15 +79,14 @@ public class AgentExecutor {
                     : "REJECTED by operator";
             recordToolCall(ctx, item.getToolName());
 
-            messages.add(SpiMessage.tool(result, item.getToolCallId(), item.getToolName()));
             ctx.getMessages().add(SpiMessage.tool(result, item.getToolCallId(), item.getToolName()));
         }
 
         // 继续 ReAct 循环（从第 2 步开始，因为第 1 步已生成 tool_calls）
-        return reactLoop(ctx, request, messages, tools, toolMap, null, 2);
+        return reactLoop(ctx, request, tools, toolMap, null, 2);
     }
 
-    private Reply reactLoop(TaskContext ctx, SpiChatRequest request, List<SpiMessage> messages,
+    private Reply reactLoop(TaskContext ctx, SpiChatRequest request,
                             List<ToolCallback> tools, Map<String, ToolCallback> toolMap,
                             HitlSubSystem hitlSub, int startStep) {
         for (int step = startStep; step <= maxSteps; step++) {
@@ -101,12 +100,11 @@ public class AgentExecutor {
                     SpiChatRequest.builder()
                             .vesselId(request.getVesselId())
                             .sessionId(request.getSessionId())
-                            .messages(messages)
+                            .messages(new ArrayList<>(ctx.getMessages().getMessages()))
                             .build(),
                     ctx,
                     tools.toArray(new ToolCallback[0])
             );
-            ctx.addTokenUsage(response != null ? response.usage() : null);
 
             if (response == null || response.toolCalls() == null || response.toolCalls().isEmpty()) {
                 String content = response != null ? response.content() : "";
@@ -122,20 +120,18 @@ public class AgentExecutor {
             }
 
             // 添加 assistant 消息（含 reasoning + tool calls）
-            messages.add(SpiMessage.assistant(response.content(), response.reasoningContent(), response.toolCalls()));
             ctx.getMessages().add(SpiMessage.assistant(response.content(), response.reasoningContent(), response.toolCalls()));
 
             // 执行 tool calls 并将结果回注到消息列表
-            VesselContext.setVesselId(request.getVesselId());
+            VesselContext.bind(ctx);
             try {
                 for (SpiToolCall tc : response.toolCalls()) {
                     String result = executeToolCall(toolMap.get(tc.getName()), tc);
                     recordToolCall(ctx, tc.getName());
-                    messages.add(SpiMessage.tool(result, tc.getId(), tc.getName()));
                     ctx.getMessages().add(SpiMessage.tool(result, tc.getId(), tc.getName()));
                 }
             } finally {
-                VesselContext.clear();
+                VesselContext.unbind();
             }
         }
 
@@ -182,9 +178,8 @@ public class AgentExecutor {
     }
 
     private void recordToolCall(TaskContext ctx, String toolName) {
-        ctx.incrementToolCallCount();
         if (metricsRecorder != null) {
-            metricsRecorder.recordToolCall(ctx.getTask().getVesselId(), toolName);
+            metricsRecorder.recordToolCall(ctx.getVesselId(), toolName);
         }
     }
 

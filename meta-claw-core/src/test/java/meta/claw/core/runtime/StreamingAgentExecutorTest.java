@@ -44,9 +44,7 @@ class StreamingAgentExecutorTest {
         ReflectionTestUtils.setField(executor, "llmClient", llmClient);
 
         SubSystemRegistry registry = new SubSystemRegistry();
-        TaskContext ctx = new TaskContext(
-                VesselTask.builder().taskId("t1").vesselId("v1").sessionId("s1").userMessage("hi").build(),
-                null, registry);
+        TaskContext ctx = TaskContext.builder().taskId("t1").vesselId("v1").sessionId("s1").userMessage("hi").profile(null).registry(registry).build();
 
         SpiChatRequest request = SpiChatRequest.builder()
                 .vesselId("v1").sessionId("s1").messages(List.of(SpiMessage.user("hi"))).build();
@@ -110,9 +108,7 @@ class StreamingAgentExecutorTest {
         registry.register(toolSub);
         registry.register(hitlSub);
 
-        TaskContext ctx = new TaskContext(
-                VesselTask.builder().taskId("t1").vesselId("v1").sessionId("s1").userMessage("calc").build(),
-                null, registry);
+        TaskContext ctx = TaskContext.builder().taskId("t1").vesselId("v1").sessionId("s1").userMessage("calc").profile(null).registry(registry).build();
 
         SpiChatRequest request = SpiChatRequest.builder()
                 .vesselId("v1").sessionId("s1").messages(List.of(SpiMessage.user("calc"))).build();
@@ -167,9 +163,7 @@ class StreamingAgentExecutorTest {
         registry.register(toolSub);
         registry.register(hitlSub);
 
-        TaskContext ctx = new TaskContext(
-                VesselTask.builder().taskId("t1").vesselId("v1").sessionId("s1").userMessage("do it").build(),
-                null, registry);
+        TaskContext ctx = TaskContext.builder().taskId("t1").vesselId("v1").sessionId("s1").userMessage("do it").profile(null).registry(registry).build();
 
         SpiChatRequest request = SpiChatRequest.builder()
                 .vesselId("v1").sessionId("s1").messages(List.of(SpiMessage.user("do it"))).build();
@@ -242,9 +236,7 @@ class StreamingAgentExecutorTest {
         registry.register(toolSub);
         registry.register(hitlSub);
 
-        TaskContext ctx = new TaskContext(
-                VesselTask.builder().taskId("t1").vesselId("v1").sessionId("s1").userMessage("do it").build(),
-                null, registry);
+        TaskContext ctx = TaskContext.builder().taskId("t1").vesselId("v1").sessionId("s1").userMessage("do it").profile(null).registry(registry).build();
 
         SpiChatRequest request = SpiChatRequest.builder()
                 .vesselId("v1").sessionId("s1").messages(List.of(SpiMessage.user("do it"))).build();

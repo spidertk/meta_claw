@@ -59,11 +59,8 @@ class AgentExecutorHitlTest {
         registry.register(toolSub);
         registry.register(hitlSub);
 
-        TaskContext ctx = new TaskContext(
-                VesselTask.builder().taskId("t1").vesselId("v1").sessionId("s1").userMessage("do it").build(),
-                null,
-                registry
-        );
+        TaskContext ctx = TaskContext.builder().taskId("t1").vesselId("v1").sessionId("s1").userMessage("do it").profile(null).registry(registry
+        ).build();
 
         SpiChatRequest request = SpiChatRequest.builder()
                 .vesselId("v1")
@@ -112,11 +109,8 @@ class AgentExecutorHitlTest {
         registry.register(toolSub);
         registry.register(hitlSub);
 
-        TaskContext ctx = new TaskContext(
-                VesselTask.builder().taskId("t1").vesselId("v1").sessionId("s1").userMessage("do it").build(),
-                null,
-                registry
-        );
+        TaskContext ctx = TaskContext.builder().taskId("t1").vesselId("v1").sessionId("s1").userMessage("do it").profile(null).registry(registry
+        ).build();
 
         ApprovalTicket ticket = ApprovalTicket.builder()
                 .ticketId("ticket-1")

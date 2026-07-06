@@ -1346,6 +1346,30 @@
         }
       ],
       "notes": "核心改动：MetaClawCallContext 新增 TaskContext 绑定；LlmClientManager 新增带 TaskContext 的重载；AgentExecutor/StreamingAgentExecutor 复用 TaskContext；LlmClientProviderManager 集中装配 Advisors；OpenAiLlmClientProvider 减负；新增 MetaClawResponseStreamAdvisor；删除 LlmClientManagerStreamWithToolsTest，由 MetaClawResponseStreamAdvisorTest 替代。"
+    },
+    {
+      "id": "context-001",
+      "priority": 45,
+      "area": "core-architecture",
+      "title": "整合 TaskContext / MetaClawCallContext / VesselTask / VesselContext",
+      "user_visible_behavior": "框架上下文体系只剩一个任务级上下文 TaskContext 和一个单次 LLM 调用的轻量视图 LlmCallContext；VesselTask 被合并，VesselContext 显式绑定 TaskContext；AgentExecutor/StreamingAgentExecutor 不再维护两份 messages，也不再重复累加 token/tool 计数。",
+      "status": "passing",
+      "verification": [
+        "删除 MetaClawCallContext 与 VesselTask，将字段并入 TaskContext。",
+        "TaskContext 内新增 LlmCallContext 作为 Advisor 链载体，单次调用结束后结果写回 TaskContext。",
+        "VesselContext 增加 bind(TaskContext)/unbind()，Agent 工具执行前后显式绑定/解绑。",
+        "AgentExecutor/StreamingAgentExecutor 统一使用 ctx.getMessages()，移除本地 messages 列表。",
+        "token usage 与 tool-call 计数统一由 MetaClawResponse*Advisor 写入，Executor 不再重复累加。",
+        "运行 ./init.sh 全量编译与 P0 测试通过，验证 bootstrap 能正常启动。"
+      ],
+      "evidence": [
+        {
+          "date": "2026-07-06",
+          "result": "passing",
+          "detail": "./init.sh BUILD SUCCESS，9 个 reactor 模块全部 SUCCESS，core 134 个测试全部通过，tool 20 个 P0 测试全部通过；meta-claw-bootstrap spring-boot:run 成功启动 Tomcat on 8080，无循环依赖报错。"
+        }
+      ],
+      "notes": "核心改动：删除 MetaClawCallContext.java 与 VesselTask.java；重写 TaskContext 为 @Builder 并内含 LlmCallContext 静态内部类；重写 VesselContext 显式绑定；重写 AgentExecutor/StreamingAgentExecutor/VesselRuntime/LlmClientManager 及 Advisors；更新 MetaClawModelMetricsHook 计数路径；更新所有相关测试。"
     }
   ]
 }

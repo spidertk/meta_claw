@@ -53,7 +53,7 @@ public class StreamingAgentExecutor {
         List<ToolCallback> tools = toolSub != null ? toolSub.getToolCallbacks() : List.of();
         Map<String, ToolCallback> toolMap = buildToolMap(tools);
 
-        List<SpiMessage> messages = new ArrayList<>(request.getMessages());
+        ctx.getMessages().addAll(request.getMessages());
 
         for (int step = 1; step <= maxSteps; step++) {
             ctx.getSteps().add(StepRecord.builder()
@@ -67,13 +67,12 @@ public class StreamingAgentExecutor {
                     SpiChatRequest.builder()
                             .vesselId(request.getVesselId())
                             .sessionId(request.getSessionId())
-                            .messages(messages)
+                            .messages(new ArrayList<>(ctx.getMessages().getMessages()))
                             .build(),
                     ctx,
                     tools.toArray(new ToolCallback[0]),
                     callback
             );
-            ctx.addTokenUsage(response != null ? response.usage() : null);
 
             if (response == null || response.toolCalls() == null || response.toolCalls().isEmpty()) {
                 String content = response != null ? response.content() : "";
@@ -94,28 +93,31 @@ public class StreamingAgentExecutor {
                                 .operator("stream-user")
                                 .build();
                     }
-                    executeApprovedToolCalls(messages, ctx, response, evaluation.getTicket(), resolution, toolMap);
+                    executeApprovedToolCalls(ctx, response, evaluation.getTicket(), resolution, toolMap);
                     continue;
                 }
             }
 
             // 添加 assistant 消息（含 reasoning + tool calls）
-            messages.add(SpiMessage.assistant(response.content(), response.reasoningContent(), response.toolCalls()));
             ctx.getMessages().add(SpiMessage.assistant(response.content(), response.reasoningContent(), response.toolCalls()));
 
             // 执行 tool calls 并将结果回注到消息列表
-            for (SpiToolCall tc : response.toolCalls()) {
-                String result = executeToolCall(toolMap.get(tc.getName()), tc);
-                recordToolCall(ctx, tc.getName());
-                messages.add(SpiMessage.tool(result, tc.getId(), tc.getName()));
-                ctx.getMessages().add(SpiMessage.tool(result, tc.getId(), tc.getName()));
+            VesselContext.bind(ctx);
+            try {
+                for (SpiToolCall tc : response.toolCalls()) {
+                    String result = executeToolCall(toolMap.get(tc.getName()), tc);
+                    recordToolCall(ctx, tc.getName());
+                    ctx.getMessages().add(SpiMessage.tool(result, tc.getId(), tc.getName()));
+                }
+            } finally {
+                VesselContext.unbind();
             }
         }
 
         throw new RuntimeException("超过最大步数: " + maxSteps);
     }
 
-    private void executeApprovedToolCalls(List<SpiMessage> messages, TaskContext ctx, SpiChatResponse response,
+    private void executeApprovedToolCalls(TaskContext ctx, SpiChatResponse response,
                                           ApprovalTicket ticket, ApprovalResolution resolution,
                                           Map<String, ToolCallback> toolMap) {
         // 添加 assistant 消息（含 content + reasoning + tool calls），从 ticket 重建 tool calls
@@ -128,17 +130,20 @@ public class StreamingAgentExecutor {
                 .toList();
         String content = response != null ? response.content() : null;
         String reasoning = response != null ? response.reasoningContent() : null;
-        messages.add(SpiMessage.assistant(content, reasoning, toolCalls));
         ctx.getMessages().add(SpiMessage.assistant(content, reasoning, toolCalls));
 
-        for (ApprovalItem item : ticket.getItems()) {
-            ApprovalStatus status = resolution.getDecisions().get(item.getToolCallId());
-            String result = (status == ApprovalStatus.APPROVED)
-                    ? executeToolCall(toolMap.get(item.getToolName()), item)
-                    : "REJECTED by operator";
-            recordToolCall(ctx, item.getToolName());
-            messages.add(SpiMessage.tool(result, item.getToolCallId(), item.getToolName()));
-            ctx.getMessages().add(SpiMessage.tool(result, item.getToolCallId(), item.getToolName()));
+        VesselContext.bind(ctx);
+        try {
+            for (ApprovalItem item : ticket.getItems()) {
+                ApprovalStatus status = resolution.getDecisions().get(item.getToolCallId());
+                String result = (status == ApprovalStatus.APPROVED)
+                        ? executeToolCall(toolMap.get(item.getToolName()), item)
+                        : "REJECTED by operator";
+                recordToolCall(ctx, item.getToolName());
+                ctx.getMessages().add(SpiMessage.tool(result, item.getToolCallId(), item.getToolName()));
+            }
+        } finally {
+            VesselContext.unbind();
         }
     }
 
@@ -182,9 +187,8 @@ public class StreamingAgentExecutor {
     }
 
     private void recordToolCall(TaskContext ctx, String toolName) {
-        ctx.incrementToolCallCount();
         if (metricsRecorder != null) {
-            metricsRecorder.recordToolCall(ctx.getTask().getVesselId(), toolName);
+            metricsRecorder.recordToolCall(ctx.getVesselId(), toolName);
         }
     }
 

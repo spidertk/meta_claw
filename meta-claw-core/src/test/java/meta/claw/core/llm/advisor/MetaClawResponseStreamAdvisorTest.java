@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import meta.claw.core.llm.SpiChatResponse;
 import meta.claw.core.llm.SpiStreamingCallback;
 import meta.claw.core.llm.SpiUsage;
+import meta.claw.core.runtime.TaskContext;
 import meta.claw.core.tool.SpiToolCall;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.client.ChatClient;
@@ -34,7 +35,15 @@ class MetaClawResponseStreamAdvisorTest {
                 .defaultAdvisors(advisor)
                 .build();
 
-        MetaClawCallContext ctx = new MetaClawCallContext("v1", "s1");
+        TaskContext taskContext = TaskContext.builder()
+                .taskId("t1")
+                .vesselId("v1")
+                .sessionId("s1")
+                .userMessage("1+1")
+                .profile(null)
+                .registry(null)
+                .build();
+
         AtomicReference<SpiToolCall> captured = new AtomicReference<>();
         SpiStreamingCallback callback = new SpiStreamingCallback() {
             @Override public void onStart() { }
@@ -45,10 +54,10 @@ class MetaClawResponseStreamAdvisorTest {
             @Override public void onComplete(SpiChatResponse response) { }
             @Override public void onError(Throwable error) { }
         };
-        ctx.setStreamingCallback(callback);
+        TaskContext.LlmCallContext ctx = taskContext.beginCall(callback);
 
         chatClient.prompt("1+1")
-                .advisors(spec -> spec.param(MetaClawCallContext.CONTEXT_KEY, ctx))
+                .advisors(spec -> spec.param(TaskContext.LlmCallContext.CONTEXT_KEY, ctx))
                 .stream()
                 .chatResponse()
                 .blockLast();
@@ -58,9 +67,9 @@ class MetaClawResponseStreamAdvisorTest {
         assertEquals("calculator", captured.get().getName());
         assertEquals(Map.of("expression", "1+1"), captured.get().getArguments());
 
-        assertNotNull(ctx.getToolCalls());
-        assertEquals(1, ctx.getToolCalls().size());
-        assertEquals("call_1", ctx.getToolCalls().get(0).getId());
+        assertNotNull(taskContext.getLastToolCalls());
+        assertEquals(1, taskContext.getLastToolCalls().size());
+        assertEquals("call_1", taskContext.getLastToolCalls().get(0).getId());
     }
 
     static class StubChatModel implements ChatModel {

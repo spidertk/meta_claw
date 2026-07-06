@@ -218,8 +218,8 @@ public class SpringAiAlibabaAgentEngine implements AgentEngine {
     }
 
     private RunnableConfig buildRunnableConfig(TaskContext ctx, boolean resume) {
-        String sessionId = ctx.getTask().getSessionId();
-        String taskId = ctx.getTask().getTaskId();
+        String sessionId = ctx.getSessionId();
+        String taskId = ctx.getTaskId();
         String threadId = (sessionId != null && !sessionId.isBlank()) ? sessionId : taskId;
         if (threadId == null || threadId.isBlank()) {
             threadId = "$default";

@@ -29,7 +29,8 @@
 - 最近已通过证据 21：2026-06-30 完成 multimodal knowledge extension 计划 Task 10~15：扩展 `KnowledgeEntry` frontmatter 资产引用字段（asset_id / media_type / multimodal_used）；新增 `PdfExtractor`（PDFBox 文本抽取 + 可选页面图片描述）；新增 `DouyinVideoExtractor`（通过 `YtDlpVideoExtractor` 调用 yt-dlp，30 秒同步超时）；在 `KnowledgeTool` 新增 `knowledgeAcquireFromFile` 与 `knowledgeAcquireFromUrl`；扩展 `GitManager.grepFiles` 同时搜索 `knowledge/**/*.md` 与 `assets/**/extracted.md`，结果返回 `media_type` 与 `asset_id`；新增端到端 `KnowledgeAcquisitionSmokeTest` 覆盖图片+文本采集与检索；修复 `ImageExtractorTest.tearDown` 因 `originalUserDir` 可能为 null 导致的 NPE；全量 `./init.sh` BUILD SUCCESS，9 个 reactor 模块全部 SUCCESS，core 112 个测试全部通过，tool 模块 P0 18 个测试全部通过；全量 `mvn -pl meta-claw-tool -am test -q` BUILD SUCCESS，tool 模块 57 个测试全部通过（1 个跳过）
 - 最近已通过证据 22：2026-07-04 解除 `LlmClientManager ↔ ToolRegistry` Spring 循环依赖并修复 bootstrap 启动：采用全 Advisor 化方案，新增 `ToolRegistryAdvisor` / `MetaClawResponseCallAdvisor` / `MetaClawCallContext`，`OpenAiLlmClientProvider.buildChatClient()` 运行时通过 `applicationContext.getBean(ToolRegistry.class)` 获取工具注册表并注入 Advisor 链，`LlmClientManager.chat()` 从共享上下文读取 Advisor 提取的 content/reasoningContent/usage/toolCalls，`chatStream()` 委托给 `streamWithTools()`；同时修复 bootstrap 模式因 `InMemoryHitlGate` 的 `@ConditionalOnMissingBean` 未生效导致的 `HitlGate` 缺失问题（移除该注解，为 `CliHitlGate` 加 `@Primary`）；全量 `./init.sh` BUILD SUCCESS，9 个 reactor 模块全部 SUCCESS，core 112 个 P0 测试全部通过，tool 20 个 P0 测试全部通过；`mvn spring-boot:run -pl meta-claw-bootstrap -DskipTests` 成功启动 Tomcat on 8080，无循环依赖报错。
 - 最近已通过证据 23：2026-07-05 完成 TaskContext 复用与 Advisor 注入集中化重构：`MetaClawCallContext` 绑定 `TaskContext`，`setUsage`/`setToolCalls` 自动同步到任务上下文；`AgentExecutor`/`StreamingAgentExecutor` 将 `TaskContext` 传入 `LlmClientManager`，避免 ReAct 循环每次迭代新建上下文；`LlmClientProviderManager` 通过 `ChatClient.mutate().defaultAdvisors(...)` 统一装配 `ToolCallAdvisor` / `ShortMemoryAdvisor` / `ToolRegistryAdvisor` / `MetaClawResponseCallAdvisor` / `MetaClawResponseStreamAdvisor`，`OpenAiLlmClientProvider` 不再负责 Advisor 装配；新增 `MetaClawResponseStreamAdvisor` 替代 `LlmClientManager.streamWithTools()` 中的 `accumulateToolCalls()` 手工累积；删除 `LlmClientManagerStreamWithToolsTest`，新增 `MetaClawResponseStreamAdvisorTest` 覆盖分段 arguments + 大写 finishReason 场景；全量 `./init.sh` BUILD SUCCESS，9 个 reactor 模块全部 SUCCESS，core 112 个 P0 测试全部通过，tool 20 个 P0 测试全部通过；`mvn spring-boot:run -pl meta-claw-bootstrap -DskipTests` 成功启动 Tomcat on 8080。
-- 当前最高优先级未完成功能：multimodal knowledge extension 计划 Task 1~15、LlmClientManager 循环依赖修复与 TaskContext 复用 / Advisor 集中化重构均已完成；feature_list.json 已补充 multimodal-knowledge-007~012、multimodal-core-001/002、spring-wiring-002 与 spring-wiring-003 并标记为 passing；下一步为整体收尾与提交，或按路线图开始后续功能。
+- 最近已通过证据 24：2026-07-06 完成上下文体系整合重构：删除 `MetaClawCallContext` 与 `VesselTask`，将字段并入 `TaskContext`；`TaskContext` 内新增 `LlmCallContext` 静态内部类作为单次 LLM 调用的 Advisor 链载体；`VesselContext` 增加 `bind(TaskContext)`/`unbind()` 显式绑定；`AgentExecutor`/`StreamingAgentExecutor` 统一使用 `ctx.getMessages()` 作为权威消息列表，移除本地 messages 列表；token usage 与 tool-call 计数统一由 `MetaClawResponseCallAdvisor`/`MetaClawResponseStreamAdvisor` 写入，Executor 不再重复累加；更新 `MetaClawModelMetricsHook` 使用新的累加方法；更新所有相关测试；全量 `./init.sh` BUILD SUCCESS，9 个 reactor 模块全部 SUCCESS，core 134 个测试全部通过，tool 20 个 P0 测试全部通过；`mvn spring-boot:run -pl meta-claw-bootstrap -DskipTests` 成功启动 Tomcat on 8080，无循环依赖报错。
+- 当前最高优先级未完成功能：上下文体系整合重构（context-001）已完成；feature_list.json 已补充 context-001 并标记为 passing；下一步为整体收尾与提交，或按路线图开始后续功能。
 - 当前 blocker：
   1. 当前无 blocker
 
@@ -97,6 +98,63 @@
   - `clean-state-checklist.md`
 - 已知风险或未解决的问题：
   - `chatStream()` 改为委托给 `streamWithTools()` 后，不再通过 Advisor 向 `ShortMemoryAdvisor` 传递 vesselName/sessionId；由于 `VesselRuntime.chatStream()` 主链路已走 `AgentEngine.executeStream()` → `StreamingAgentExecutor.streamWithTools()`（使用 `buildRawChatClient()`，无 Advisor），此行为变化对当前主链路无影响。
+- 下一步最佳动作：
+  1. 提交本轮修改。
+
+### Session 073
+
+- 日期：2026-07-06
+- 本轮目标：整合 `MetaClawCallContext` / `TaskContext` / `VesselTask` / `VesselContext`，降低上下文理解和维护成本。
+- 背景：用户反馈当前上下文体系混乱，`MetaClawCallContext` 与 `TaskContext` 重叠、`VesselTask` 单薄冗余、`VesselContext` 是隐式 ThreadLocal 补丁、`AgentExecutor`/`StreamingAgentExecutor` 维护两份 messages 且存在重复计数风险。
+- 实现：
+  - 先进入 plan mode，输出重构计划文件 `.kimi/plans/barry-allen-terra-daredevil.md`，明确：
+    - 删除 `MetaClawCallContext`，将其字段并入 `TaskContext`；
+    - 在 `TaskContext` 内新增 `LlmCallContext` 静态内部类作为单次 LLM 调用的 Advisor 链载体；
+    - 删除 `VesselTask`，将 `taskId`/`vesselId`/`sessionId`/`userMessage`/`createdAt` 直接并入 `TaskContext`；
+    - `VesselContext` 增加 `bind(TaskContext)`/`unbind()` 显式绑定；
+    - `AgentExecutor`/`StreamingAgentExecutor` 统一使用 `ctx.getMessages()`，移除本地 messages 列表；
+    - token usage / tool-call 计数统一由 Advisors 写入，Executor 不再重复累加。
+  - 重写 `meta.claw.core.runtime.TaskContext.java`：改为 `@Builder`，内含 `LlmCallContext` 静态内部类，提供 `beginCall(SpiStreamingCallback)`、`accumulateTokenUsage(SpiUsage)`、`accumulateToolCalls(List<SpiToolCall>)` 等方法。
+  - 重写 `meta.claw.core.runtime.VesselContext.java`：新增 `bind(TaskContext)` 与 `unbind()`，`AgentExecutor` 工具执行前后显式绑定/解绑。
+  - 删除 `MetaClawCallContext.java` 与 `VesselTask.java`。
+  - 重写 `LlmClientManager`：`createCallContext` 返回 `TaskContext.LlmCallContext`，`buildResponse` 从 `TaskContext` 读取结果。
+  - 重写 `MetaClawResponseCallAdvisor` / `MetaClawResponseStreamAdvisor` / `ToolRegistryAdvisor`：使用 `TaskContext.LlmCallContext.CONTEXT_KEY` 与 `EXPLICIT_TOOL_CALLBACKS_KEY`。
+  - 重写 `AgentExecutor` / `StreamingAgentExecutor`：移除本地 messages 列表，使用 `ctx.getMessages()`；移除 `ctx.addTokenUsage()` 和 `ctx.incrementToolCallCount()` 的重复调用；工具执行前后使用 `VesselContext.bind(ctx)` / `VesselContext.unbind()`。
+  - 扩展 `MessageThread`：新增 `addAll(List<SpiMessage>)` 与 `getMessages()`。
+  - 重写 `VesselRuntime`：`chat`/`execute`/`resume`/`chatStream` 直接通过 `TaskContext.create(...)` 构造上下文；`resume` 签名简化为 `(String sessionId, String userMessage, ApprovalTicket, ApprovalResolution)`。
+  - 更新 `SpringAiAlibabaAgentEngine` / `MetaClawAgentMetricsHook` / `MetaClawModelMetricsHook` / `MetricsSubSystem` / `HitlSubSystem`：所有 `ctx.getTask().getXxx()` 改为 `ctx.getXxx()`；`MetaClawModelMetricsHook` 改为调用 `ctx.accumulateTokenUsage()` / `ctx.accumulateToolCalls()`。
+  - 更新所有相关测试：将 `new TaskContext(VesselTask.builder()...)` 改为 `TaskContext.builder()...`；`MetaClawResponseStreamAdvisorTest` 改为使用 `TaskContext.LlmCallContext`。
+- 运行过的验证：
+  - `export JAVA_HOME=... && mvn -pl meta-claw-core -am compile -q` → BUILD SUCCESS。
+  - `export JAVA_HOME=... && mvn -pl meta-claw-core test -q` → BUILD SUCCESS，core 134 个测试全部通过。
+  - `./init.sh`（真实环境，Java 21）→ BUILD SUCCESS；9 个 reactor 模块全部 SUCCESS，core 134 个测试全部通过，tool 20 个 P0 测试全部通过。
+  - `mvn spring-boot:run -pl meta-claw-bootstrap -DskipTests` → Tomcat 成功启动于 8080，无循环依赖报错。
+- 已记录证据：
+  - `feature_list.json` 已新增 `context-001` 并标记为 passing，更新日期为 2026-07-06。
+  - `claude-progress.md` 已补充证据 24 与本 Session 073。
+- 更新过的文件或工件：
+  - `.kimi/plans/barry-allen-terra-daredevil.md`（新增计划文件）
+  - `meta-claw-core/src/main/java/meta/claw/core/runtime/TaskContext.java`（重写）
+  - `meta-claw-core/src/main/java/meta/claw/core/runtime/VesselContext.java`（重写）
+  - `meta-claw-core/src/main/java/meta/claw/core/runtime/VesselTask.java`（删除）
+  - `meta-claw-core/src/main/java/meta/claw/core/llm/advisor/MetaClawCallContext.java`（删除）
+  - `meta-claw-core/src/main/java/meta/claw/core/runtime/MessageThread.java`（扩展）
+  - `meta-claw-core/src/main/java/meta/claw/core/runtime/LlmClientManager.java`（重写）
+  - `meta-claw-core/src/main/java/meta/claw/core/runtime/AgentExecutor.java`（重写）
+  - `meta-claw-core/src/main/java/meta/claw/core/runtime/StreamingAgentExecutor.java`（重写）
+  - `meta-claw-core/src/main/java/meta/claw/core/runtime/VesselRuntime.java`（重写）
+  - `meta-claw-core/src/main/java/meta/claw/core/llm/advisor/MetaClawResponseCallAdvisor.java`（更新）
+  - `meta-claw-core/src/main/java/meta/claw/core/llm/advisor/MetaClawResponseStreamAdvisor.java`（更新）
+  - `meta-claw-core/src/main/java/meta/claw/core/llm/advisor/ToolRegistryAdvisor.java`（更新）
+  - `meta-claw-core/src/main/java/meta/claw/core/runtime/engine/SpringAiAlibabaAgentEngine.java`（更新）
+  - `meta-claw-core/src/main/java/meta/claw/core/runtime/engine/alibabahook/MetaClawAgentMetricsHook.java`（更新）
+  - `meta-claw-core/src/main/java/meta/claw/core/runtime/engine/alibabahook/MetaClawModelMetricsHook.java`（更新）
+  - `meta-claw-core/src/main/java/meta/claw/core/runtime/subsystem/MetricsSubSystem.java`（更新）
+  - `meta-claw-core/src/main/java/meta/claw/core/runtime/subsystem/HitlSubSystem.java`（更新）
+  - 以及所有受影响的测试文件
+- 已知风险或未解决的问题：
+  - `VesselRuntime.resume` 签名由 `(VesselTask, ApprovalTicket, ApprovalResolution)` 改为 `(String sessionId, String userMessage, ApprovalTicket, ApprovalResolution)`；当前外部调用者只有 `AgentEngine` 接口链路，无直接外部调用，但如未来有外部 resume 入口需同步调整。
+  - `VesselContext` 仍依赖 ThreadLocal，后续若工具调用能传递上下文，可彻底移除。
 - 下一步最佳动作：
   1. 提交本轮修改。
 

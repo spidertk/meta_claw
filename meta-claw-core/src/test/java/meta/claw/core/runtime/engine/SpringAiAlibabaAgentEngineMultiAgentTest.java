@@ -16,7 +16,6 @@ import meta.claw.core.message.Reply;
 import meta.claw.core.message.ReplyType;
 import meta.claw.core.runtime.TaskContext;
 import meta.claw.core.runtime.VesselProfile;
-import meta.claw.core.runtime.VesselTask;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
@@ -100,13 +99,7 @@ class SpringAiAlibabaAgentEngineMultiAgentTest {
     }
 
     private TaskContext dummyContextWithAgents() {
-        VesselTask task = VesselTask.builder()
-                .taskId("t1")
-                .vesselId("v1")
-                .sessionId("s1")
-                .userMessage("hi")
-                .build();
-
+        
         VesselAgentConfig subAgent = new VesselAgentConfig();
         subAgent.setName("planner");
 
@@ -133,6 +126,13 @@ class SpringAiAlibabaAgentEngineMultiAgentTest {
         VesselProfile profile = mock(VesselProfile.class);
         when(profile.getBundle()).thenReturn(bundle);
 
-        return new TaskContext(task, profile, null);
+        return TaskContext.builder()
+                .taskId("t1")
+                .vesselId("v1")
+                .sessionId("s1")
+                .userMessage("hi")
+                .profile(profile)
+                .registry(null)
+                .build();
     }
 }

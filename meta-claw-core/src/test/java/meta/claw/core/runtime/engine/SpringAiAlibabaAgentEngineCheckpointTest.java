@@ -9,7 +9,6 @@ import meta.claw.core.config.bundle.VesselConfigBundle;
 import meta.claw.core.llm.SpiChatRequest;
 import meta.claw.core.runtime.TaskContext;
 import meta.claw.core.runtime.VesselProfile;
-import meta.claw.core.runtime.VesselTask;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -165,12 +164,6 @@ class SpringAiAlibabaAgentEngineCheckpointTest {
     }
 
     private TaskContext dummyContext(String vesselId, String sessionId, boolean checkpointResume) {
-        VesselTask task = VesselTask.builder()
-                .taskId("t1")
-                .vesselId(vesselId)
-                .sessionId(sessionId)
-                .userMessage("hi")
-                .build();
         VesselProfile profile = mock(VesselProfile.class);
         meta.claw.core.config.RuntimeConfig runtimeConfig = new meta.claw.core.config.RuntimeConfig();
         runtimeConfig.setProviderConfig(new ProviderConfig());
@@ -192,6 +185,13 @@ class SpringAiAlibabaAgentEngineCheckpointTest {
                 .runtimeConfig(runtimeConfig)
                 .build();
         when(profile.getBundle()).thenReturn(bundle);
-        return new TaskContext(task, profile, new meta.claw.core.runtime.subsystem.SubSystemRegistry());
+        return TaskContext.builder()
+                .taskId("t1")
+                .vesselId(vesselId)
+                .sessionId(sessionId)
+                .userMessage("hi")
+                .profile(profile)
+                .registry(new meta.claw.core.runtime.subsystem.SubSystemRegistry())
+                .build();
     }
 }

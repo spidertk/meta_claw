@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import meta.claw.core.llm.SpiUsage;
+import meta.claw.core.runtime.TaskContext;
 import meta.claw.core.runtime.metrics.MetricsRecorder;
 import meta.claw.core.tool.SpiToolCall;
 import org.springframework.ai.chat.client.ChatClientRequest;
@@ -24,7 +25,7 @@ import java.util.Map;
  * 流式 LLM 调用的响应提取与指标记录 Advisor。
  * <p>
  * 在流式响应过程中累积 content、reasoningContent、usage 与 tool calls（处理分段 arguments），
- * 流结束时将结果写入 {@link MetaClawCallContext}，并触发 callback.onToolCall() 与指标记录。
+ * 流结束时将结果写入 {@link TaskContext.LlmCallContext}，并触发 callback.onToolCall() 与指标记录。
  * </p>
  */
 @Slf4j
@@ -40,7 +41,7 @@ public class MetaClawResponseStreamAdvisor implements StreamAdvisor {
 
     @Override
     public Flux<ChatClientResponse> adviseStream(ChatClientRequest request, StreamAdvisorChain chain) {
-        MetaClawCallContext ctx = (MetaClawCallContext) request.context().get(MetaClawCallContext.CONTEXT_KEY);
+        TaskContext.LlmCallContext ctx = (TaskContext.LlmCallContext) request.context().get(TaskContext.LlmCallContext.CONTEXT_KEY);
 
         StringBuilder contentBuilder = new StringBuilder();
         StringBuilder reasoningBuilder = new StringBuilder();
@@ -182,7 +183,7 @@ public class MetaClawResponseStreamAdvisor implements StreamAdvisor {
         return result;
     }
 
-    private void notifyToolCalls(MetaClawCallContext ctx, List<SpiToolCall> toolCalls) {
+    private void notifyToolCalls(TaskContext.LlmCallContext ctx, List<SpiToolCall> toolCalls) {
         if (ctx == null || ctx.getStreamingCallback() == null || toolCalls.isEmpty()) {
             return;
         }
@@ -191,14 +192,14 @@ public class MetaClawResponseStreamAdvisor implements StreamAdvisor {
         }
     }
 
-    private void notifyChunk(MetaClawCallContext ctx, String chunk) {
+    private void notifyChunk(TaskContext.LlmCallContext ctx, String chunk) {
         if (ctx == null || ctx.getStreamingCallback() == null || chunk == null || chunk.isEmpty()) {
             return;
         }
         ctx.getStreamingCallback().onChunk(chunk);
     }
 
-    private void notifyReasoningChunk(MetaClawCallContext ctx, String chunk) {
+    private void notifyReasoningChunk(TaskContext.LlmCallContext ctx, String chunk) {
         if (ctx == null || ctx.getStreamingCallback() == null || chunk == null || chunk.isEmpty()) {
             return;
         }

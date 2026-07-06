@@ -5,7 +5,6 @@ import com.alibaba.cloud.ai.graph.RunnableConfig;
 import com.alibaba.cloud.ai.graph.agent.hook.HookPosition;
 import meta.claw.core.runtime.HitlSuspendedException;
 import meta.claw.core.runtime.TaskContext;
-import meta.claw.core.runtime.VesselTask;
 import meta.claw.core.runtime.hitl.ApprovalItem;
 import meta.claw.core.runtime.hitl.ApprovalTicket;
 import meta.claw.core.runtime.hitl.HitlDecision;
@@ -80,15 +79,16 @@ class MetaClawHitlHookTest {
     }
 
     private MetaClawHitlHook createHook(HitlSubSystem hitlSub) {
-        VesselTask task = VesselTask.builder()
+        SubSystemRegistry registry = new SubSystemRegistry();
+        registry.register(hitlSub);
+        TaskContext ctx = TaskContext.builder()
                 .taskId("t1")
                 .vesselId("v1")
                 .sessionId("s1")
                 .userMessage("hi")
+                .profile(null)
+                .registry(registry)
                 .build();
-        SubSystemRegistry registry = new SubSystemRegistry();
-        registry.register(hitlSub);
-        TaskContext ctx = new TaskContext(task, null, registry);
         return new MetaClawHitlHook(ctx);
     }
 

@@ -16,6 +16,16 @@ public class MessageThread {
         messages.add(message);
     }
 
+    public void addAll(List<SpiMessage> messagesToAdd) {
+        if (messagesToAdd != null) {
+            messages.addAll(messagesToAdd);
+        }
+    }
+
+    public List<SpiMessage> getMessages() {
+        return messages;
+    }
+
     public List<SpiMessage> snapshot() {
         return List.copyOf(messages);
     }

@@ -7,7 +7,6 @@ import meta.claw.core.llm.SpiChatResponse;
 import meta.claw.core.llm.SpiLlmClient;
 import meta.claw.core.llm.SpiMessage;
 import meta.claw.core.llm.SpiStreamingCallback;
-import meta.claw.core.llm.advisor.MetaClawCallContext;
 import meta.claw.core.llm.provider.LlmClientProviderManager;
 import meta.claw.core.memory.MemoryMessage;
 import meta.claw.core.memory.MemoryMessageConverter;
@@ -35,7 +34,7 @@ import java.util.stream.Collectors;
  * <p>
  * 作为纯适配器：将 {@link SpiMessage} 转换为 Spring AI {@link Message}，通过
  * {@link LlmClientProviderManager} 获取带公共 Advisor 栈的 {@link ChatClient}，
- * 最后从 {@link MetaClawCallContext} 读取 Advisors 写入的结果并组装 {@link SpiChatResponse}。
+ * 最后从 {@link TaskContext} 读取 Advisors 写入的结果并组装 {@link SpiChatResponse}。
  * </p>
  */
 @Slf4j
@@ -83,15 +82,15 @@ public class LlmClientManager implements SpiLlmClient {
                 .map(this::toSpringMessage)
                 .collect(Collectors.toCollection(ArrayList::new));
 
-        MetaClawCallContext ctx = createCallContext(request, taskContext);
+        TaskContext.LlmCallContext ctx = createCallContext(request, taskContext);
 
         buildChatClient(request.getVesselId())
                 .prompt(new Prompt(messages))
-                .advisors(spec -> spec.param(MetaClawCallContext.CONTEXT_KEY, ctx))
+                .advisors(spec -> spec.param(TaskContext.LlmCallContext.CONTEXT_KEY, ctx))
                 .call()
                 .chatResponse();
 
-        return buildResponse(ctx);
+        return buildResponse(taskContext);
     }
 
     /**
@@ -105,17 +104,17 @@ public class LlmClientManager implements SpiLlmClient {
                 .map(this::toSpringMessage)
                 .collect(Collectors.toCollection(ArrayList::new));
 
-        MetaClawCallContext ctx = createCallContext(request, taskContext);
+        TaskContext.LlmCallContext ctx = createCallContext(request, taskContext);
 
         buildChatClient(request.getVesselId())
                 .prompt(new Prompt(messages))
                 .advisors(spec -> spec
-                        .param(MetaClawCallContext.CONTEXT_KEY, ctx)
-                        .param(MetaClawCallContext.EXPLICIT_TOOL_CALLBACKS_KEY, toolCallbacks))
+                        .param(TaskContext.LlmCallContext.CONTEXT_KEY, ctx)
+                        .param(TaskContext.LlmCallContext.EXPLICIT_TOOL_CALLBACKS_KEY, toolCallbacks))
                 .call()
                 .chatResponse();
 
-        return buildResponse(ctx);
+        return buildResponse(taskContext);
     }
 
     /**
@@ -130,27 +129,26 @@ public class LlmClientManager implements SpiLlmClient {
                 .map(this::toSpringMessage)
                 .collect(Collectors.toCollection(ArrayList::new));
 
-        MetaClawCallContext ctx = createCallContext(request, taskContext);
-        ctx.setStreamingCallback(callback);
+        TaskContext.LlmCallContext ctx = createCallContext(request, taskContext, callback);
 
         callback.onStart();
         try {
             buildChatClient(request.getVesselId())
                     .prompt(new Prompt(messages))
                     .advisors(spec -> spec
-                            .param(MetaClawCallContext.CONTEXT_KEY, ctx)
-                            .param(MetaClawCallContext.EXPLICIT_TOOL_CALLBACKS_KEY, toolCallbacks))
+                            .param(TaskContext.LlmCallContext.CONTEXT_KEY, ctx)
+                            .param(TaskContext.LlmCallContext.EXPLICIT_TOOL_CALLBACKS_KEY, toolCallbacks))
                     .stream()
                     .chatResponse()
                     .doOnNext(response -> {
-                        // callback.onChunk/onReasoningChunk 由 streaming advisor 触发
+                        // callback.onChunk/onReasoningChunk/onToolCall 由 streaming advisor 触发
                     })
                     .doOnError(error -> {
                         log.error("[STREAM-WITH-TOOLS] Error: {}", error.getMessage(), error);
                         callback.onError(error);
                     })
                     .doOnComplete(() -> {
-                        SpiChatResponse response = buildResponse(ctx);
+                        SpiChatResponse response = buildResponse(taskContext);
                         callback.onComplete(response);
                     })
                     .blockLast();
@@ -160,7 +158,7 @@ public class LlmClientManager implements SpiLlmClient {
             throw new RuntimeException("Stream with tools failed", e);
         }
 
-        return buildResponse(ctx);
+        return buildResponse(taskContext);
     }
 
     @Override
@@ -180,19 +178,36 @@ public class LlmClientManager implements SpiLlmClient {
         return CompletableFuture.supplyAsync(() -> chat(request));
     }
 
-    private MetaClawCallContext createCallContext(SpiChatRequest request, TaskContext taskContext) {
-        if (taskContext != null) {
-            return new MetaClawCallContext(taskContext);
-        }
-        return new MetaClawCallContext(request.getVesselId(), request.getSessionId());
+    private TaskContext.LlmCallContext createCallContext(SpiChatRequest request, TaskContext taskContext) {
+        return createCallContext(request, taskContext, null);
     }
 
-    private SpiChatResponse buildResponse(MetaClawCallContext ctx) {
+    private TaskContext.LlmCallContext createCallContext(SpiChatRequest request, TaskContext taskContext,
+                                                         SpiStreamingCallback callback) {
+        if (taskContext != null) {
+            return taskContext.beginCall(callback);
+        }
+        // 非 Agent 链路的降级：创建一个临时 TaskContext 仅用于承载单次调用结果
+        TaskContext fallback = TaskContext.builder()
+                .taskId("fallback")
+                .vesselId(request.getVesselId())
+                .sessionId(request.getSessionId())
+                .userMessage(null)
+                .profile(null)
+                .registry(null)
+                .build();
+        return fallback.beginCall(callback);
+    }
+
+    private SpiChatResponse buildResponse(TaskContext taskContext) {
+        if (taskContext == null) {
+            return SpiChatResponse.builder().content("").toolCalls(List.of()).build();
+        }
         return SpiChatResponse.builder()
-                .content(ctx.getContentOrEmpty())
-                .reasoningContent(ctx.getReasoningContent())
-                .toolCalls(ctx.getToolCallsOrEmpty())
-                .usage(ctx.getUsage())
+                .content(taskContext.getLastContent() != null ? taskContext.getLastContent() : "")
+                .reasoningContent(taskContext.getLastReasoningContent())
+                .toolCalls(taskContext.getLastToolCalls() != null ? taskContext.getLastToolCalls() : List.of())
+                .usage(taskContext.getLastUsage())
                 .build();
     }
 

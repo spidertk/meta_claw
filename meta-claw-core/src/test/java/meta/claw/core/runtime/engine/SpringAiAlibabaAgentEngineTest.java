@@ -8,7 +8,6 @@ import meta.claw.core.llm.SpiChatRequest;
 import meta.claw.core.message.Reply;
 import meta.claw.core.runtime.TaskContext;
 import meta.claw.core.runtime.VesselProfile;
-import meta.claw.core.runtime.VesselTask;
 import meta.claw.core.runtime.hitl.ApprovalItem;
 import meta.claw.core.runtime.hitl.ApprovalResolution;
 import meta.claw.core.runtime.hitl.ApprovalStatus;
@@ -129,19 +128,20 @@ class SpringAiAlibabaAgentEngineTest {
     }
 
     private TaskContext dummyContext(SubSystemRegistry registry) {
-        VesselTask task = VesselTask.builder()
-                .taskId("t1")
-                .vesselId("v1")
-                .sessionId("s1")
-                .userMessage("hi")
-                .build();
-        VesselProfile profile = mock(VesselProfile.class);
+                VesselProfile profile = mock(VesselProfile.class);
         meta.claw.core.config.RuntimeConfig runtimeConfig = new meta.claw.core.config.RuntimeConfig();
         runtimeConfig.setProviderConfig(new ProviderConfig());
         VesselConfigBundle bundle = VesselConfigBundle.builder()
                 .runtimeConfig(runtimeConfig)
                 .build();
         when(profile.getBundle()).thenReturn(bundle);
-        return new TaskContext(task, profile, registry);
+        return TaskContext.builder()
+                .taskId("t1")
+                .vesselId("v1")
+                .sessionId("s1")
+                .userMessage("hi")
+                .profile(profile)
+                .registry(registry)
+                .build();
     }
 }
