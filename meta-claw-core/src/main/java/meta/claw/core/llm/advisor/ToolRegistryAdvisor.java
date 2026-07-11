@@ -63,6 +63,15 @@ public class ToolRegistryAdvisor implements CallAdvisor, StreamAdvisor {
             toolCallbacks = Arrays.asList(ToolCallbacks.from(toolInstances.toArray()));
         }
 
+        org.springframework.ai.chat.prompt.ChatOptions options = request.prompt().getOptions();
+        if (options instanceof ToolCallingChatOptions toolOptions) {
+            // 直接修改原始 options，避免丢失 OpenAiChatOptions 的 streamUsage 等专属参数
+            toolOptions.setToolCallbacks(toolCallbacks);
+            toolOptions.setInternalToolExecutionEnabled(false);
+            return request;
+        }
+
+        // fallback：原始 options 不是 ToolCallingChatOptions 时整体替换
         ToolCallingChatOptions toolOptions = ToolCallingChatOptions.builder()
                 .toolCallbacks(toolCallbacks)
                 .internalToolExecutionEnabled(false)

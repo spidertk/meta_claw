@@ -17,9 +17,12 @@ import org.springframework.ai.chat.model.Generation;
 import reactor.core.publisher.Flux;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * 流式 LLM 调用的响应提取与指标记录 Advisor。
@@ -48,6 +51,7 @@ public class MetaClawResponseStreamAdvisor implements StreamAdvisor {
         SpiUsage[] usageHolder = new SpiUsage[1];
         Map<String, AssistantMessage.ToolCall> accumulatingToolCalls = new LinkedHashMap<>();
         Map<String, StringBuilder> accumulatingToolArgs = new LinkedHashMap<>();
+        Set<String> notifiedToolCallIds = new HashSet<>();
 
         return chain.nextStream(request)
                 .doOnNext(response -> {
@@ -84,7 +88,10 @@ public class MetaClawResponseStreamAdvisor implements StreamAdvisor {
                             && (finishReason.equalsIgnoreCase("tool_calls") || finishReason.equalsIgnoreCase("tool_call"));
                     if (isToolCallFinish && !accumulatingToolCalls.isEmpty()) {
                         List<SpiToolCall> parsed = parseAccumulatedToolCalls(accumulatingToolCalls, accumulatingToolArgs);
-                        notifyToolCalls(ctx, parsed);
+                        List<SpiToolCall> newlyCompleted = parsed.stream()
+                                .filter(tc -> tc.getId() != null && notifiedToolCallIds.add(tc.getId()))
+                                .collect(Collectors.toList());
+                        notifyToolCalls(ctx, newlyCompleted);
                     }
                 })
                 .doOnComplete(() -> {
@@ -93,8 +100,11 @@ public class MetaClawResponseStreamAdvisor implements StreamAdvisor {
                     }
                     // 流正常结束时，若还有未通知的累积 tool calls（如 finishReason 未触发），统一解析
                     List<SpiToolCall> parsed = parseAccumulatedToolCalls(accumulatingToolCalls, accumulatingToolArgs);
-                    if (!parsed.isEmpty()) {
-                        notifyToolCalls(ctx, parsed);
+                    List<SpiToolCall> newlyCompleted = parsed.stream()
+                            .filter(tc -> tc.getId() != null && notifiedToolCallIds.add(tc.getId()))
+                            .collect(Collectors.toList());
+                    if (!newlyCompleted.isEmpty()) {
+                        notifyToolCalls(ctx, newlyCompleted);
                     }
 
                     long latency = System.currentTimeMillis() - ctx.getStartTime();
