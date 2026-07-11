@@ -1367,9 +1367,14 @@
           "date": "2026-07-06",
           "result": "passing",
           "detail": "./init.sh BUILD SUCCESS，9 个 reactor 模块全部 SUCCESS，core 134 个测试全部通过，tool 20 个 P0 测试全部通过；meta-claw-bootstrap spring-boot:run 成功启动 Tomcat on 8080，无循环依赖报错。"
+        },
+        {
+          "date": "2026-07-11",
+          "result": "passing",
+          "detail": "修复上下文重构后 CLI 真实端到端工具调用失败：反编译 Spring AI 1.1.8 ToolCallAdvisor 确认，流式路径中 ToolCallAdvisor 在 internalStream 里用原始 request 的 options 副本构造本地 request，执行工具时仍使用该本地 request，导致 ToolRegistryAdvisor 注入的 toolCallbacks 无法被 DefaultToolCallingManager 看到，抛出 No ToolCallback found for tool name: calculate。移除 LlmClientProviderManager 中的 ToolCallAdvisor，由 meta-claw 自己的 ReAct 循环处理工具调用；重新执行 ./init.sh 通过，9 个 reactor 模块全部 SUCCESS，core 112 个测试全部通过，tool 20 个 P0 测试全部通过。"
         }
       ],
-      "notes": "核心改动：删除 MetaClawCallContext.java 与 VesselTask.java；重写 TaskContext 为 @Builder 并内含 LlmCallContext 静态内部类；重写 VesselContext 显式绑定；重写 AgentExecutor/StreamingAgentExecutor/VesselRuntime/LlmClientManager 及 Advisors；更新 MetaClawModelMetricsHook 计数路径；更新所有相关测试。"
+      "notes": "核心改动：删除 MetaClawCallContext.java 与 VesselTask.java；重写 TaskContext 为 @Builder 并内含 LlmCallContext 静态内部类；重写 VesselContext 显式绑定；重写 AgentExecutor/StreamingAgentExecutor/VesselRuntime/LlmClientManager 及 Advisors；更新 MetaClawModelMetricsHook 计数路径；更新所有相关测试。2026-07-11 修复：移除 ToolCallAdvisor，避免 Spring AI 内部执行工具时找不到 ToolCallback。"
     }
   ]
 }

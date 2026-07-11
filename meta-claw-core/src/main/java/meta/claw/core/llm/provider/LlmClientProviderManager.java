@@ -10,7 +10,6 @@ import meta.claw.core.llm.advisor.ToolRegistryAdvisor;
 import meta.claw.core.runtime.metrics.MetricsRecorder;
 import meta.claw.core.tool.registry.ToolRegistry;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.client.advisor.ToolCallAdvisor;
 import org.springframework.ai.chat.client.advisor.api.Advisor;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.beans.BeansException;
@@ -115,9 +114,8 @@ public class LlmClientProviderManager implements ApplicationContextAware, Applic
         ShortMemoryAdvisor shortMemoryAdvisor = applicationContext.getBean(ShortMemoryAdvisor.class);
 
         this.defaultAdvisors = new Advisor[] {
-                ToolCallAdvisor.builder().build(),                    // 外层：自动处理 tool calling 循环
                 shortMemoryAdvisor,                                    // 流式响应持久化到 ShortMemory
-                new ToolRegistryAdvisor(toolRegistry),                 // 注入可用工具定义
+                new ToolRegistryAdvisor(toolRegistry),                 // 注入可用工具定义（internalToolExecutionEnabled=false）
                 new MetaClawResponseCallAdvisor(                       // 同步响应提取与指标
                         metricsRecorderProvider.getIfAvailable(), objectMapper),
                 new MetaClawResponseStreamAdvisor(                     // 流式响应提取与指标
