@@ -56,10 +56,20 @@ public class MetaClawResponseStreamAdvisor implements StreamAdvisor {
         return chain.nextStream(request)
                 .doOnNext(response -> {
                     ChatResponse chatResponse = response != null ? response.chatResponse() : null;
-                    if (chatResponse == null || chatResponse.getResult() == null) {
+                    if (chatResponse == null) {
                         return;
                     }
+
+                    // 即使 result/generation 为空（如 OpenAI 流式 usage 最终 chunk），也要先提取 usage
+                    SpiUsage usage = extractUsage(chatResponse);
+                    if (usage != null) {
+                        usageHolder[0] = usage;
+                    }
+
                     Generation gen = chatResponse.getResult();
+                    if (gen == null) {
+                        return;
+                    }
                     AssistantMessage am = gen.getOutput() instanceof AssistantMessage
                             ? (AssistantMessage) gen.getOutput() : null;
 
@@ -76,11 +86,6 @@ public class MetaClawResponseStreamAdvisor implements StreamAdvisor {
                         if (am.hasToolCalls()) {
                             accumulateToolCalls(am, accumulatingToolCalls, accumulatingToolArgs);
                         }
-                    }
-
-                    SpiUsage usage = extractUsage(chatResponse);
-                    if (usage != null) {
-                        usageHolder[0] = usage;
                     }
 
                     String finishReason = gen.getMetadata() != null ? gen.getMetadata().getFinishReason() : null;
