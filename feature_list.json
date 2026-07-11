@@ -1376,7 +1376,7 @@
         {
           "date": "2026-07-11",
           "result": "passing",
-          "detail": "修复真实 CLI 中工具调用重复通知与 token usage 丢失：ToolRegistryAdvisor 替换整个 options 为 DefaultToolCallingChatOptions，导致 OpenAiChatOptions 的 streamUsage 等参数丢失；改为直接修改原始 ToolCallingChatOptions 的 toolCallbacks/internalToolExecutionEnabled，保留原始 options 的 streamUsage。MetaClawResponseStreamAdvisor 在 finishReason 触发与 doOnComplete 中可能重复通知同一 toolCall，新增 notifiedToolCallIds 集合去重；同时修复 usage 最终 chunk 可能 result/generation 为空导致 usage 被跳过提取的问题。重新执行 ./init.sh 通过，core 112 个测试全部通过，tool 20 个 P0 测试全部通过。"
+          "detail": "修复真实 CLI 中工具调用重复通知与 token usage 丢失：ToolRegistryAdvisor 替换整个 options 为 DefaultToolCallingChatOptions，导致 OpenAiChatOptions 的 streamUsage 等参数丢失；改为直接修改原始 ToolCallingChatOptions 的 toolCallbacks/internalToolExecutionEnabled，保留原始 options 的 streamUsage。MetaClawResponseStreamAdvisor 在 finishReason 触发与 doOnComplete 中可能重复通知同一 toolCall，新增 notifiedToolCallIds 集合去重；修复 usage 最终 chunk 可能 result/generation 为空导致 usage 被跳过提取的问题；修复 doOnComplete 中未调用 callback.onUsage() 导致 CLI 无法显示 token 消耗的问题。重新执行 ./init.sh 通过，core 112 个测试全部通过，tool 20 个 P0 测试全部通过。"
         }
       ],
       "notes": "核心改动：删除 MetaClawCallContext.java 与 VesselTask.java；重写 TaskContext 为 @Builder 并内含 LlmCallContext 静态内部类；重写 VesselContext 显式绑定；重写 AgentExecutor/StreamingAgentExecutor/VesselRuntime/LlmClientManager 及 Advisors；更新 MetaClawModelMetricsHook 计数路径；更新所有相关测试。2026-07-11 修复：移除 ToolCallAdvisor 避免 Spring AI 内部执行工具失败；保留原始 options 避免 streamUsage 丢失；给 MetaClawResponseStreamAdvisor 加 toolCallId 去重避免重复通知。"

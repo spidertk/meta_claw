@@ -8,11 +8,11 @@
 - [x] 标准验证路径仍然可运行
   证据：修复后 `./init.sh` 全量通过；`mvn spring-boot:run -pl meta-claw-bootstrap -DskipTests` 在上一轮验证中成功启动 Tomcat on 8080，无循环依赖报错。
 - [x] 当前进度已经记录到进度日志
-  证据：`claude-progress.md` 已新增证据 25 与 26，分别记录 ToolCallAdvisor 移除、原始 options 保留、toolCallId 去重与空 result chunk 提取 usage 的根因、修复方案与验证结果。
+  证据：`claude-progress.md` 已新增证据 25 与 26，分别记录 ToolCallAdvisor 移除、原始 options 保留、toolCallId 去重、空 result chunk 提取 usage 与 doOnComplete 调用 onUsage 的根因、修复方案与验证结果。
 - [x] 功能状态真实反映了 passing 和未验证的边界
-  证据：`feature_list.json` 的 `context-001` 已补充 2026-07-11 三次修复证据并维持 passing；未引入新的未验证功能。
+  证据：`feature_list.json` 的 `context-001` 已补充 2026-07-11 四次修复证据并维持 passing；未引入新的未验证功能。
 - [x] 没有任何半成品步骤处于未记录状态
-  证据：`ToolRegistryAdvisor` 已改为直接修改原始 `ToolCallingChatOptions`；`MetaClawResponseStreamAdvisor` 已增加 `notifiedToolCallIds` 去重，并在空 result chunk 时仍尝试提取 usage；相关状态文件已同步更新。
+  证据：`ToolRegistryAdvisor` 已改为直接修改原始 `ToolCallingChatOptions`；`MetaClawResponseStreamAdvisor` 已增加 `notifiedToolCallIds` 去重，在空 result chunk 时仍尝试提取 usage，并在 `doOnComplete()` 中调用 `callback.onUsage()`；相关状态文件已同步更新。
 - [x] 下一轮会话无需人工修复即可继续
   证据：下一轮可直接运行 `./init.sh`；bootstrap 启动路径已验证可用。
 

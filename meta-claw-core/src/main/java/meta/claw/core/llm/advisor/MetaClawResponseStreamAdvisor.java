@@ -117,6 +117,9 @@ public class MetaClawResponseStreamAdvisor implements StreamAdvisor {
                     ctx.setReasoningContent(reasoningBuilder.toString());
                     ctx.setUsage(usageHolder[0]);
                     ctx.setToolCalls(parsed);
+                    if (usageHolder[0] != null) {
+                        notifyUsage(ctx, usageHolder[0]);
+                    }
                     ctx.recordLlmMetrics(metricsRecorder, latency);
 
                     log.debug("[MetaClawResponseStreamAdvisor] vessel={}, latency={}ms, contentLen={}, reasoningLen={}, toolCalls={}",
@@ -219,5 +222,12 @@ public class MetaClawResponseStreamAdvisor implements StreamAdvisor {
             return;
         }
         ctx.getStreamingCallback().onReasoningChunk(chunk);
+    }
+
+    private void notifyUsage(TaskContext.LlmCallContext ctx, SpiUsage usage) {
+        if (ctx == null || ctx.getStreamingCallback() == null || usage == null) {
+            return;
+        }
+        ctx.getStreamingCallback().onUsage(usage);
     }
 }
