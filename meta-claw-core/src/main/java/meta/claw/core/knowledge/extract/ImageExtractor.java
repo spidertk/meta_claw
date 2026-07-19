@@ -27,7 +27,7 @@ public class ImageExtractor implements ContentExtractor {
     @Override
     public ExtractedDocument extract(KnowledgeSource source, ExtractionContext ctx) {
         AssetRef asset = ctx.getAssetManager().store(source, ctx.getVesselId());
-        String description = visionDescriber.describe(asset.getOriginalPath(), source.getMediaType());
+        String description = visionDescriber.describe(asset.getOriginalPath(), source.getMediaType(), ctx.getVesselId());
 
         return ExtractedDocument.builder()
                 .markdownBody("## 图片描述\n\n" + description + "\n\n![image](assets/" + asset.getAssetId() + "/" + asset.getOriginalPath().getFileName() + ")")

@@ -34,7 +34,7 @@ class PdfExtractorTest {
             byte[] pdfBytes = createSimplePdf("Hello PDF");
 
             VisionDescriber describer = mock(VisionDescriber.class);
-            when(describer.describe(any(Path.class), anyString())).thenReturn("A page image");
+            when(describer.describe(any(Path.class), anyString(), anyString())).thenReturn("A page image");
 
             LocalAssetManager assetManager = new LocalAssetManager();
             PdfExtractor extractor = new PdfExtractor(describer);

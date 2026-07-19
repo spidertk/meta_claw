@@ -1,6 +1,6 @@
 {
   "project": "meta-claw",
-  "last_updated": "2026-07-05",
+  "last_updated": "2026-07-19",
   "package_structure": {
     "config": "meta.claw.core.config — 所有配置模型 + 加载器 + 解析器",
     "vessel": "meta.claw.core.vessel — Vessel 用户域（Profile + Initializer）",
@@ -1100,6 +1100,11 @@
           "date": "2026-06-30",
           "result": "passing",
           "detail": "mvn -pl meta-claw-tool -am test -Dtest=KnowledgeToolTest -Dsurefire.failIfNoSpecifiedTests=false -q BUILD SUCCESS；KnowledgeToolTest 14/14 通过；全量 ./init.sh BUILD SUCCESS，9 个 reactor 模块全部 SUCCESS，core 112 个测试、tool 18 个测试全部通过。"
+        },
+        {
+          "date": "2026-07-19",
+          "result": "passing",
+          "detail": "修复 KnowledgeAnalyzer LLM 调用 NPE：analyze/extractKeywords 构造 SpiChatRequest 时未设置 vesselId，导致 RuntimeConfigResolver.resolve(null) 抛无 message 的 NPE（日志表现为 'LLM text analysis failed: null'）。已为 analyze(ExtractedDocument,...)/analyze(String,...)/extractKeywords(String) 增加 vesselId 参数并在所有请求构造点设置；KnowledgeManager.acquire 显式下传；./init.sh 全量通过。"
         }
       ],
       "notes": "Task 8 已完成。当前 MultimodalConfig 默认 enabled=false，因此文本知识 acquisitions 仍走文本路径；启用多模态并配置支持媒体类型后，图片资源将自动进入多模态分析。"
@@ -1124,6 +1129,11 @@
           "date": "2026-06-29",
           "result": "passing",
           "detail": "mvn -pl meta-claw-tool -am test -Dtest=ImageExtractorTest -Dsurefire.failIfNoSpecifiedTests=false -q BUILD SUCCESS；ImageExtractorTest 1/1 通过；mvn -pl meta-claw-tool -am test -q BUILD SUCCESS（tool 模块全部测试通过）。"
+        },
+        {
+          "date": "2026-07-19",
+          "result": "passing",
+          "detail": "修复 VisionDescriber 图片描述失败：describe() 构造 SpiChatRequest 时未设置 vesselId 导致 NPE，异常被 catch 吞掉只返回 '[Failed to describe image: ...]' 占位符。已为 describe(Path,String) 增加 vesselId 参数，ImageExtractor/PdfExtractor 通过 ExtractionContext.getVesselId() 传入；同步更新 ImageExtractorTest/PdfExtractorTest mock 签名；./init.sh 全量通过。"
         }
       ],
       "notes": "Task 9 已完成。VisionDescriber 与 ImageExtractor 均为 Spring @Component，可被 ContentExtractorService 自动收集。"

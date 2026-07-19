@@ -81,13 +81,13 @@ public class KnowledgeManager {
                 .build();
         ExtractedDocument doc = extractorService.extract(source, ctx);
 
-        List<String> keywords = analyzer.extractKeywords(doc.getMarkdownBody());
+        List<String> keywords = analyzer.extractKeywords(doc.getMarkdownBody(), vesselId);
         log.debug("Extracted keywords: {}", keywords);
 
         List<KnowledgeEntry> relatedEntries = findRelatedEntries(keywords, knowledgeDir);
         log.debug("Found {} related entries", relatedEntries.size());
 
-        AnalysisResult analysis = analyzer.analyze(doc, relatedEntries, context);
+        AnalysisResult analysis = analyzer.analyze(doc, relatedEntries, context, vesselId);
         log.info("Analysis complete: type={}, confidence={}", analysis.getKnowledgeType(), analysis.getConfidence());
 
         Map<String, Object> result = new LinkedHashMap<>();

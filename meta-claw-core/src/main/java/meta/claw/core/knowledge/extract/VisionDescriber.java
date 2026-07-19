@@ -21,7 +21,7 @@ public class VisionDescriber {
         this.llmClient = llmClient;
     }
 
-    public String describe(Path imagePath, String mimeType) {
+    public String describe(Path imagePath, String mimeType, String vesselId) {
         if (llmClient == null) {
             return "[Image: " + imagePath.getFileName() + "]";
         }
@@ -33,6 +33,7 @@ public class VisionDescriber {
                 .build();
 
         SpiChatRequest request = SpiChatRequest.builder()
+                .vesselId(vesselId)
                 .messages(List.of(SpiMessage.user(
                         "请用一段简洁的中文描述这张图片的内容，提取其中的文字和关键信息。", List.of(part))))
                 .build();

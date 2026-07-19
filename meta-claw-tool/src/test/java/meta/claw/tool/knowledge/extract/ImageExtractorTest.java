@@ -49,7 +49,7 @@ class ImageExtractorTest {
         byte[] bytes = baos.toByteArray();
 
         VisionDescriber describer = mock(VisionDescriber.class);
-        when(describer.describe(any(Path.class), anyString())).thenReturn("A red square");
+        when(describer.describe(any(Path.class), anyString(), anyString())).thenReturn("A red square");
 
         LocalAssetManager assetManager = new LocalAssetManager();
         ImageExtractor extractor = new ImageExtractor(describer);

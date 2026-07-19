@@ -36,7 +36,8 @@ public class KnowledgeAnalyzer {
 
     public AnalysisResult analyze(ExtractedDocument doc,
                                   List<KnowledgeEntry> relatedEntries,
-                                  String context) {
+                                  String context,
+                                  String vesselId) {
         if (llmClient == null) {
             log.warn("No LLM client available, returning default analysis");
             return defaultAnalysis();
@@ -47,13 +48,13 @@ public class KnowledgeAnalyzer {
                 && modelCapability.supportsMediaType(doc.getMediaType());
 
         if (useMultimodal) {
-            return analyzeWithMultimodal(doc, relatedEntries, context);
+            return analyzeWithMultimodal(doc, relatedEntries, context, vesselId);
         }
 
-        return analyzeTextFallback(doc, relatedEntries, context);
+        return analyzeTextFallback(doc, relatedEntries, context, vesselId);
     }
 
-    public AnalysisResult analyze(String newContent, List<KnowledgeEntry> relatedEntries, String context) {
+    public AnalysisResult analyze(String newContent, List<KnowledgeEntry> relatedEntries, String context, String vesselId) {
         if (llmClient == null) {
             log.warn("No LLM client available, returning default analysis");
             return defaultAnalysis();
@@ -63,6 +64,7 @@ public class KnowledgeAnalyzer {
 
         try {
             SpiChatRequest request = SpiChatRequest.builder()
+                    .vesselId(vesselId)
                     .messages(List.of(SpiMessage.user(prompt)))
                     .build();
 
@@ -84,7 +86,8 @@ public class KnowledgeAnalyzer {
 
     private AnalysisResult analyzeWithMultimodal(ExtractedDocument doc,
                                                  List<KnowledgeEntry> relatedEntries,
-                                                 String context) {
+                                                 String context,
+                                                 String vesselId) {
         List<MediaPart> mediaParts = doc.getEmbeddedAssets().stream()
                 .filter(a -> a.getMediaType() != null && a.getMediaType().startsWith("image/"))
                 .filter(a -> a.getOriginalPath() != null)
@@ -98,6 +101,7 @@ public class KnowledgeAnalyzer {
 
         String prompt = buildAnalysisPrompt(doc.getMarkdownBody(), relatedEntries, context);
         SpiChatRequest request = SpiChatRequest.builder()
+                .vesselId(vesselId)
                 .messages(List.of(SpiMessage.user(prompt, mediaParts)))
                 .build();
 
@@ -108,16 +112,18 @@ public class KnowledgeAnalyzer {
             return result;
         } catch (Exception e) {
             log.error("Multimodal analysis failed, falling back to text: {}", e.getMessage());
-            return analyzeTextFallback(doc, relatedEntries, context);
+            return analyzeTextFallback(doc, relatedEntries, context, vesselId);
         }
     }
 
     private AnalysisResult analyzeTextFallback(ExtractedDocument doc,
                                                List<KnowledgeEntry> relatedEntries,
-                                               String context) {
+                                               String context,
+                                               String vesselId) {
         String prompt = buildAnalysisPrompt(doc.getMarkdownBody(), relatedEntries, context);
         try {
             SpiChatRequest request = SpiChatRequest.builder()
+                    .vesselId(vesselId)
                     .messages(List.of(SpiMessage.user(prompt)))
                     .build();
             SpiChatResponse response = llmClient.chat(request);
@@ -291,7 +297,7 @@ public class KnowledgeAnalyzer {
                 .build();
     }
 
-    public List<String> extractKeywords(String content) {
+    public List<String> extractKeywords(String content, String vesselId) {
         if (llmClient == null) {
             return Arrays.stream(content.split("\\s+"))
                     .filter(w -> w.length() > 3)
@@ -308,6 +314,7 @@ public class KnowledgeAnalyzer {
 
         try {
             SpiChatRequest request = SpiChatRequest.builder()
+                    .vesselId(vesselId)
                     .messages(List.of(SpiMessage.user(prompt)))
                     .build();
 

@@ -58,7 +58,7 @@ public class PdfExtractor implements ContentExtractor {
             int pageCount = document.getNumberOfPages();
             for (int i = 0; i < pageCount; i++) {
                 Path pageImage = renderPage(pdfPath.getParent(), renderer, i);
-                String pageDescription = visionDescriber.describe(pageImage, "image/png");
+                String pageDescription = visionDescriber.describe(pageImage, "image/png", ctx.getVesselId());
                 markdown.append("## 第 ").append(i + 1).append(" 页\n\n")
                         .append(pageDescription).append("\n\n");
 
