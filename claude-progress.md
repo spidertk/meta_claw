@@ -33,7 +33,7 @@
 - 最近已通过证据 25：2026-07-11 修复上下文重构后 CLI 真实端到端工具调用失败：用户输入 `1+1` 触发 `calculate` 工具时，Spring AI `ToolCallAdvisor` 内部尝试执行工具但找不到 `ToolCallback`，抛出 `IllegalStateException: No ToolCallback found for tool name: calculate`。反编译 Spring AI 1.1.8 `ToolCallAdvisor` 确认，流式路径中 `ToolCallAdvisor.internalStream` 使用原始 request 的 options 副本构造本地 request，执行工具时仍使用该本地 request，导致内侧 `ToolRegistryAdvisor` 注入的 `toolCallbacks` 无法被 `DefaultToolCallingManager` 看到。修复：从 `LlmClientProviderManager` 的默认 Advisor 栈中移除 `ToolCallAdvisor`，由 meta-claw 自己的 ReAct 循环处理工具调用；`ToolRegistryAdvisor` 仍负责注入工具定义并设置 `internalToolExecutionEnabled=false`。重新执行 `./init.sh` BUILD SUCCESS，9 个 reactor 模块全部 SUCCESS，core 112 个测试全部通过，tool 20 个 P0 测试全部通过。
 - 最近已通过证据 26：2026-07-11 修复真实 CLI 工具调用的三个后续问题：① `calculate` 被通知两次（UI 打印两次 "🔧 Calling tool"），因为 `MetaClawResponseStreamAdvisor` 在 `finishReason == tool_calls` 的 `doOnNext` 与 `doOnComplete` 中各通知一次同一 toolCall；新增 `notifiedToolCallIds` 集合按 `toolCallId` 去重，每个工具只通知一次。② 每轮结束时 token usage 不显示（`lastUsage[0]` 为 null），因为 `ToolRegistryAdvisor` 把原始 `OpenAiChatOptions` 整体替换为 `DefaultToolCallingChatOptions`，导致 `streamUsage` 等 OpenAI 专属参数丢失；改为当原始 options 已经是 `ToolCallingChatOptions` 时直接 `setToolCallbacks/setInternalToolExecutionEnabled`，保留原始 options 的其它参数。③ usage 仍不显示：进一步分析发现 OpenAI 流式 usage 最终 chunk 的 `ChatResponse.getResult()` 可能为空，`MetaClawResponseStreamAdvisor` 原代码在 `chatResponse == null || chatResponse.getResult() == null` 时直接返回，导致 usage 提取被跳过；改为先判断 `chatResponse == null` 并提取 usage，再判断 `getResult() == null` 决定是否继续处理 content/toolCalls。④ usage 提取后仍不显示：继续分析发现 `MetaClawResponseStreamAdvisor.doOnComplete()` 把 usage 写入 `LlmCallContext` 但未调用 `callback.onUsage()`，而 `ChatCommand` 依赖 `onUsage()` 回调来更新 `lastUsage[0]`；新增 `notifyUsage()` 并在 `doOnComplete()` 中调用 `callback.onUsage(usage)`。重新执行 `./init.sh` BUILD SUCCESS，9 个 reactor 模块全部 SUCCESS，core 112 个测试全部通过，tool 20 个 P0 测试全部通过。
 - 最近已通过证据 27：2026-07-19 修复 Knowledge 子系统 LLM 调用 NPE：CLI 输入图片路径触发 `knowledgeAcquireFromFile` 后，日志报 `LLM text analysis failed: null`、`Keyword extraction failed: null`，且图片描述退化为 `[Failed to describe image: ...]` 占位符。根因是 `KnowledgeAnalyzer`（`analyze`/`extractKeywords` 及其多模态/文本回退路径）与 `VisionDescriber.describe()` 构造 `SpiChatRequest` 时未设置 `vesselId`，`LlmClientManager.chat()` 调 `RuntimeConfigResolver.resolve(null)` 在 `baseDir.resolve("vessels").resolve(null)` 处抛无 message 的 NPE，且 `VisionDescriber` 的 catch 吞掉异常只返回失败占位符。修复（方案 B，显式传参替代依赖 `VesselContext` ThreadLocal）：给 `KnowledgeAnalyzer.analyze(ExtractedDocument,...)`、`analyze(String,...)`、`extractKeywords(String)` 与 `VisionDescriber.describe(Path,String)` 增加 `String vesselId` 参数，所有 `SpiChatRequest.builder()` 调用点补 `.vesselId(vesselId)`；`KnowledgeManager.acquire()`（已通过 `VesselContext.getVesselId()` 拿到 vesselId）显式下传；`ImageExtractor`/`PdfExtractor` 复用 `ExtractionContext.getVesselId()` 传给 `VisionDescriber`；同步更新 `ImageExtractorTest`/`PdfExtractorTest` 的 mock 签名。重新执行 `./init.sh` BUILD SUCCESS，9 个 reactor 模块全部 SUCCESS，core 112 个测试全部通过，tool 20 个 P0 测试全部通过。
-- 当前最高优先级未完成功能：CLI 工具调用回归及后续重复通知、usage 丢失问题均已修复；Knowledge 子系统 vesselId NPE 已修复；下一步为整体收尾与提交，或按路线图开始后续功能。
+- 最近已通过证据 28：2026-07-19 修复本地图片发给 Moonshot/Kimi 视觉模型无图片描述的问题：网上查证 Moonshot 官方文档明确「URL 格式的图片：不支持，目前仅支持使用 base64 编码的图片内容」（或 `ms://` 文件引用）；而 `SpiMessageConverter.toSpringMedia()` 把 `VisionDescriber`/`KnowledgeAnalyzer` 传入的 `file:///...` URI 原样构造为 `Media(MimeType, URI)`，Spring AI 序列化后把 `file://` URL 直接发给模型，服务端无法读取本地路径。反编译 Spring AI 1.1.8 `OpenAiChatModel.fromMediaData` 确认 `byte[]` 类型的 Media data 会序列化为 `data:<mime>;base64,<...>`。修复：`toSpringMedia()` 对 `file` scheme 的 URI 读取文件字节，用 `Media.builder().data(byte[])` 构造；远程 URL 保持原样。新增 `SpiMessageConverterTest` 两个用例覆盖本地 file→byte[] 与远程 URL 透传；重新执行 `./init.sh` BUILD SUCCESS，9 个 reactor 模块全部 SUCCESS，core 114 个测试全部通过，tool 20 个 P0 测试全部通过。CLI 工具调用回归及后续重复通知、usage 丢失问题均已修复；Knowledge 子系统 vesselId NPE 已修复；下一步为整体收尾与提交，或按路线图开始后续功能。
 - 当前 blocker：
   1. 当前无 blocker
 
@@ -61,6 +61,36 @@
 - `serve/start/stop/restart/status/logs`、工具引擎、MCP、Skill 系统仍未实现
 
 ## 会话记录
+
+### Session 075
+
+- 日期：2026-07-19
+- 本轮目标：排查 CLI 输入图片后无图片描述的问题，确认是否请求方式不对。
+- 排查结论：
+  - 日志中模型选择调用 `execute`（shell `file` 命令）查看图片元数据，属于模型的工具选择行为；真正导致「没有图片描述」的是视觉请求格式问题。
+  - 网上查证：Moonshot/Kimi 视觉 API 官方文档明确「URL 格式的图片：不支持，目前仅支持使用 base64 编码的图片内容」与 `ms://` 文件引用；GitHub 上也有多个类似 issue（如 hermes-agent #23657 验证 `api.moonshot.cn` 的 kimi-k2.5/k2.6 需要 base64 image_url）。
+  - 代码查证：`SpiMessageConverter.toSpringMedia()` 把 `file:///...` URI 原样构造为 `Media(MimeType, URI)`；反编译 Spring AI 1.1.8 `OpenAiChatModel.fromMediaData` 确认 String/URI data 原样发送，只有 `byte[]` 会编码为 `data:<mime>;base64,<...>`。
+- 实现：
+  - 修改 `SpiMessageConverter.toSpringMedia()`：`file` scheme 的 URI 读取文件字节，用 `Media.builder().mimeType(...).data(byte[])` 构造；远程 URL 保持原样。此单点修复同时覆盖 `VisionDescriber.describe()` 与 `KnowledgeAnalyzer.analyzeWithMultimodal()` 两条路径。
+  - 新增 `SpiMessageConverterTest#convertsLocalFileMediaToByteArray` 与 `#keepsRemoteMediaUrlAsIs`。
+- 运行过的验证：
+  - `mvn -pl meta-claw-core -am test -Dtest=SpiMessageConverterTest -Dsurefire.failIfNoSpecifiedTests=false -q` → BUILD SUCCESS。
+  - `./init.sh`（真实环境，Java 21 + Maven 3.9.15）→ BUILD SUCCESS；9 个 reactor 模块全部 SUCCESS，core 114 个测试全部通过，tool 20 个 P0 测试全部通过。
+- 已记录证据：
+  - `feature_list.json` 的 `multimodal-core-002` 已补充 2026-07-19 修复证据并维持 passing。
+  - `claude-progress.md` 已补充证据 28 与本 Session 075。
+  - `clean-state-checklist.md` 已更新。
+- 更新过的文件或工件：
+  - `meta-claw-core/src/main/java/meta/claw/core/runtime/engine/SpiMessageConverter.java`
+  - `meta-claw-core/src/test/java/meta/claw/core/runtime/engine/SpiMessageConverterTest.java`
+  - `feature_list.json`
+  - `claude-progress.md`
+  - `clean-state-checklist.md`
+- 已知风险或未解决的问题：
+  - 当前无 blocker。真实 CLI 端到端（输入真实图片触发 `knowledgeAcquireFromFile`）未在本轮复测，建议用户下一轮实际验证图片描述是否恢复；若模型仍倾向用 `execute`/`file` 命令而不是知识采集工具，属于提示词/工具描述层面的调优问题，与本修复无关。
+- 下一步最佳动作：
+  1. 提交本轮修改。
+  2. 用户用真实图片复测知识采集链路。
 
 ### Session 074
 

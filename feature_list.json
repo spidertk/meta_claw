@@ -1306,6 +1306,11 @@
           "date": "2026-06-30",
           "result": "passing",
           "detail": "./init.sh BUILD SUCCESS，9 个 reactor 模块全部 SUCCESS，core 112 个测试全部通过，tool 18 个 P0 测试全部通过。"
+        },
+        {
+          "date": "2026-07-19",
+          "result": "passing",
+          "detail": "修复本地图片发送给 Moonshot/Kimi 视觉模型失败：SpiMessageConverter.toSpringMedia 把 file:// URI 原样放进 Media，而 Moonshot 视觉 API 不支持 URL 形式图片（官方文档明确仅支持 base64 data URI 与 ms:// 文件引用），导致 VisionDescriber/KnowledgeAnalyzer 多模态路径拿不到图片描述。已改为 file scheme 时读取文件字节并用 Media.builder().data(byte[]) 构造，Spring AI 会序列化为 data:<mime>;base64,<...>；远程 URL 保持原样。新增 SpiMessageConverterTest 两个用例（本地 file→byte[]、远程 URL 不变）；./init.sh 全量通过，core 114 个测试全部通过。"
         }
       ],
       "notes": "Task 2 已完成。映射时默认 mimeType 为 image/png，可在 MediaPart 中显式指定。"

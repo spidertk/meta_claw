@@ -12,7 +12,10 @@ import org.springframework.ai.chat.messages.ToolResponseMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.util.MimeType;
 
+import java.io.IOException;
 import java.net.URI;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -92,9 +95,22 @@ public final class SpiMessageConverter {
         return parts.stream()
                 .map(part -> {
                     String mimeType = part.getMimeType() != null ? part.getMimeType() : "image/png";
+                    URI uri = URI.create(part.getUrl());
+                    // Moonshot/Kimi vision API 不支持 URL 形式的图片（包括 file://），只接受 base64 data URI；
+                    // Spring AI 对 byte[] 类型的 Media 会序列化为 data:<mime>;base64,<...>，因此本地文件读成字节数组。
+                    if ("file".equalsIgnoreCase(uri.getScheme())) {
+                        try {
+                            return org.springframework.ai.content.Media.builder()
+                                    .mimeType(MimeType.valueOf(mimeType))
+                                    .data((Object) Files.readAllBytes(Path.of(uri)))
+                                    .build();
+                        } catch (IOException e) {
+                            throw new IllegalStateException("Failed to read media file: " + part.getUrl(), e);
+                        }
+                    }
                     return new org.springframework.ai.content.Media(
                             MimeType.valueOf(mimeType),
-                            URI.create(part.getUrl()));
+                            uri);
                 })
                 .collect(Collectors.toList());
     }

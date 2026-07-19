@@ -1,17 +1,23 @@
 package meta.claw.core.runtime.engine;
 
+import meta.claw.core.llm.MediaPart;
 import meta.claw.core.llm.SpiMessage;
 import meta.claw.core.tool.SpiToolCall;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.ToolResponseMessage;
 import org.springframework.ai.chat.messages.UserMessage;
+import org.springframework.ai.content.Media;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -111,5 +117,45 @@ class SpiMessageConverterTest {
 
         assertInstanceOf(UserMessage.class, message);
         assertEquals("?", ((UserMessage) message).getText());
+    }
+
+    @Test
+    void convertsLocalFileMediaToByteArray(@TempDir Path tempDir) throws Exception {
+        byte[] imageBytes = new byte[]{1, 2, 3, 4};
+        Path imagePath = tempDir.resolve("test.png");
+        Files.write(imagePath, imageBytes);
+
+        MediaPart part = MediaPart.builder()
+                .type("image_url")
+                .mimeType("image/png")
+                .url(imagePath.toUri().toString())
+                .build();
+        Message message = SpiMessageConverter.toSpringMessage(
+                SpiMessage.user("describe", List.of(part)));
+
+        UserMessage userMessage = assertInstanceOf(UserMessage.class, message);
+        assertEquals(1, userMessage.getMedia().size());
+        Media media = userMessage.getMedia().get(0);
+        // Moonshot/Kimi vision API 只接受 base64 data URI；本地文件必须读成 byte[]，
+        // 由 Spring AI 序列化为 data:<mime>;base64,<...>
+        assertInstanceOf(byte[].class, media.getData());
+        assertArrayEquals(imageBytes, (byte[]) media.getData());
+        assertEquals("image/png", media.getMimeType().toString());
+    }
+
+    @Test
+    void keepsRemoteMediaUrlAsIs() {
+        MediaPart part = MediaPart.builder()
+                .type("image_url")
+                .mimeType("image/png")
+                .url("https://example.com/test.png")
+                .build();
+        Message message = SpiMessageConverter.toSpringMessage(
+                SpiMessage.user("describe", List.of(part)));
+
+        UserMessage userMessage = assertInstanceOf(UserMessage.class, message);
+        assertEquals(1, userMessage.getMedia().size());
+        Media media = userMessage.getMedia().get(0);
+        assertEquals("https://example.com/test.png", media.getData().toString());
     }
 }
