@@ -1311,6 +1311,11 @@
           "date": "2026-07-19",
           "result": "passing",
           "detail": "修复本地图片发送给 Moonshot/Kimi 视觉模型失败：SpiMessageConverter.toSpringMedia 把 file:// URI 原样放进 Media，而 Moonshot 视觉 API 不支持 URL 形式图片（官方文档明确仅支持 base64 data URI 与 ms:// 文件引用），导致 VisionDescriber/KnowledgeAnalyzer 多模态路径拿不到图片描述。已改为 file scheme 时读取文件字节并用 Media.builder().data(byte[]) 构造，Spring AI 会序列化为 data:<mime>;base64,<...>；远程 URL 保持原样。新增 SpiMessageConverterTest 两个用例（本地 file→byte[]、远程 URL 不变）；./init.sh 全量通过，core 114 个测试全部通过。"
+        },
+        {
+          "date": "2026-07-19",
+          "result": "passing",
+          "detail": "修复 VisionDescriber 图片入参丢失：LlmClientManager 使用私有 toSpringMessage，user 分支只构造纯文本 UserMessage，mediaParts 被完全丢弃——真实 HTTP 请求体只有文本没有 image_url，模型回复「没有看到您上传的图片」。此前 base64 修复改的是 SpiMessageConverter（SAA 引擎路径），未覆盖 LlmClientManager 路径。修复：LlmClientManager.toSpringMessage 的 user 分支委托给 SpiMessageConverter.toSpringMessage（带 mediaParts 时构造多模态 UserMessage，file:// 读成 byte[] 序列化为 base64 data URI）。LlmClientManagerChatResponseTest 新增多模态转换用例；./init.sh 全量通过，core 119 个测试全部通过。"
         }
       ],
       "notes": "Task 2 已完成。映射时默认 mimeType 为 image/png，可在 MediaPart 中显式指定。"

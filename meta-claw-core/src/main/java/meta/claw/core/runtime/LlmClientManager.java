@@ -10,6 +10,7 @@ import meta.claw.core.llm.SpiStreamingCallback;
 import meta.claw.core.llm.provider.LlmClientProviderManager;
 import meta.claw.core.memory.MemoryMessage;
 import meta.claw.core.memory.MemoryMessageConverter;
+import meta.claw.core.runtime.engine.SpiMessageConverter;
 import meta.claw.core.config.resolver.RuntimeConfigResolver;
 import meta.claw.core.tool.SpiToolCall;
 import org.springframework.ai.chat.client.ChatClient;
@@ -237,7 +238,9 @@ public class LlmClientManager implements SpiLlmClient {
     private Message toSpringMessage(SpiMessage msg) {
         return switch (msg.getRole()) {
             case "system" -> new SystemMessage(msg.getContent());
-            case "user" -> new UserMessage(msg.getContent());
+            // 复用 SpiMessageConverter 的 user 分支：带 mediaParts 时构造多模态 UserMessage，
+            // 本地文件会读成 byte[] 由 Spring AI 序列化为 base64 data URI（Moonshot 只支持该形式）
+            case "user" -> SpiMessageConverter.toSpringMessage(msg);
             case "assistant" -> {
                 java.util.Map<String, Object> properties = new java.util.HashMap<>();
                 if (msg.getReasoningContent() != null && !msg.getReasoningContent().isEmpty()) {

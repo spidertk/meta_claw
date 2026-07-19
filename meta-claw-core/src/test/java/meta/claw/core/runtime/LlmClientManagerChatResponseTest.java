@@ -1,15 +1,25 @@
 package meta.claw.core.runtime;
 
+import meta.claw.core.llm.MediaPart;
 import meta.claw.core.llm.SpiChatResponse;
+import meta.claw.core.llm.SpiMessage;
 import meta.claw.core.llm.SpiUsage;
 import meta.claw.core.tool.SpiToolCall;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.springframework.ai.chat.messages.Message;
+import org.springframework.ai.chat.messages.UserMessage;
+import org.springframework.ai.content.Media;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 
 /**
  * 验证一次性 chat 调用（无 TaskContext，如 KnowledgeAnalyzer/VisionDescriber）
@@ -59,5 +69,28 @@ class LlmClientManagerChatResponseTest {
 
         assertEquals("", response.content());
         assertEquals(0, response.toolCalls().size());
+    }
+
+    @Test
+    void convertsUserMessageWithLocalImageToMultimediaMessage(@TempDir Path tempDir) throws Exception {
+        byte[] imageBytes = new byte[]{9, 8, 7};
+        Path imagePath = tempDir.resolve("pic.png");
+        Files.write(imagePath, imageBytes);
+
+        LlmClientManager manager = new LlmClientManager();
+        SpiMessage userMsg = SpiMessage.user("描述图片", List.of(MediaPart.builder()
+                .type("image_url")
+                .mimeType("image/png")
+                .url(imagePath.toUri().toString())
+                .build()));
+
+        Message springMsg = (Message) ReflectionTestUtils.invokeMethod(manager, "toSpringMessage", userMsg);
+
+        UserMessage userMessage = assertInstanceOf(UserMessage.class, springMsg);
+        assertEquals(1, userMessage.getMedia().size());
+        Media media = userMessage.getMedia().get(0);
+        // 本地文件必须读成 byte[]，由 Spring AI 序列化为 base64 data URI（Moonshot 不支持 file:// URL）
+        assertInstanceOf(byte[].class, media.getData());
+        assertArrayEquals(imageBytes, (byte[]) media.getData());
     }
 }
