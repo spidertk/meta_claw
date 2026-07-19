@@ -35,7 +35,7 @@
 - 最近已通过证据 27：2026-07-19 修复 Knowledge 子系统 LLM 调用 NPE：CLI 输入图片路径触发 `knowledgeAcquireFromFile` 后，日志报 `LLM text analysis failed: null`、`Keyword extraction failed: null`，且图片描述退化为 `[Failed to describe image: ...]` 占位符。根因是 `KnowledgeAnalyzer`（`analyze`/`extractKeywords` 及其多模态/文本回退路径）与 `VisionDescriber.describe()` 构造 `SpiChatRequest` 时未设置 `vesselId`，`LlmClientManager.chat()` 调 `RuntimeConfigResolver.resolve(null)` 在 `baseDir.resolve("vessels").resolve(null)` 处抛无 message 的 NPE，且 `VisionDescriber` 的 catch 吞掉异常只返回失败占位符。修复（方案 B，显式传参替代依赖 `VesselContext` ThreadLocal）：给 `KnowledgeAnalyzer.analyze(ExtractedDocument,...)`、`analyze(String,...)`、`extractKeywords(String)` 与 `VisionDescriber.describe(Path,String)` 增加 `String vesselId` 参数，所有 `SpiChatRequest.builder()` 调用点补 `.vesselId(vesselId)`；`KnowledgeManager.acquire()`（已通过 `VesselContext.getVesselId()` 拿到 vesselId）显式下传；`ImageExtractor`/`PdfExtractor` 复用 `ExtractionContext.getVesselId()` 传给 `VisionDescriber`；同步更新 `ImageExtractorTest`/`PdfExtractorTest` 的 mock 签名。重新执行 `./init.sh` BUILD SUCCESS，9 个 reactor 模块全部 SUCCESS，core 112 个测试全部通过，tool 20 个 P0 测试全部通过。
 - 最近已通过证据 28：2026-07-19 修复本地图片发给 Moonshot/Kimi 视觉模型无图片描述的问题：网上查证 Moonshot 官方文档明确「URL 格式的图片：不支持，目前仅支持使用 base64 编码的图片内容」（或 `ms://` 文件引用）；而 `SpiMessageConverter.toSpringMedia()` 把 `VisionDescriber`/`KnowledgeAnalyzer` 传入的 `file:///...` URI 原样构造为 `Media(MimeType, URI)`，Spring AI 序列化后把 `file://` URL 直接发给模型，服务端无法读取本地路径。反编译 Spring AI 1.1.8 `OpenAiChatModel.fromMediaData` 确认 `byte[]` 类型的 Media data 会序列化为 `data:<mime>;base64,<...>`。修复：`toSpringMedia()` 对 `file` scheme 的 URI 读取文件字节，用 `Media.builder().data(byte[])` 构造；远程 URL 保持原样。新增 `SpiMessageConverterTest` 两个用例覆盖本地 file→byte[] 与远程 URL 透传；重新执行 `./init.sh` BUILD SUCCESS，9 个 reactor 模块全部 SUCCESS，core 114 个测试全部通过，tool 20 个 P0 测试全部通过。
 - 最近已通过证据 29：2026-07-19 修复内部一次性 LLM 调用被注入工具导致知识分析全部回退的问题：用户实测图片采集后日志显示 `extractKeywords`/`analyze` 请求（经 `LlmClientManager.chat()` 单发路径）被 `ToolRegistryAdvisor` 注入全部 18 个注册工具，kimi-k2.5 看到 `assets/.../original.jpg` 路径后选择返回 `tool_calls`（`fileExists`/`listFiles`/`knowledgeList`）而不是直接输出 JSON；单发 `chat()` 没有 ReAct 循环执行工具，响应 content 是自然语言而非 JSON，导致 `No content to map due to end-of-input` 解析失败并回退到默认结果（图片描述为空、关键词为原始文本分词）。修复：新增 `TaskContext.LlmCallContext.SKIP_TOOL_INJECTION_KEY` 上下文标志；`LlmClientManager.chat()` 单发路径设置该标志，`ToolRegistryAdvisor.addTools()` 检测到后原样透传请求；`chatWithTools`/`streamWithTools` 的 ReAct 主链路（显式传入 ToolCallback）不受影响。新增 `ToolRegistryAdvisorTest` 两个用例（skip 标志透传 / 无标志正常注入）并纳入 `init.sh` P0 基线；重新执行 `./init.sh` BUILD SUCCESS，9 个 reactor 模块全部 SUCCESS，core 116 个测试全部通过，tool 20 个 P0 测试全部通过。
-- 当前最高优先级未完成功能：CLI 工具调用回归及后续重复通知、usage 丢失问题均已修复；Knowledge 子系统 vesselId NPE、本地图片 base64 编码、内部调用工具注入问题均已修复；下一步为整体收尾与提交，或按路线图开始后续功能。
+- 最近已通过证据 30：2026-07-19 修复一次性 chat 调用响应 content 永远为空的问题：用户实测发现跳过工具注入后模型已正常返回 JSON（HTTP 日志 200 + 正常 content），但 `extractKeywords` 仍报 `No content to map due to end-of-input`、图片描述与分析结果依然为空。根因：`LlmClientManager.chat(SpiChatRequest)`（`KnowledgeAnalyzer`/`VisionDescriber` 使用）传 `taskContext=null`，而 `buildResponse(null)` 硬编码返回 `content("")`；`createCallContext` 创建的 fallback TaskContext 承载了真实结果却被丢弃。修复：新增 `buildResponseFromCallContext(LlmCallContext)`，`taskContext` 为空时从本次调用的 `LlmCallContext` 组装 content/reasoningContent/toolCalls/usage。新增 `LlmClientManagerChatResponseTest` 两个用例（正常映射 / 空结果安全回退）并纳入 `init.sh` P0 基线；重新执行 `./init.sh` BUILD SUCCESS，9 个 reactor 模块全部 SUCCESS，core 118 个测试全部通过，tool 20 个 P0 测试全部通过。CLI 工具调用回归及后续重复通知、usage 丢失问题均已修复；Knowledge 子系统 vesselId NPE、本地图片 base64 编码、内部调用工具注入问题均已修复；下一步为整体收尾与提交，或按路线图开始后续功能。
 - 当前 blocker：
   1. 当前无 blocker
 
@@ -63,6 +63,36 @@
 - `serve/start/stop/restart/status/logs`、工具引擎、MCP、Skill 系统仍未实现
 
 ## 会话记录
+
+### Session 077
+
+- 日期：2026-07-19
+- 本轮目标：修复跳过工具注入后关键词提取/图片描述/知识分析仍然全部为空的问题。
+- 排查结论：
+  - 用户实测 HTTP 日志显示请求已无 tools 字段、模型正常返回 JSON 数组（200 OK），但 `KnowledgeAnalyzer` 仍报 `No content to map due to end-of-input`。
+  - 根因：`LlmClientManager.chat(SpiChatRequest)` 传 `taskContext=null`，`buildResponse(null)` 硬编码返回空 content；`createCallContext` 创建的 fallback `TaskContext` 承载了 Advisor 提取的真实结果却被丢弃。这不是多模态问题，而是响应组装问题。
+- 实现：
+  - `LlmClientManager` 新增 `buildResponseFromCallContext(LlmCallContext)`；`chat()` 在 `taskContext == null` 时改从本次调用的 `LlmCallContext` 组装响应。
+  - 新增 `LlmClientManagerChatResponseTest` 两个用例，并纳入 `init.sh` P0 基线。
+- 运行过的验证：
+  - `mvn -pl meta-claw-core -am test -Dtest=LlmClientManagerChatResponseTest -Dsurefire.failIfNoSpecifiedTests=false -q` → BUILD SUCCESS。
+  - `./init.sh`（真实环境，Java 21 + Maven 3.9.15）→ BUILD SUCCESS；9 个 reactor 模块全部 SUCCESS，core 118 个测试全部通过，tool 20 个 P0 测试全部通过。
+- 已记录证据：
+  - `feature_list.json` 的 `spring-wiring-002` 已补充 2026-07-19 修复证据并维持 passing。
+  - `claude-progress.md` 已补充证据 30 与本 Session 077。
+  - `clean-state-checklist.md` 已更新。
+- 更新过的文件或工件：
+  - `meta-claw-core/src/main/java/meta/claw/core/runtime/LlmClientManager.java`
+  - `meta-claw-core/src/test/java/meta/claw/core/runtime/LlmClientManagerChatResponseTest.java`（新增）
+  - `init.sh`
+  - `feature_list.json`
+  - `claude-progress.md`
+  - `clean-state-checklist.md`
+- 已知风险或未解决的问题：
+  - 当前无 blocker。真实 CLI 端到端图片采集未在本轮复测，建议用户下一轮实测：预期图片描述有真实内容、关键词为基于描述内容提取的准确结果、分析返回真实 JSON。
+- 下一步最佳动作：
+  1. 提交本轮修改。
+  2. 用户用真实图片复测知识采集链路。
 
 ### Session 076
 

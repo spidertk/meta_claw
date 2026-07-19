@@ -93,7 +93,9 @@ public class LlmClientManager implements SpiLlmClient {
                 .call()
                 .chatResponse();
 
-        return buildResponse(taskContext);
+        // taskContext 为空时（KnowledgeAnalyzer/VisionDescriber 等一次性调用），
+        // 从本次调用的 LlmCallContext 组装响应，否则 content 永远为空字符串
+        return taskContext != null ? buildResponse(taskContext) : buildResponseFromCallContext(ctx);
     }
 
     /**
@@ -211,6 +213,19 @@ public class LlmClientManager implements SpiLlmClient {
                 .reasoningContent(taskContext.getLastReasoningContent())
                 .toolCalls(taskContext.getLastToolCalls() != null ? taskContext.getLastToolCalls() : List.of())
                 .usage(taskContext.getLastUsage())
+                .build();
+    }
+
+    /**
+     * 无 {@link TaskContext} 的一次性调用（KnowledgeAnalyzer/VisionDescriber）从
+     * {@link TaskContext.LlmCallContext} 组装响应，避免 content 永远为空。
+     */
+    private SpiChatResponse buildResponseFromCallContext(TaskContext.LlmCallContext ctx) {
+        return SpiChatResponse.builder()
+                .content(ctx.getContentOrEmpty())
+                .reasoningContent(ctx.getReasoningContent())
+                .toolCalls(ctx.getToolCallsOrEmpty())
+                .usage(ctx.getUsage())
                 .build();
     }
 
