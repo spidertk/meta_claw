@@ -146,6 +146,7 @@ public class TaskContext {
 
         public static final String CONTEXT_KEY = "llmCallContext";
         public static final String EXPLICIT_TOOL_CALLBACKS_KEY = "explicitToolCallbacks";
+        public static final String SKIP_TOOL_INJECTION_KEY = "skipToolInjection";
 
         private final TaskContext taskContext;
         private final SpiStreamingCallback streamingCallback;

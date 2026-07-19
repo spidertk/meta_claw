@@ -48,6 +48,13 @@ public class ToolRegistryAdvisor implements CallAdvisor, StreamAdvisor {
     }
 
     private ChatClientRequest addTools(ChatClientRequest request) {
+        // 内部一次性调用（如 KnowledgeAnalyzer/VisionDescriber）不需要工具，
+        // 注入工具会让模型选择 tool_calls 而不是直接输出结果
+        if (Boolean.TRUE.equals(request.context().get(TaskContext.LlmCallContext.SKIP_TOOL_INJECTION_KEY))) {
+            log.debug("[ToolRegistryAdvisor] skipping tool injection");
+            return request;
+        }
+
         ToolCallback[] explicitCallbacks = (ToolCallback[]) request.context().get(TaskContext.LlmCallContext.EXPLICIT_TOOL_CALLBACKS_KEY);
 
         List<ToolCallback> toolCallbacks;

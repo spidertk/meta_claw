@@ -1334,6 +1334,11 @@
           "date": "2026-07-04",
           "result": "passing",
           "detail": "./init.sh BUILD SUCCESS，9 个 reactor 模块全部 SUCCESS，core 112 个 P0 测试全部通过，tool 20 个 P0 测试全部通过；meta-claw-bootstrap spring-boot:run 成功启动 Tomcat on 8080，无循环依赖报错。"
+        },
+        {
+          "date": "2026-07-19",
+          "result": "passing",
+          "detail": "修复内部一次性 LLM 调用被注入工具导致 JSON 解析失败：LlmClientManager.chat() 走默认 ChatClient，ToolRegistryAdvisor 会给所有请求注入全部注册工具；KnowledgeAnalyzer.extractKeywords/analyze 与 VisionDescriber.describe 发出请求后，kimi-k2.5 看到图片路径选择返回 tool_calls（fileExists/listFiles/knowledgeList）而不是直接输出 JSON，而这些单发调用没有 ReAct 循环执行工具，响应 content 非 JSON 导致 'No content to map due to end-of-input' 解析失败并回退。修复：新增 LlmCallContext.SKIP_TOOL_INJECTION_KEY，chat() 单发路径设置该标志，ToolRegistryAdvisor 检测到后原样透传请求不注入工具；chatWithTools/streamWithTools 的 ReAct 主链路不受影响。新增 ToolRegistryAdvisorTest 两个用例并纳入 init.sh P0 基线；./init.sh 全量通过。"
         }
       ],
       "notes": "核心改动：新增 ToolRegistryAdvisor / MetaClawResponseCallAdvisor / MetaClawCallContext；OpenAiLlmClientProvider.buildChatClient() 运行时通过 applicationContext.getBean(ToolRegistry.class) 获取工具注册表；LlmClientManager.chat() 从 Advisor 写入的共享上下文读取结果；chatStream() 委托给 streamWithTools()。设计文档位于 docs/superpowers/specs/2026-07-02-break-llmclientmanager-toolregistry-cycle-design.md。"

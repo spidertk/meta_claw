@@ -86,7 +86,10 @@ public class LlmClientManager implements SpiLlmClient {
 
         buildChatClient(request.getVesselId())
                 .prompt(new Prompt(messages))
-                .advisors(spec -> spec.param(TaskContext.LlmCallContext.CONTEXT_KEY, ctx))
+                .advisors(spec -> spec
+                        .param(TaskContext.LlmCallContext.CONTEXT_KEY, ctx)
+                        // 一次性 chat 无 ReAct 循环执行工具，注入工具只会让模型返回 tool_calls
+                        .param(TaskContext.LlmCallContext.SKIP_TOOL_INJECTION_KEY, Boolean.TRUE))
                 .call()
                 .chatResponse();
 
