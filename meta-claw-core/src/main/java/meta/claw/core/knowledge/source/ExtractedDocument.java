@@ -16,6 +16,9 @@ import java.util.Map;
 public class ExtractedDocument {
     private String markdownBody;
     private String mediaType;
+    /** 提取阶段（如视觉理解）已产出的关键词；非空时无需再单独调用 LLM 提取。 */
+    @Builder.Default
+    private List<String> keywords = Collections.emptyList();
     @Builder.Default
     private List<AssetRef> embeddedAssets = Collections.emptyList();
     @Builder.Default

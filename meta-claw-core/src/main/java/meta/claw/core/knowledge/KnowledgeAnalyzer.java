@@ -43,7 +43,9 @@ public class KnowledgeAnalyzer {
             return defaultAnalysis();
         }
 
-        boolean useMultimodal = modelCapability.supportsMultimodal()
+        // 默认不向分析调用附原图：分析吃提取阶段的文本描述，避免图片重复上传。
+        // 显式开启 meta-claw.llm.multimodal.attach-image-to-analysis 后才走多模态分析。
+        boolean useMultimodal = modelCapability.attachImageToAnalysis()
                 && hasVisualAssets(doc)
                 && modelCapability.supportsMediaType(doc.getMediaType());
 

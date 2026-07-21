@@ -4,6 +4,7 @@ import meta.claw.core.knowledge.asset.LocalAssetManager;
 import meta.claw.core.knowledge.extract.ExtractionContext;
 import meta.claw.core.knowledge.extract.ImageExtractor;
 import meta.claw.core.knowledge.extract.VisionDescriber;
+import meta.claw.core.knowledge.extract.VisionInsight;
 import meta.claw.core.knowledge.source.ExtractedDocument;
 import meta.claw.core.knowledge.source.KnowledgeSource;
 import org.junit.jupiter.api.AfterEach;
@@ -49,7 +50,11 @@ class ImageExtractorTest {
         byte[] bytes = baos.toByteArray();
 
         VisionDescriber describer = mock(VisionDescriber.class);
-        when(describer.describe(any(Path.class), anyString(), anyString())).thenReturn("A red square");
+        when(describer.analyze(any(Path.class), anyString(), anyString()))
+                .thenReturn(VisionInsight.builder()
+                        .description("A red square")
+                        .keywords(java.util.List.of("red", "square"))
+                        .build());
 
         LocalAssetManager assetManager = new LocalAssetManager();
         ImageExtractor extractor = new ImageExtractor(describer);
@@ -68,5 +73,7 @@ class ImageExtractorTest {
 
         assertTrue(doc.getMarkdownBody().contains("A red square"));
         assertTrue(doc.getEmbeddedAssets().get(0).getOriginalPath().toString().endsWith(".png"));
+        // 视觉理解一次调用同时产出关键词，无需第二次 LLM 调用
+        assertTrue(doc.getKeywords().contains("red"));
     }
 }

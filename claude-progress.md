@@ -37,9 +37,13 @@
 - 最近已通过证据 29：2026-07-19 修复内部一次性 LLM 调用被注入工具导致知识分析全部回退的问题：用户实测图片采集后日志显示 `extractKeywords`/`analyze` 请求（经 `LlmClientManager.chat()` 单发路径）被 `ToolRegistryAdvisor` 注入全部 18 个注册工具，kimi-k2.5 看到 `assets/.../original.jpg` 路径后选择返回 `tool_calls`（`fileExists`/`listFiles`/`knowledgeList`）而不是直接输出 JSON；单发 `chat()` 没有 ReAct 循环执行工具，响应 content 是自然语言而非 JSON，导致 `No content to map due to end-of-input` 解析失败并回退到默认结果（图片描述为空、关键词为原始文本分词）。修复：新增 `TaskContext.LlmCallContext.SKIP_TOOL_INJECTION_KEY` 上下文标志；`LlmClientManager.chat()` 单发路径设置该标志，`ToolRegistryAdvisor.addTools()` 检测到后原样透传请求；`chatWithTools`/`streamWithTools` 的 ReAct 主链路（显式传入 ToolCallback）不受影响。新增 `ToolRegistryAdvisorTest` 两个用例（skip 标志透传 / 无标志正常注入）并纳入 `init.sh` P0 基线；重新执行 `./init.sh` BUILD SUCCESS，9 个 reactor 模块全部 SUCCESS，core 116 个测试全部通过，tool 20 个 P0 测试全部通过。
 - 最近已通过证据 30：2026-07-19 修复一次性 chat 调用响应 content 永远为空的问题：用户实测发现跳过工具注入后模型已正常返回 JSON（HTTP 日志 200 + 正常 content），但 `extractKeywords` 仍报 `No content to map due to end-of-input`、图片描述与分析结果依然为空。根因：`LlmClientManager.chat(SpiChatRequest)`（`KnowledgeAnalyzer`/`VisionDescriber` 使用）传 `taskContext=null`，而 `buildResponse(null)` 硬编码返回 `content("")`；`createCallContext` 创建的 fallback TaskContext 承载了真实结果却被丢弃。修复：新增 `buildResponseFromCallContext(LlmCallContext)`，`taskContext` 为空时从本次调用的 `LlmCallContext` 组装 content/reasoningContent/toolCalls/usage。新增 `LlmClientManagerChatResponseTest` 两个用例（正常映射 / 空结果安全回退）并纳入 `init.sh` P0 基线；重新执行 `./init.sh` BUILD SUCCESS，9 个 reactor 模块全部 SUCCESS，core 118 个测试全部通过，tool 20 个 P0 测试全部通过。
 - 最近已通过证据 31：2026-07-19 修复 VisionDescriber 图片入参完全丢失的问题：用户实测 HTTP 日志显示图片描述请求体只有文本、没有 image_url，模型回复「没有看到您上传的图片」。根因：`LlmClientManager` 使用私有的 `toSpringMessage()`，其 user 分支只构造纯文本 `UserMessage`，`mediaParts` 被完全丢弃；Session 075 的 base64 修复改的是 `SpiMessageConverter`（SAA 引擎路径），未覆盖 `LlmClientManager` 路径——两条消息转换链路不一致。修复：`LlmClientManager.toSpringMessage()` 的 user 分支委托给 `SpiMessageConverter.toSpringMessage()`，带 mediaParts 时构造多模态 UserMessage，本地文件读成 byte[] 由 Spring AI 序列化为 base64 data URI；`LlmClientManagerChatResponseTest` 新增多模态转换用例；重新执行 `./init.sh` BUILD SUCCESS，9 个 reactor 模块全部 SUCCESS，core 119 个测试全部通过，tool 20 个 P0 测试全部通过。
-- 当前最高优先级未完成功能：CLI 工具调用回归及后续重复通知、usage 丢失问题均已修复；Knowledge 子系统 vesselId NPE、本地图片 base64 编码、内部调用工具注入、一次性调用空响应、LlmClientManager 多模态消息转换问题均已修复；下一步为整体收尾与提交，或按路线图开始后续功能。
+- 最近已通过证据 32：2026-07-20 完成知识采集链路重构（设计文档 docs/knowledge-acquire-refactor-design.md，Phase 1+2+3 全量实施），解决三个问题：①LLM 调用过多——图片场景原 4 次调用（VisionDescriber 描述、extractKeywords、analyze 多模态再发一次图）合并为 2 次（VisionDescriber.analyze 一次调用同出描述+关键词 VisionInsight；analyze 默认文本路径不重复发图，MultimodalConfig 新增 attachImageToAnalysis 开关兑底）；PDF 有文本层零视觉调用，扫描件页图合并为一次调用；②needs_review 不走 HITL——acquire 拆为提案+确认两段：分析结果持久化为 knowledge/.pending/{proposalId}.json，经新增 KnowledgeReviewGate 人审（core 默认 PendingKnowledgeReviewGate 挂起；CLI CliKnowledgeReviewGate @Primary JLine 同步 y/n/回车挂起），确认后 commitProposal 落盘+git commit，新增 knowledgeReview 工具支持异步 approve/reject 与待审列表；executeAcquire 顺带补上被替代条目真正改写 SUPERSEDED 并单独 commit；③资产重复录入——LocalAssetManager 改 content-addressable（assetId=sha256 前 12 位）+ 新增 AssetRegistry（assets/index.json，hash→assetId→knowledgeEntryIds），重复资产 alreadyExists 命中后 KnowledgeManager 快速路径直接返回 already_known 零 LLM 调用，force=true 可强制重分析；同时修复同一次 acquire 在 KnowledgeManager 与 ImageExtractor/PdfExtractor 双份 store 的 bug（ExtractionContext 新增 sourceAsset 下传）。验证：定向测试 13/13 通过（含 LLM 调用次数=2、重复资产零调用、pending→approve/reject 行为断言），./init.sh BUILD SUCCESS，9 个 reactor 模块全部 SUCCESS，core 119 个 P0 测试、tool 25 个 P0 测试全部通过。
+- 最近已通过证据 33：2026-07-21 根据真实 CLI 实测反馈修复 dryRun 结果过薄问题：用户图片问询时主 agent 选择 dryRun=true，工具结果只返回 classification/confidence/title，视觉识别正文与结构化分析全部丢失，主 agent 只能凭标题编内容，视觉调用被浪费。修复：①dryRun 也持久化待审提案（knowledge/.pending/{id}.json）并返回完整提取内容（content 全量，上限 8000 字符）+ proposal_id + preview，用户后续 knowledgeReview approve 直接落库零额外 LLM 调用；②快速路径扩展：同资产已有待审提案时直接复用返回（existingProposalResult），重复 dryRun 零 LLM 调用；③knowledgeAcquireFromFile 的 dryRun 参数描述同步更新。新增冒烟测试 dryRunReturnsFullContentAndReusableProposal（完整内容返回/提案复用/approve 零新调用三组断言）；定向测试 14/14 通过，./init.sh BUILD SUCCESS，tool 26 个 P0 测试全部通过。
+- 最近已通过证据 34：2026-07-21 按用户要求继续优化 knowledgeAcquireFromFile：①dryRun=true 不再跑知识库矛盾自检等分析 LLM 调用——acquire 在提取（图片识别）后直接返回 status=extracted，跳过关键词/检索/统一分析；提案以 analysis=null 持久化（KnowledgeProposal 新增 context 字段保存分析上下文），knowledgeReview approve 时由 commitProposal 补跑一次统一分析（extractKeywords + findRelatedEntries + analyze）再落库，无需重新提取；renderProposalPreview/analysisToMap 对 null analysis 空安全；KnowledgeTool 三个 acquire 入口的 dryRun 参数描述同步更新，formatAcquireResult 支持 extracted 状态；②CLI 新增工具执行加载动画——ChatCommand 内部类 ToolSpinner，onToolCall 打印 🔧 行后启动 braille 转圈（独立 daemon 线程，\r 原地刷新，所有终端写入走同一把锁），下一轮 onChunk/onReasoningChunk/onHitlSuspend/onComplete/onError 停止并擦除动画行；冒烟测试 dryRunReturnsFullContentAndReusableProposal 改写为 dryRunSkipsAnalysisAndDefersItToApproval（dryRun 仅 1 次视觉调用、重复 dryRun 复用零调用、approve 补跑分析后落库）；KnowledgeAcquisitionSmokeTest 8/8 通过，./init.sh BUILD SUCCESS，core 119、tool 26 个 P0 测试全部通过
+- 当前最高优先级未完成功能：知识采集链路重构（knowledge-acquire-refactor-001）已完成并验证；下一步为整体收尾与提交，或按路线图开始后续功能（可选 Phase 4：purpose 级模型路由、语义去重、采纳率统计）。
 - 当前 blocker：
   1. 当前无 blocker
+- 已知遗留（非 blocker）：meta-claw-core 全量测试中 SpiMessageConverterMultimodalTest 硬编码 file:///tmp/test.png 在本机不存在而报错，为 2026-06-30 提交 fd0485f 引入的历史问题，与 2026-07-20 重构无关；init.sh P0 基线不含该测试，不受影响。真实 CLI 端到端图片采集（真实模型）未在本轮复测。
 
 ## 与设计文档对齐后的真实现状
 
@@ -2747,3 +2751,32 @@
 - 下一步最佳动作：
   1. 提交本轮修改
   2. 进入 Phase 2：实现 `SpringAiAlibabaAgentEngine` 同步调用
+
+### Session 079
+
+- 日期：2026-07-21
+- 本轮目标：继续优化 knowledgeAcquireFromFile——dryRun=true 时不再调用知识库矛盾自检等分析调用（只做图片识别）；CLI 在工具执行期间显示转圈加载动画。
+- 已完成：
+  - `KnowledgeManager.acquire()`：dryRun 分支前移，提取（如图片视觉识别）后直接返回 `status=extracted`，跳过 extractKeywords/findRelatedEntries/analyzer.analyze（矛盾自检内嵌在 analyze 中）；提案以 `analysis=null` 持久化。
+  - `KnowledgeProposal` 新增 `context` 字段，保存分析上下文供 approve 时补跑使用。
+  - `KnowledgeManager.commitProposal()`：`analysis == null`（dryRun 提案）时补跑一次 extractKeywords + findRelatedEntries + analyze，再 executeAcquire 落库；内容无需重新提取。
+  - `renderProposalPreview` / `analysisToMap` 对 null analysis 空安全；`existingProposalResult` 对无分析提案返回 extracted 状态。
+  - `KnowledgeTool`：三个 acquire 入口的 dryRun 参数描述同步更新；`formatAcquireResult` 支持 `extracted` 状态（复用 analyzed 分支打印完整提取内容）。
+  - `ChatCommand` 新增内部类 `ToolSpinner`：`onToolCall` 打印 🔧 行后启动 braille 转圈动画（独立 daemon 线程、`\r` 原地刷新、所有终端写入走同一把锁避免与流式输出交错）；在 `onChunk`/`onReasoningChunk`/`onHitlSuspend`/`onComplete`/`onError` 停止并以 `\r\u001B[K` 擦除动画行。
+  - 冒烟测试 `dryRunReturnsFullContentAndReusableProposal` 改写为 `dryRunSkipsAnalysisAndDefersItToApproval`：断言 dryRun 仅 1 次视觉 LLM 调用、重复 dryRun 复用提案零调用、approve 补跑分析后落库（行为变化是用户明确要求，非削弱验证）。
+- 运行过的验证：
+  - `mvn -pl meta-claw-tool,meta-claw-cli -am test -Dtest=KnowledgeAcquisitionSmokeTest -Dsurefire.failIfNoSpecifiedTests=false` → 成功，8/8 通过
+  - `./init.sh` → BUILD SUCCESS；core 119 个 P0 测试、tool 26 个 P0 测试全部通过
+- 更新过的文件或工件：
+  - `meta-claw-core/src/main/java/meta/claw/core/knowledge/KnowledgeManager.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/knowledge/model/KnowledgeProposal.java`
+  - `meta-claw-tool/src/main/java/meta/claw/tool/KnowledgeTool.java`
+  - `meta-claw-tool/src/test/java/meta/claw/tool/knowledge/KnowledgeAcquisitionSmokeTest.java`
+  - `meta-claw-cli/src/main/java/meta/claw/cli/ChatCommand.java`
+  - `feature_list.json`、`claude-progress.md`、`clean-state-checklist.md`
+- 已知风险或未解决的问题：
+  - 旧版（2026-07-21 之前）持久化的 dryRun 提案带有完整 analysis，approve 仍走零调用落库路径，行为兼容。
+  - ToolSpinner 停止时机是「下一轮输出/挂起/结束」回调，而非工具结束的精确时刻（core 的 SpiStreamingCallback 无 onToolResult 事件）；如需精确停止需跨 core+cli 加事件，属于可选增强。
+- 下一步最佳动作：
+  1. 用户确认后提交本轮修改
+  2. 真实 CLI 端到端复测图片采集（dryRun → 只看识别结果 → approve 落库）与转圈动画效果

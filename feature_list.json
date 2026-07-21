@@ -1,6 +1,6 @@
 {
   "project": "meta-claw",
-  "last_updated": "2026-07-19",
+  "last_updated": "2026-07-21",
   "package_structure": {
     "config": "meta.claw.core.config — 所有配置模型 + 加载器 + 解析器",
     "vessel": "meta.claw.core.vessel — Vessel 用户域（Profile + Initializer）",
@@ -1410,6 +1410,43 @@
         }
       ],
       "notes": "核心改动：删除 MetaClawCallContext.java 与 VesselTask.java；重写 TaskContext 为 @Builder 并内含 LlmCallContext 静态内部类；重写 VesselContext 显式绑定；重写 AgentExecutor/StreamingAgentExecutor/VesselRuntime/LlmClientManager 及 Advisors；更新 MetaClawModelMetricsHook 计数路径；更新所有相关测试。2026-07-11 修复：移除 ToolCallAdvisor 避免 Spring AI 内部执行工具失败；保留原始 options 避免 streamUsage 丢失；给 MetaClawResponseStreamAdvisor 加 toolCallId 去重避免重复通知。"
+    },
+    {
+      "id": "knowledge-acquire-refactor-001",
+      "priority": 46,
+      "area": "knowledge",
+      "title": "知识采集链路重构：资产 hash 去重 + LLM 调用合并 + HITL 审核入库",
+      "user_visible_behavior": "用户发起图片/文件问询时：①同内容资产（sha256）第二次采集直接返回已提炼的知识条目，零 LLM 调用、不产生重复资产目录；②图片场景 LLM 调用从 4 次降到 2 次（视觉理解+关键词合一、统一知识分析），有文本层的 PDF 零视觉调用、扫描件多页合并为一次调用；③分析结果不再按置信度静默落盘或丢弃，而是生成待审提案走人审（CLI 控制台 y/n 同步确认；其他通道挂起为 pending，用 knowledgeReview 工具异步 approve/reject），确认后才写盘并 git commit，被替代的旧条目真正改写为 superseded。",
+      "status": "passing",
+      "verification": [
+        "LocalAssetManager 改为 content-addressable（assetId=sha256 前 12 位），新增 AssetRegistry（assets/index.json）登记 hash→assetId→knowledgeEntryIds；同内容重复 store 幂等命中 alreadyExists。",
+        "修复同一次 acquire 双份资产 bug：ExtractionContext 携带 sourceAsset，ImageExtractor/PdfExtractor 不再各自重复 store。",
+        "KnowledgeManager.acquire 快速路径：已录入且已提炼的资产直接返回 already_known，零 LLM 调用；force=true 可强制重分析。",
+        "VisionDescriber.analyze 一次调用同时产出描述+关键词（VisionInsight）；ExtractedDocument 携带 keywords，KnowledgeManager 不再无条件调用 extractKeywords。",
+        "PdfExtractor：有文本层零视觉调用；扫描件页图合并为一次视觉调用（≤5 页）。",
+        "MultimodalConfig 新增 attachImageToAnalysis（默认 false）：分析调用默认吃文本描述不重复发图。",
+        "KnowledgeReviewGate/ReviewDecision/PendingKnowledgeReviewGate（core）+ CliKnowledgeReviewGate（cli，@Primary，JLine 同步 y/n）；提案持久化 knowledge/.pending/{id}.json；KnowledgeManager.resolveProposal/listPendingProposals；KnowledgeTool 新增 knowledgeReview 工具与 force 参数。",
+        "executeAcquire 真正把被替代条目改写为 SUPERSEDED 并单独 git commit。",
+        "运行 ./init.sh 全量通过；mvn -pl meta-claw-tool -am test 中知识相关测试全部通过。"
+      ],
+      "evidence": [
+        {
+          "date": "2026-07-20",
+          "result": "passing",
+          "detail": "定向测试 13/13 通过：KnowledgeAcquisitionSmokeTest 7/7（含图片采集仅 2 次 LLM 调用断言、重复资产 already_known 零调用断言、force 绕过断言、pending→approve 落盘断言、reject 不落盘断言）、LocalAssetManagerDedupTest 2/2、PdfExtractorTest 2/2（文本层零视觉/扫描件单次批量视觉）、ImageExtractorTest 1/1、LocalAssetManagerTest 1/1；./init.sh BUILD SUCCESS，9 个 reactor 模块全部 SUCCESS，core 119 个 P0 测试、tool 25 个 P0 测试全部通过。"
+        },
+        {
+          "date": "2026-07-21",
+          "result": "passing",
+          "detail": "真实 CLI 实测反馈修复：dryRun 结果过薄（只回 classification/confidence/title，视觉正文丢失）。修复：dryRun 同样持久化待审提案并返回完整提取内容+proposal_id，approve 后零额外 LLM 落库；同资产已有待审提案时快速路径直接复用，重复 dryRun 零调用。新增 dryRunReturnsFullContentAndReusableProposal 测试；定向测试 14/14 通过，./init.sh BUILD SUCCESS，tool 26 个 P0 测试全部通过。"
+        },
+        {
+          "date": "2026-07-21",
+          "result": "passing",
+          "detail": "按用户要求调整 dryRun 语义：dryRun=true 只做内容提取（如图片识别，1 次视觉 LLM 调用），跳过关键词/检索/矛盾自检等分析 LLM 调用，状态改为 extracted；提案不带 analysis 持久化（KnowledgeProposal 新增 context 字段），knowledgeReview approve 时在 commitProposal 补跑一次统一分析（含矛盾自检）后落库，无需重新提取。renderProposalPreview/analysisToMap 对 null analysis 做了空安全。同时 CLI ChatCommand 新增 ToolSpinner：onToolCall 后启动 braille 转圈动画（独立 daemon 线程 + 同锁写入），下一轮 chunk/onHitlSuspend/onComplete/onError 时停止并擦除。冒烟测试改为 dryRunSkipsAnalysisAndDefersItToApproval（dryRun 仅 1 次调用/重复 dryRun 复用零调用/approve 补跑分析后落库）；KnowledgeAcquisitionSmokeTest 8/8 通过，./init.sh BUILD SUCCESS，core 119、tool 26 个 P0 测试全部通过。"
+        }
+      ],
+      "notes": "设计文档：docs/knowledge-acquire-refactor-design.md（Phase 1+2+3 已实现，Phase 4 可选未做）。已知遗留：meta-claw-core 全量测试中 SpiMessageConverterMultimodalTest 硬编码 file:///tmp/test.png 在本机不存在而报错，为 2026-06-30 提交 fd0485f 引入的历史问题，与本次改动无关，init.sh P0 基线不受影响。真实 CLI 端到端图片采集（真实模型）未在本轮复测。"
     }
   ]
 }

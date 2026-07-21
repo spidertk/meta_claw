@@ -16,4 +16,6 @@ public class AssetRef {
     private String mediaType;
     private Path originalPath;      // absolute path to original file
     private Path extractedPath;     // absolute path to extracted.md (optional)
+    private String sha256;          // content hash, used for dedup
+    private boolean alreadyExists;  // true when the same content was stored before
 }

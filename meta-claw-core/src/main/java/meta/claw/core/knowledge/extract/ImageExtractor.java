@@ -26,12 +26,17 @@ public class ImageExtractor implements ContentExtractor {
 
     @Override
     public ExtractedDocument extract(KnowledgeSource source, ExtractionContext ctx) {
-        AssetRef asset = ctx.getAssetManager().store(source, ctx.getVesselId());
-        String description = visionDescriber.describe(asset.getOriginalPath(), source.getMediaType(), ctx.getVesselId());
+        // 源资产由调用方（KnowledgeManager）统一入库，避免重复存储
+        AssetRef asset = ctx.getSourceAsset() != null
+                ? ctx.getSourceAsset()
+                : ctx.getAssetManager().store(source, ctx.getVesselId());
+
+        VisionInsight insight = visionDescriber.analyze(asset.getOriginalPath(), source.getMediaType(), ctx.getVesselId());
 
         return ExtractedDocument.builder()
-                .markdownBody("## 图片描述\n\n" + description + "\n\n![image](assets/" + asset.getAssetId() + "/" + asset.getOriginalPath().getFileName() + ")")
+                .markdownBody("## 图片描述\n\n" + insight.getDescription() + "\n\n![image](assets/" + asset.getAssetId() + "/" + asset.getOriginalPath().getFileName() + ")")
                 .mediaType(source.getMediaType())
+                .keywords(insight.getKeywords())
                 .embeddedAssets(List.of(asset))
                 .metadata(Map.of("width", 0, "height", 0))
                 .build();

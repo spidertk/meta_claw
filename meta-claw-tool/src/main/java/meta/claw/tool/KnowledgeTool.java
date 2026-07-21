@@ -42,7 +42,7 @@ public class KnowledgeTool {
     public String knowledgeAcquire(
             @ToolParam(description = "Full knowledge content in markdown format") String content,
             @ToolParam(description = "Additional context to help with classification and contradiction detection", required = false) String context,
-            @ToolParam(description = "If true, only analyze without committing", required = false) Boolean dryRun) {
+            @ToolParam(description = "If true, only prepare the knowledge without committing: analysis/contradiction check is skipped and runs later at approval", required = false) Boolean dryRun) {
 
         if (content == null || content.isBlank()) {
             return "Error: content is required for acquire";
@@ -61,11 +61,17 @@ public class KnowledgeTool {
         return formatAcquireResult(result);
     }
 
-    @Tool(description = "Acquire knowledge from a local file (image, PDF, etc.)")
+    @Tool(description = """
+            Acquire knowledge from a local file (image, PDF, etc.).
+            Assets are deduplicated by content hash: if the same file was acquired before,
+            existing knowledge is returned directly without re-analysis.
+            Non-dry-run acquisition produces a proposal that requires human review
+            (approve/reject via knowledgeReview) before it is committed to the knowledge base.""")
     public String knowledgeAcquireFromFile(
             @ToolParam(description = "Absolute or vessel-relative file path") String filePath,
             @ToolParam(description = "Optional context", required = false) String context,
-            @ToolParam(description = "If true, only analyze without committing", required = false) Boolean dryRun) {
+            @ToolParam(description = "If true, only run content extraction (e.g. image recognition) without analysis/contradiction check or committing; the full extracted content and a reusable pending proposal_id are returned, so the result can be approved later via knowledgeReview (analysis runs once at approval, no re-extraction needed)", required = false) Boolean dryRun,
+            @ToolParam(description = "If true, force re-analysis even if this asset was acquired before", required = false) Boolean force) {
 
         if (filePath == null || filePath.isBlank()) {
             return "Error: filePath is required";
@@ -90,7 +96,8 @@ public class KnowledgeTool {
                 .originalName(path.getFileName().toString())
                 .build();
 
-        Map<String, Object> result = knowledgeManager.acquire(source, context != null ? context : "", dryRun != null && dryRun);
+        Map<String, Object> result = knowledgeManager.acquire(source, context != null ? context : "",
+                dryRun != null && dryRun, force != null && force);
         return formatAcquireResult(result);
     }
 
@@ -98,7 +105,8 @@ public class KnowledgeTool {
     public String knowledgeAcquireFromUrl(
             @ToolParam(description = "Source URL") String url,
             @ToolParam(description = "Optional context", required = false) String context,
-            @ToolParam(description = "If true, only analyze without committing", required = false) Boolean dryRun) {
+            @ToolParam(description = "If true, only run content extraction without analysis/contradiction check or committing; analysis runs later at approval", required = false) Boolean dryRun,
+            @ToolParam(description = "If true, force re-analysis even if this asset was acquired before", required = false) Boolean force) {
 
         if (url == null || url.isBlank()) {
             return "Error: url is required";
@@ -115,7 +123,42 @@ public class KnowledgeTool {
                 .originalName("douyin_link")
                 .build();
 
-        Map<String, Object> result = knowledgeManager.acquire(source, context != null ? context : "", dryRun != null && dryRun);
+        Map<String, Object> result = knowledgeManager.acquire(source, context != null ? context : "",
+                dryRun != null && dryRun, force != null && force);
+        return formatAcquireResult(result);
+    }
+
+    @Tool(description = """
+            Review a pending knowledge proposal (human-in-the-loop).
+            Every non-dry-run acquisition first creates a pending proposal; nothing is
+            committed until it is approved here. Use 'approve' to commit it into the
+            knowledge base, or 'reject' to discard it.""")
+    public String knowledgeReview(
+            @ToolParam(description = "Pending proposal ID returned by knowledgeAcquire*") String proposalId,
+            @ToolParam(description = "'approve' to commit, 'reject' to discard") String decision) {
+
+        if (proposalId == null || proposalId.isBlank()) {
+            List<Map<String, Object>> pending = knowledgeManager.listPendingProposals();
+            if (pending.isEmpty()) {
+                return "No pending knowledge proposals.";
+            }
+            StringBuilder sb = new StringBuilder("Pending knowledge proposals:\n\n");
+            for (Map<String, Object> p : pending) {
+                sb.append("- ").append(p.get("proposal_id"))
+                        .append(": ").append(p.getOrDefault("title", "(untitled)"))
+                        .append(" (type=").append(p.get("type"))
+                        .append(", confidence=").append(String.format("%.2f", ((Number) p.get("confidence")).doubleValue()))
+                        .append(")\n");
+            }
+            return sb.toString();
+        }
+
+        boolean approve = "approve".equalsIgnoreCase(decision != null ? decision.trim() : "");
+        if (!approve && !"reject".equalsIgnoreCase(decision != null ? decision.trim() : "")) {
+            return "Error: decision must be 'approve' or 'reject'";
+        }
+
+        Map<String, Object> result = knowledgeManager.resolveProposal(proposalId.trim(), approve);
         return formatAcquireResult(result);
     }
 
@@ -314,8 +357,47 @@ public class KnowledgeTool {
         String status = String.valueOf(result.getOrDefault("status", "unknown"));
         sb.append("Status: ").append(status).append("\n");
 
-                                                                                                                                                                if ("needs_review".equals(status)) {
-            sb.append("Manual review required\n");
+        switch (status) {
+            case "pending_review" -> {
+                sb.append("Proposal ID: ").append(result.getOrDefault("proposal_id", "unknown")).append("\n");
+                if (result.containsKey("preview")) {
+                    sb.append(result.get("preview"));
+                }
+            }
+            case "analyzed", "extracted" -> {
+                sb.append("Proposal ID: ").append(result.getOrDefault("proposal_id", "unknown")).append("\n");
+                if (result.containsKey("preview")) {
+                    sb.append(result.get("preview"));
+                }
+                // dryRun 也要把完整提取内容返回给主 agent，否则视觉/分析调用结果被浪费
+                Object content = result.get("content");
+                if (content != null) {
+                    String c = String.valueOf(content);
+                    sb.append("\nExtracted Content (full):\n");
+                    sb.append(c, 0, Math.min(8000, c.length()));
+                    if (c.length() > 8000) {
+                        sb.append("\n...（内容共 ").append(c.length()).append(" 字符，已截断）");
+                    }
+                    sb.append("\n");
+                }
+            }
+            case "already_known" -> {
+                sb.append("Asset ID: ").append(result.getOrDefault("asset_id", "unknown")).append("\n");
+                @SuppressWarnings("unchecked")
+                List<Map<String, Object>> entries = (List<Map<String, Object>>) result.get("entries");
+                if (entries != null) {
+                    for (Map<String, Object> e : entries) {
+                        sb.append("  - [ ").append(e.get("id")).append("] ")
+                                .append(e.getOrDefault("title", "Untitled"))
+                                .append(" (").append(e.getOrDefault("status", "unknown")).append(")\n");
+                        if (e.containsKey("path")) {
+                            sb.append("    Path: ").append(e.get("path")).append("\n");
+                        }
+                    }
+                }
+            }
+            case "rejected" -> sb.append("The proposal was rejected. Nothing was committed.\n");
+            default -> { }
         }
 
         if (result.containsKey("analysis")) {

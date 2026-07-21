@@ -1,10 +1,14 @@
 package meta.claw.core.knowledge.model;
 
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 @Data
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class ContradictionInfo {
     private boolean detected;
     @Builder.Default

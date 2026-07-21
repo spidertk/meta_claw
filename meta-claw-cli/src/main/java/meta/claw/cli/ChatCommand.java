@@ -126,6 +126,7 @@ public class ChatCommand implements Runnable {
                 boolean[] hasReasoning = {false};
                 boolean[] hasContent = {false};
                 SpiUsage[] lastUsage = {null};
+                ToolSpinner toolSpinner = new ToolSpinner(terminal);
 
                 vesselRuntime.chatStream(sessionSelection.getSessionId(),input, new SpiStreamingCallback() {
                     @Override
@@ -135,6 +136,7 @@ public class ChatCommand implements Runnable {
 
                     @Override
                     public void onReasoningChunk(String chunk) {
+                        toolSpinner.stop();
                         if (!hasReasoning[0]) {
                             hasReasoning[0] = true;
                             terminal.writer().println("\u001B[90m🤔 Thinking...\u001B[0m");
@@ -147,6 +149,7 @@ public class ChatCommand implements Runnable {
 
                     @Override
                     public void onChunk(String chunk) {
+                        toolSpinner.stop();
                         if (hasReasoning[0] && !hasContent[0]) {
                             hasContent[0] = true;
                             terminal.writer().println("\u001B[0m"); // 结束灰色
@@ -165,6 +168,7 @@ public class ChatCommand implements Runnable {
 
                     @Override
                     public ApprovalResolution onHitlSuspend(ApprovalTicket ticket) {
+                        toolSpinner.stop();
                         // 如果正在输出 thinking，先关闭灰色模式
                         if (hasReasoning[0] && !hasContent[0]) {
                             terminal.writer().println("\u001B[0m");
@@ -186,6 +190,8 @@ public class ChatCommand implements Runnable {
                                 toolCall.getName(),
                                 toolCall.getArguments() != null ? toolCall.getArguments() : "{}");
                         terminal.writer().flush();
+                        // 工具同步执行期间显示转圈动画，直到下一轮输出/挂起/结束
+                        toolSpinner.start(toolCall.getName());
                     }
 
                     @Override
@@ -195,6 +201,7 @@ public class ChatCommand implements Runnable {
 
                     @Override
                     public void onComplete(SpiChatResponse response) {
+                        toolSpinner.stop();
                         long totalTime = System.currentTimeMillis() - streamStartTime[0];
 
                         // 如果只有 reasoning 没有 content，需要关闭灰色模式并换行
@@ -220,6 +227,7 @@ public class ChatCommand implements Runnable {
 
                     @Override
                     public void onError(Throwable error) {
+                        toolSpinner.stop();
                         terminal.writer().println("\n\u001B[91mError: " + error.getMessage() + "\u001B[0m");
                         terminal.writer().flush();
                     }
@@ -234,5 +242,68 @@ public class ChatCommand implements Runnable {
         terminal.writer().flush();
     }
 
+    /**
+     * 工具执行期间的终端转圈加载动画。
+     * 工具在 agent 执行器里同步阻塞执行，动画跑在独立 daemon 线程上，
+     * 通过 \r 原地刷新；停止时擦除动画行。所有终端写入都在同一把锁内，避免与流式输出交错。
+     */
+    private static final class ToolSpinner {
+        private static final String[] FRAMES = {"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"};
+        private static final long FRAME_INTERVAL_MS = 80;
+
+        private final Terminal terminal;
+        private final Object lock = new Object();
+        private boolean running;
+        private Thread thread;
+
+        private ToolSpinner(Terminal terminal) {
+            this.terminal = terminal;
+        }
+
+        void start(String toolName) {
+            stop();
+            synchronized (lock) {
+                running = true;
+                thread = new Thread(() -> {
+                    int frame = 0;
+                    while (true) {
+                        synchronized (lock) {
+                            if (!running) {
+                                return;
+                            }
+                            terminal.writer().print("\r\u001B[36m" + FRAMES[frame % FRAMES.length]
+                                    + " Executing tool " + toolName + " ...\u001B[0m");
+                            terminal.writer().flush();
+                        }
+                        frame++;
+                        try {
+                            Thread.sleep(FRAME_INTERVAL_MS);
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                            return;
+                        }
+                    }
+                });
+                thread.setDaemon(true);
+                thread.start();
+            }
+        }
+
+        void stop() {
+            synchronized (lock) {
+                if (!running) {
+                    return;
+                }
+                running = false;
+                if (thread != null) {
+                    thread.interrupt();
+                    thread = null;
+                }
+                // 擦除动画行
+                terminal.writer().print("\r\u001B[K");
+                terminal.writer().flush();
+            }
+        }
+    }
 
 }
