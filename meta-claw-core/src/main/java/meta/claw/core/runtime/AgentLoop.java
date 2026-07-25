@@ -77,7 +77,7 @@ public class AgentLoop {
 
         try {
             // 步骤 1：确定目标 Vessel
-            String targetVesselId = determineTargetVessel();
+            String targetVesselId = determineTargetVessel(context);
             if (targetVesselId == null) {
                 log.warn("未找到可用的 Vessel，无法处理用户消息: sessionId={}", sessionId);
                 // 发布 ERROR 类型的回复事件，提示当前无可用 Vessel
@@ -115,6 +115,31 @@ public class AgentLoop {
 
     /**
      * 确定目标 Vessel
+     * <p>
+     * 优先读取上游（Gateway 路由层）注入的 vesselId 提示（Context.kwargs["vesselId"]），
+     * 该提示存在且对应 Vessel 已加载时直接使用；否则回退到第一个可用的 Vessel。
+     * </p>
+     *
+     * @param context 消息上下文，可为 null（null 时直接走兜底策略）
+     * @return 目标 Vessel 的 ID；若不存在任何可用 Vessel，则返回 null
+     */
+    public String determineTargetVessel(Context context) {
+        // 优先使用路由层注入的 vesselId 提示
+        if (context != null && context.getKwargs() != null) {
+            Object hint = context.getKwargs().get("vesselId");
+            if (hint instanceof String vesselId && !vesselId.isBlank()) {
+                if (vesselManager.hasVessel(vesselId)) {
+                    log.debug("使用路由层指定的 Vessel: {}", vesselId);
+                    return vesselId;
+                }
+                log.warn("路由层指定的 Vessel 不存在，回退默认策略: {}", vesselId);
+            }
+        }
+        return determineTargetVessel();
+    }
+
+    /**
+     * 确定目标 Vessel（兜底策略）
      * <p>
      * 当前实现采用最简单的策略：返回第一个可用的 Vessel ID。
      * 后续可扩展为基于意图识别、负载均衡或权重匹配的复杂路由策略。

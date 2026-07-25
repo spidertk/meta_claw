@@ -7,9 +7,15 @@ import meta.claw.core.events.VesselResponseReady;
 import meta.claw.core.events.UserMessageReceived;
 import meta.claw.core.message.Context;
 import meta.claw.core.message.ContextType;
+import meta.claw.core.message.Reply;
+import meta.claw.core.message.ReplyType;
 import meta.claw.gateway.channel.Channel;
 import meta.claw.gateway.channel.ChannelRegistry;
+import meta.claw.gateway.channel.ChannelVesselRouter;
 import meta.claw.gateway.channel.ChatMessage;
+
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Gateway 中央控制器
@@ -32,18 +38,40 @@ public class Gateway {
     private final EventBusWrapper eventBus;
 
     /**
-     * 构造函数
-     * 初始化 Gateway 并自动将自身注册为事件总线的订阅者，以便接收 VesselResponseReady 事件。
+     * 渠道 Vessel 路由器，可为 null（null 时跳过命令拦截与 vesselId 注入，保持旧行为）
+     */
+    private final ChannelVesselRouter vesselRouter;
+
+    /**
+     * /vessel 切换命令匹配：/vessel <vesselId>
+     */
+    private static final Pattern VESSEL_CMD = Pattern.compile("^/vessel\\s+(\\S+)$");
+
+    /**
+     * 构造函数（无路由器，保持旧行为）
      *
      * @param registry 渠道注册表实例
      * @param eventBus 事件总线封装器实例
      */
     public Gateway(ChannelRegistry registry, EventBusWrapper eventBus) {
+        this(registry, eventBus, null);
+    }
+
+    /**
+     * 构造函数
+     * 初始化 Gateway 并自动将自身注册为事件总线的订阅者，以便接收 VesselResponseReady 事件。
+     *
+     * @param registry     渠道注册表实例
+     * @param eventBus     事件总线封装器实例
+     * @param vesselRouter 渠道 Vessel 路由器，可为 null
+     */
+    public Gateway(ChannelRegistry registry, EventBusWrapper eventBus, ChannelVesselRouter vesselRouter) {
         this.registry = registry;
         this.eventBus = eventBus;
+        this.vesselRouter = vesselRouter;
         // 将 Gateway 自身注册为 EventBus 订阅者，订阅 VesselResponseReady 等事件
         this.eventBus.register(this);
-        log.info("[Gateway] Gateway 已初始化并注册为 EventBus 订阅者");
+        log.info("[Gateway] Gateway 已初始化并注册为 EventBus 订阅者, vesselRouter={}", vesselRouter != null);
     }
 
     /**
@@ -71,9 +99,28 @@ public class Gateway {
      * @param channelType 消息来源渠道类型，例如：weixin、slack 等
      */
     public void onInboundMessage(ChatMessage msg, String channelType) {
+        onInboundMessage(msg, channelType, null, null);
+    }
+
+    /**
+     * 处理入站消息（多实例渠道完整版）
+     * <p>
+     * 在旧版基础上增加：
+     * 1. channelKey 写入 Context，供回复路由定位具体渠道实例；
+     * 2. /vessel 切换命令拦截（不进入 Agent 流程）；
+     * 3. 通过 ChannelVesselRouter 解析目标 vesselId 并注入 Context.kwargs。
+     * </p>
+     *
+     * @param msg             封装后的内部聊天消息对象
+     * @param channelType     消息来源渠道类型，例如：weixin
+     * @param channelKey      渠道实例键（如 weixin:main），可为 null
+     * @param defaultVesselId 渠道账号配置的默认 vesselId，可为 null
+     */
+    public void onInboundMessage(ChatMessage msg, String channelType, String channelKey, String defaultVesselId) {
         // 构造消息上下文，设置消息类型、内容、渠道类型等基础属性
         Context context = new Context(ContextType.TEXT, msg.getContent());
         context.setChannelType(channelType);
+        context.setChannelKey(channelKey);
         context.setSessionId(msg.getOtherUserId());
         context.setReceiver(msg.getOtherUserId());
         context.setGroup(msg.isGroup());
@@ -81,9 +128,30 @@ public class Gateway {
         // 将原始 ChatMessage 存入扩展参数，供下游处理流程使用
         context.getKwargs().put("msg", msg);
 
+        // 对话标识：私聊为对端 userId（群聊的 groupId 路由在 P4 实现）
+        String chatKey = msg.getOtherUserId();
+
+        // 拦截 /vessel 切换命令：直接绑定路由并回复，不进入 Agent 流程
+        if (vesselRouter != null && channelKey != null && msg.getContent() != null) {
+            Matcher matcher = VESSEL_CMD.matcher(msg.getContent().trim());
+            if (matcher.matches()) {
+                String targetVessel = matcher.group(1);
+                vesselRouter.bind(channelKey, chatKey, targetVessel);
+                Reply reply = new Reply(ReplyType.INFO, "已切换到 vessel: " + targetVessel);
+                eventBus.post(new VesselResponseReady(channelType, reply, context));
+                log.info("[Gateway] /vessel 命令已处理, channelKey={}, chatKey={}, vessel={}", channelKey, chatKey, targetVessel);
+                return;
+            }
+            // 解析目标 vesselId 并注入上下文，供 AgentLoop 路由
+            String vesselId = vesselRouter.resolve(channelKey, chatKey, defaultVesselId);
+            if (vesselId != null) {
+                context.getKwargs().put("vesselId", vesselId);
+            }
+        }
+
         // 发布用户消息接收事件，触发后续 Vessel 处理流程
         eventBus.post(new UserMessageReceived(context, msg.getOtherUserId(), channelType));
-        log.debug("[Gateway] 入站消息已发布事件, channelType={}, sessionId={}", channelType, msg.getOtherUserId());
+        log.debug("[Gateway] 入站消息已发布事件, channelType={}, channelKey={}, sessionId={}", channelType, channelKey, msg.getOtherUserId());
     }
 
     /**
@@ -116,7 +184,11 @@ public class Gateway {
     @Subscribe
     public void onResponseReady(VesselResponseReady event) {
         String channelType = event.getChannelType();
-        Channel channel = registry.get(channelType);
+        // 优先按 context.channelKey 定位具体渠道实例（多实例场景），为空时回退渠道类型（单实例兼容）
+        String channelKey = event.getContext() != null ? event.getContext().getChannelKey() : null;
+        Channel channel = channelKey != null && !channelKey.isBlank()
+                ? registry.get(channelKey)
+                : registry.get(channelType);
 
         if (channel != null) {
             channel.send(event.getReply(), event.getContext());

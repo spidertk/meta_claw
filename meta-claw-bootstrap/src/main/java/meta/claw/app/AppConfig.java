@@ -1,17 +1,12 @@
 package meta.claw.app;
 
 import meta.claw.core.eventbus.EventBusWrapper;
-import meta.claw.core.infra.ProjectRootFinder;
 import meta.claw.gateway.Gateway;
 import meta.claw.gateway.channel.ChannelRegistry;
-import meta.claw.gateway.weixin.WeixinChannel;
-import meta.claw.gateway.weixin.WeixinConfig;
+import meta.claw.gateway.channel.ChannelVesselRouter;
+import meta.claw.core.infra.ProjectRootFinder;
 import meta.claw.core.runtime.AgentLoop;
 import meta.claw.core.runtime.VesselManager;
-import meta.claw.core.runtime.VesselRuntime;
-import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -26,14 +21,6 @@ import java.nio.file.Path;
  */
 @Configuration
 public class AppConfig {
-
-    /**
-     * 微信渠道认证令牌，从 application.yml 中读取
-     */
-    @Value("${meta.claw.weixin.token}")
-    private String weixinToken;
-
-
 
     /**
      * 事件总线包装器 Bean
@@ -64,6 +51,21 @@ public class AppConfig {
     }
 
     /**
+     * 渠道 Vessel 路由器 Bean
+     * <p>
+     * 维护 {channelKey, chatKey} → vesselId 路由表，持久化于 .meta-claw/channels/routes.json，
+     * 支持用户通过 /vessel 命令切换对话绑定的 Vessel。
+     * </p>
+     *
+     * @return ChannelVesselRouter 实例
+     */
+    @Bean
+    public ChannelVesselRouter channelVesselRouter() {
+        Path routesFile = ProjectRootFinder.getMetaClawDir().resolve("channels").resolve("routes.json");
+        return new ChannelVesselRouter(routesFile);
+    }
+
+    /**
      * 网关中央控制器 Bean
      * <p>
      * 作为系统消息出入口的核心协调者，负责渠道注册、入站消息处理及 Vessel 回复路由。
@@ -72,11 +74,12 @@ public class AppConfig {
      *
      * @param registry 渠道注册表
      * @param eventBus 事件总线包装器
+     * @param router   渠道 Vessel 路由器
      * @return Gateway 实例
      */
     @Bean
-    public Gateway gateway(ChannelRegistry registry, EventBusWrapper eventBus) {
-        return new Gateway(registry, eventBus);
+    public Gateway gateway(ChannelRegistry registry, EventBusWrapper eventBus, ChannelVesselRouter router) {
+        return new Gateway(registry, eventBus, router);
     }
 
 
@@ -96,24 +99,5 @@ public class AppConfig {
     public AgentLoop agentLoop(EventBusWrapper eventBus, VesselManager vesselManager) {
         return new AgentLoop(eventBus, vesselManager);
     }
-
-    /**
-     * 微信渠道 Bean
-     * <p>
-     * 基于 openilink SDK 实现与微信的对接，支持扫码登录及消息收发。
-     * 使用从 application.yml 读取的 token 构建 WeixinConfig。
-     * </p>
-     *
-     * @param gateway 网关中央控制器
-     * @return WeixinChannel 实例
-     */
-    @Bean
-    public WeixinChannel weixinChannel(Gateway gateway,
-                                       meta.claw.gateway.weixin.WeixinMessageConverter converter) {
-        WeixinConfig config = new WeixinConfig();
-        config.setToken(weixinToken);
-        return new WeixinChannel(config, gateway, converter);
-    }
-
 
 }

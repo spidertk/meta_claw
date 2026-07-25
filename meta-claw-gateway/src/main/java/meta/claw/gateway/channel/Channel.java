@@ -18,6 +18,17 @@ public interface Channel {
     String getChannelType();
 
     /**
+     * 获取渠道实例唯一键
+     * <p>同一渠道类型可能存在多个实例（如多个微信号），实例键用于注册表存取与回复路由。
+     * 默认等于渠道类型；多实例渠道应覆盖为 {@code channelType:accountId} 格式。</p>
+     *
+     * @return 渠道实例唯一键
+     */
+    default String getChannelKey() {
+        return getChannelType();
+    }
+
+    /**
      * 初始化并启动渠道
      * 完成渠道所需资源的初始化、连接建立、事件监听注册等操作。
      * 启动结果可通过内部事件机制或日志进行反馈。

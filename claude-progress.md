@@ -40,7 +40,10 @@
 - 最近已通过证据 32：2026-07-20 完成知识采集链路重构（设计文档 docs/knowledge-acquire-refactor-design.md，Phase 1+2+3 全量实施），解决三个问题：①LLM 调用过多——图片场景原 4 次调用（VisionDescriber 描述、extractKeywords、analyze 多模态再发一次图）合并为 2 次（VisionDescriber.analyze 一次调用同出描述+关键词 VisionInsight；analyze 默认文本路径不重复发图，MultimodalConfig 新增 attachImageToAnalysis 开关兑底）；PDF 有文本层零视觉调用，扫描件页图合并为一次调用；②needs_review 不走 HITL——acquire 拆为提案+确认两段：分析结果持久化为 knowledge/.pending/{proposalId}.json，经新增 KnowledgeReviewGate 人审（core 默认 PendingKnowledgeReviewGate 挂起；CLI CliKnowledgeReviewGate @Primary JLine 同步 y/n/回车挂起），确认后 commitProposal 落盘+git commit，新增 knowledgeReview 工具支持异步 approve/reject 与待审列表；executeAcquire 顺带补上被替代条目真正改写 SUPERSEDED 并单独 commit；③资产重复录入——LocalAssetManager 改 content-addressable（assetId=sha256 前 12 位）+ 新增 AssetRegistry（assets/index.json，hash→assetId→knowledgeEntryIds），重复资产 alreadyExists 命中后 KnowledgeManager 快速路径直接返回 already_known 零 LLM 调用，force=true 可强制重分析；同时修复同一次 acquire 在 KnowledgeManager 与 ImageExtractor/PdfExtractor 双份 store 的 bug（ExtractionContext 新增 sourceAsset 下传）。验证：定向测试 13/13 通过（含 LLM 调用次数=2、重复资产零调用、pending→approve/reject 行为断言），./init.sh BUILD SUCCESS，9 个 reactor 模块全部 SUCCESS，core 119 个 P0 测试、tool 25 个 P0 测试全部通过。
 - 最近已通过证据 33：2026-07-21 根据真实 CLI 实测反馈修复 dryRun 结果过薄问题：用户图片问询时主 agent 选择 dryRun=true，工具结果只返回 classification/confidence/title，视觉识别正文与结构化分析全部丢失，主 agent 只能凭标题编内容，视觉调用被浪费。修复：①dryRun 也持久化待审提案（knowledge/.pending/{id}.json）并返回完整提取内容（content 全量，上限 8000 字符）+ proposal_id + preview，用户后续 knowledgeReview approve 直接落库零额外 LLM 调用；②快速路径扩展：同资产已有待审提案时直接复用返回（existingProposalResult），重复 dryRun 零 LLM 调用；③knowledgeAcquireFromFile 的 dryRun 参数描述同步更新。新增冒烟测试 dryRunReturnsFullContentAndReusableProposal（完整内容返回/提案复用/approve 零新调用三组断言）；定向测试 14/14 通过，./init.sh BUILD SUCCESS，tool 26 个 P0 测试全部通过。
 - 最近已通过证据 34：2026-07-21 按用户要求继续优化 knowledgeAcquireFromFile：①dryRun=true 不再跑知识库矛盾自检等分析 LLM 调用——acquire 在提取（图片识别）后直接返回 status=extracted，跳过关键词/检索/统一分析；提案以 analysis=null 持久化（KnowledgeProposal 新增 context 字段保存分析上下文），knowledgeReview approve 时由 commitProposal 补跑一次统一分析（extractKeywords + findRelatedEntries + analyze）再落库，无需重新提取；renderProposalPreview/analysisToMap 对 null analysis 空安全；KnowledgeTool 三个 acquire 入口的 dryRun 参数描述同步更新，formatAcquireResult 支持 extracted 状态；②CLI 新增工具执行加载动画——ChatCommand 内部类 ToolSpinner，onToolCall 打印 🔧 行后启动 braille 转圈（独立 daemon 线程，\r 原地刷新，所有终端写入走同一把锁），下一轮 onChunk/onReasoningChunk/onHitlSuspend/onComplete/onError 停止并擦除动画行；冒烟测试 dryRunReturnsFullContentAndReusableProposal 改写为 dryRunSkipsAnalysisAndDefersItToApproval（dryRun 仅 1 次视觉调用、重复 dryRun 复用零调用、approve 补跑分析后落库）；KnowledgeAcquisitionSmokeTest 8/8 通过，./init.sh BUILD SUCCESS，core 119、tool 26 个 P0 测试全部通过
-- 当前最高优先级未完成功能：知识采集链路重构（knowledge-acquire-refactor-001）已完成并验证；下一步为整体收尾与提交，或按路线图开始后续功能（可选 Phase 4：purpose 级模型路由、语义去重、采纳率统计）。
+- 最近已通过证据 35：2026-07-21 实现长期记忆用户偏好功能（long-memory-preference-001）：参考 .rwa/expert_project 的 memory_store.py（工具+category+指导式 description）并结合业界调研（LangMem 双工具+user namespace 隔离、Letta/MemGPT core-memory 常驻 system prompt、mem0 写入去重+可删除纠正），落地轻量分层方案。①新增 MemoryTool（meta-claw-tool，@ToolService 照搬 KnowledgeTool 注册模式）：memorySave/memorySearch/memoryList/memoryDelete 四工具，按 VesselContext.getVesselId() 隔离，vesselId 经 LongMemoryFactory.get(null) 路由到 FileLongMemoryStore（preferences.jsonl）；memorySave description 按 LangMem instructions 风格写明何时存/何时不存，写入前去重（同 category+归一化 content 相同返回 Already remembered）。②常驻注入：MemorySubSystem 新增 buildPreferencesSummary(vesselId, config)（最近 10 条格式化为 - [category] content，失败返回空串不影响主链路），VesselRuntime.buildPromptVars 动态变量段注入 preferences 变量，system.tmpl.md 新增 {preferences} 占位符（PromptRenderer 原本就支持空值折叠）。③meta-claw-tool 新增 meta-claw-store test 依赖。新增 MemoryToolTest 7 个用例（保存检索落盘/去重/list+delete/未知 id/category 过滤/vessel 隔离/摘要构建）并纳入 init.sh P0 基线；./init.sh BUILD SUCCESS，core 119、tool 33 个 P0 测试全部通过
+- 最近已通过证据 36：2026-07-22 修复主 agent 不调用知识库的问题（真实 CLI 实测：用户问不耐受检查相关，agent 只 memorySearch 后直接回复没找到报告，但 alibaba vessel 知识库里确有《上海大印90项食物不耐受检测报告》）。根因：system prompt 完全没有知识库信息，agent 不知道知识库存在及内容，knowledgeRetrieve 描述也未指引使用场景（对照 expert_project 有 Knowledge vs Memory Usage Guide，我们缺失）。修复：①KnowledgeManager 新增 buildKnowledgeIndex(vesselId)——扫描 ACTIVE 条目生成『使用指南 + [主题] 标题索引』（上限 20 条，空库/异常返回空串，显式传 vesselId 不走 VesselContext ThreadLocal）；②VesselRuntime 注入 @Autowired(required=false) KnowledgeManager，buildPromptVars 动态段新增 knowledge_index 变量；③PromptRenderer 新增 {knowledge_index} 占位符（空值折叠），system.tmpl.md 同步加占位符与注释；④knowledgeRetrieve 工具描述改为『回答可能涉及已采集知识时先检索，再说没有相关信息』。新增 KnowledgeAcquisitionSmokeTest#knowledgeIndexAppearsAfterAcquisition（空库空串/采集后索引含指南+标题+主题）；./init.sh BUILD SUCCESS，core 119、tool 34 个 P0 测试全部通过
+- 最近已通过证据 37：2026-07-25 完成微信渠道接入本期实现（channel-weixin-001，按全路径设计文档 docs/weixin-channel-integration-design.md v2.0）：①配置模型——WeixinProperties @ConfigurationProperties（meta.claw.weixin.enabled + accounts[] 多账号形状先行：accountId/token/baseUrl/defaultVesselId/allowFrom/groups(P4 形状)），application.yml 切到新 schema，删除旧 meta.claw.weixin.token 单值配置与 WeixinConfig；②状态持久化——WeixinStateStore 按账号管理 .meta-claw/channels/weixin/<accountId>/{login.json,sync_buf}，原子写 + 600 权限；③WeixinChannel 重构——login.json 存在则重启免扫码直连 monitor，MonitorOptions 接 initialBuf/onBufUpdate(断点续传)/onSessionExpired(自动 relogin：删登录态→重扫码→重启 monitor)，allow-from 白名单过滤，状态访问器（online/botId/pendingQrUrl/lastInboundAt），登录流程异步化不阻塞 Spring 启动；④channelKey 贯通——Channel.getChannelKey()（weixin:<accountId>）、ChannelRegistry 按 key 注册、Context 新增 channelKey、Gateway 按 channelKey 路由回复（空则回退 channelType）；⑤Vessel 路由——ChannelVesselRouter（{channelKey,chatKey}→vesselId 三级解析：路由表绑定→账号默认→第一个 Vessel，持久化 .meta-claw/channels/routes.json 600），Gateway 拦截 /vessel 命令直接绑定+回复（不进 Agent 流程）、注入 vesselId hint，AgentLoop.determineTargetVessel(Context) 消费 hint；⑥生命周期——WeixinChannelManager @PostConstruct 按配置建实例注册 Gateway，MetaClawApplication/AppConfig 精简（删手工注册与 weixinChannel @Bean）；⑦管理端点——WeixinAdminController：GET /bot/weixin/status、GET /bot/weixin/qrcode?account=、POST /bot/weixin/relogin?account=（异步）。新增测试 29 个全绿（ChannelVesselRouterTest 6 + GatewayRoutingTest 4 + WeixinStateStoreTest 5 + WeixinMessageConverterTest 3 + WeixinChannelTest 9 + WeixinPropertiesBindTest 2），init.sh -pl 与 -Dtest 两处均已接入；./init.sh BUILD SUCCESS 9 模块全 SUCCESS；spring-boot:run 冒烟启动成功（Tomcat 8080，/bot/weixin/status 正常响应，需先 mvn install 更新本地仓库 jar）。真实微信扫码联通自测待用户执行。
+- 当前最高优先级未完成功能：channel-weixin-001（in_progress）——代码实现已完成，待用户按 docs/weixin-channel-connectivity-selftest.md 执行 P0 真实联通自测（扫码→文本闭环→免扫码重启→/vessel 切换→管理端点）。
 - 当前 blocker：
   1. 当前无 blocker
 - 已知遗留（非 blocker）：meta-claw-core 全量测试中 SpiMessageConverterMultimodalTest 硬编码 file:///tmp/test.png 在本机不存在而报错，为 2026-06-30 提交 fd0485f 引入的历史问题，与 2026-07-20 重构无关；init.sh P0 基线不含该测试，不受影响。真实 CLI 端到端图片采集（真实模型）未在本轮复测。
@@ -2780,3 +2783,90 @@
 - 下一步最佳动作：
   1. 用户确认后提交本轮修改
   2. 真实 CLI 端到端复测图片采集（dryRun → 只看识别结果 → approve 落库）与转圈动画效果
+
+### Session 080
+
+- 日期：2026-07-21
+- 本轮目标：参考 expert_project 的 memory_store.py 与业界工业级设计（mem0/LangMem/Letta），实现基于 vesselId 的长期记忆用户偏好管理工具。
+- 调研结论：
+  - 参考实现 memory_store.py：单文件 JSON + 单工具多操作（add/lookup/list/recent/delete/clear）+ category 分类，偏好不进 prompt、靠 system prompt 教 LLM 主动调工具。
+  - 业界主流（2026）：分层模式 = 小而精的常驻 core memory（Letta）+ 工具化按需读写（LangMem manage/search + user namespace 隔离）+ 写入去重/可删除纠正（mem0）。
+  - 本仓库已有 PreferenceMemory/LongMemory 接口/FileLongMemoryStore（JSONL 按 vesselId 隔离）/LongMemoryFactory，但全部未接线（无工具、不进 prompt）；PromptRenderer 已支持 {preferences} 占位符空值折叠。
+- 已完成：
+  - 新增 `MemoryTool`（meta-claw-tool，@ToolService）：memorySave（指导式 description + 写入去重）/memorySearch/memoryList/memoryDelete，按 `VesselContext.getVesselId()` 隔离。
+  - `MemorySubSystem.buildPreferencesSummary(vesselId, config)`：最近 10 条偏好格式化为 `- [category] content`，异常返回空串。
+  - `VesselRuntime.buildPromptVars()` 动态变量段注入 preferences；`system.tmpl.md` 新增 `{preferences}` 占位符与注释。
+  - meta-claw-tool pom 新增 meta-claw-store test 依赖；新增 `MemoryToolTest` 7 用例并纳入 init.sh P0。
+- 运行过的验证：
+  - `mvn -pl meta-claw-tool -am test -Dtest=MemoryToolTest -Dsurefire.failIfNoSpecifiedTests=false` → 7/7 通过
+  - `./init.sh` → BUILD SUCCESS；core 119、tool 33 个 P0 测试全部通过
+- 更新过的文件或工件：
+  - `meta-claw-tool/src/main/java/meta/claw/tool/MemoryTool.java`（新增）
+  - `meta-claw-tool/src/test/java/meta/claw/tool/memory/MemoryToolTest.java`（新增）
+  - `meta-claw-tool/pom.xml`（store test 依赖）
+  - `meta-claw-core/src/main/java/meta/claw/core/runtime/subsystem/MemorySubSystem.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/runtime/VesselRuntime.java`
+  - `meta-claw-core/src/main/resources/templates/runtime/system.tmpl.md`
+  - `init.sh`、`feature_list.json`、`claude-progress.md`、`clean-state-checklist.md`
+- 已知风险或未解决的问题：
+  - 检索为 contains 匹配，偏好条目增多后精度有限；向量检索/embedding 留作演进。
+  - 是否存偏好完全由主 agent 按工具 description 判断，无 LLM 自动提取管线（mem0 式）与后台 consolidation。
+  - 真实 CLI 端到端（真实模型主动调 memorySave 并在下轮体现偏好）未在本轮复测。
+- 下一步最佳动作：
+  1. 用户确认后提交本轮修改
+  2. 真实 CLI 端到端复测：对 vessel 说"我喜欢……"→ 验证 memorySave 落盘 → 新会话验证 ## Preferences 出现在 system prompt
+
+### Session 081
+
+- 日期：2026-07-22
+- 本轮目标：排查并修复真实 CLI 中主 agent 不调用知识库的问题（用户问不耐受检查，agent 只 memorySearch 后直接说没找到报告，而 alibaba vessel 知识库确有《上海大印90项食物不耐受检测报告》）。
+- 排查结论：
+  - 检索能力本身没问题（knowledgeRetrieve 底层 grep 子串匹配，"不耐受"可命中报告正文）。
+  - 根因是 prompt 感知缺失：system prompt 完全没有知识库的任何信息，agent 不知道知识库存在、不知道里面有什么；knowledgeRetrieve 的工具描述（"Search knowledge with multiple modes"）也未指引使用场景。对照参考项目 expert_project 的 system prompt 有 "Knowledge vs Memory Usage Guide"，本仓库缺失该指引。
+- 已完成：
+  - `KnowledgeManager.buildKnowledgeIndex(String vesselId)`：扫描 ACTIVE 条目生成「使用指南 + [主题] 标题索引」（上限 20 条；空库/异常返回空串；显式传 vesselId，因为 buildPromptVars 阶段 VesselContext 未绑定）。
+  - `VesselRuntime` 新增 `@Autowired(required=false) KnowledgeManager`，`buildPromptVars()` 动态变量段注入 `knowledge_index`。
+  - `PromptRenderer` 新增 `{knowledge_index}` 占位符替换（sectionOrEmpty 空值折叠）；`system.tmpl.md` 加占位符与注释。
+  - `knowledgeRetrieve` 工具描述改为「回答可能涉及已采集知识时先检索，再说没有相关信息」。
+  - 新增 `KnowledgeAcquisitionSmokeTest#knowledgeIndexAppearsAfterAcquisition`。
+- 运行过的验证：
+  - `./init.sh` → BUILD SUCCESS；core 119、tool 34 个 P0 测试全部通过（KnowledgeAcquisitionSmokeTest 9/9）
+- 更新过的文件或工件：
+  - `meta-claw-core/src/main/java/meta/claw/core/knowledge/KnowledgeManager.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/runtime/VesselRuntime.java`
+  - `meta-claw-core/src/main/java/meta/claw/core/prompt/PromptRenderer.java`
+  - `meta-claw-core/src/main/resources/templates/runtime/system.tmpl.md`
+  - `meta-claw-tool/src/main/java/meta/claw/tool/KnowledgeTool.java`
+  - `meta-claw-tool/src/test/java/meta/claw/tool/knowledge/KnowledgeAcquisitionSmokeTest.java`
+  - `feature_list.json`、`claude-progress.md`、`clean-state-checklist.md`
+- 已知风险或未解决的问题：
+  - 知识按 vessel 隔离：报告存在 alibaba vessel，若用 default vessel 对话其知识库为空，索引自然为空——属于数据归属问题，非代码缺陷。
+  - 真实 CLI 端到端（真实模型看到索引后主动 knowledgeRetrieve）未在本轮复测。
+- 下一步最佳动作：
+  1. 用户确认后提交本轮修改
+  2. 真实 CLI 复测：用 alibaba vessel 重问"根据不耐受检查定制餐单"，验证 agent 先 knowledgeRetrieve 命中文末报告再作答
+
+### Session 081 续
+
+- 日期：2026-07-22
+- 问题：真实 CLI 中 `⠋ Executing tool ...` 动画"不动"——实为两个缺陷：①启动即打印第一帧，本地快工具（memorySearch/readSkill，几十毫秒）在第二帧到来前就被 stop，只剩静态第一帧；②停止时仅用 ANSI `\u001B[K` 擦行，在不支持该序列的终端（dumb 模式/IDEA 控制台）残留静态行。已排除"onComplete 每轮提前 stop"（Advisor 不触发 onComplete，仅 Executor 最终轮触发一次）。
+- 修复（ChatCommand.ToolSpinner）：①显示延迟 SHOW_DELAY_MS=300，快工具完全不打印动画；②帧内附带已执行秒数（`... 1.2s`），长工具能明确看到在走；③visible 标志控制只在真打印过时擦除，擦除改为 `\r\u001B[K` + 80 空格覆写双保险。
+- 验证：`./init.sh` BUILD SUCCESS，core 119、tool 34 个 P0 测试全部通过。真实终端动画效果待用户复测。
+
+### Session 082
+
+- 日期：2026-07-22
+- 本轮目标：设计渠道接入方案（微信），产出设计方案与联通自测说明文档。
+- 调研结论：
+  - `third-party/openilink-sdk-java`：微信官方 iLink Bot 协议 Java SDK（纯 HTTP/JSON），QR 扫码换长期 botToken（Bearer）、getUpdates 35s 长轮询 + sync_buf 游标、context_token 会话维持、CDN 媒体（预签名上传 + AES-128-ECB）、errcode -14 会话过期；含可运行 EchoBot 示例；测试目录为空。
+  - 现有骨架：meta-claw-gateway 抽象（Channel/ChatChannel/Gateway + 事件链）可用；WeixinChannel 文本收发链路已在 bootstrap 接线但**从未实测**；缺口 11 项（token/游标不持久化、QR 仅打日志、无 @ConfigurationProperties 与渠道开关、入站多模态丢弃、渠道 HITL 缺失、零测试等，编号 G1-G11）。
+  - 网上案例：OpenClaw 官方 weixin 插件（token 持久化 + 游标落盘）、cc-connect（setup 扫码写回配置、allow_from 白名单、account_id 状态隔离）、CSDN Java iLink 教程（虚拟线程长轮询、AI 优先+降级、管理端点）、OpeniLink Hub（自动续期、消息持久化对标）；灰色方案（gewe/wechaty iPad 协议）因封号风险不采用。
+- 已完成（仅文档，无代码改动）：
+  - `docs/weixin-channel-integration-design.md`：选型对比、iLink 协议要点、SDK 使用指南、现状缺口表、P0-P5 分阶段计划、测试策略、风险与参考资料。
+  - `docs/weixin-channel-connectivity-selftest.md`：前置条件、扫码登录步骤、U1-U6 用例（文本闭环/会话连续/偏好记忆/知识库检索/重启恢复/边界探测）、通过标准、故障排查表、自测记录表。
+- 运行过的验证：无代码改动；沿用上一轮 `./init.sh` 通过状态（core 119、tool 34）。
+- 更新过的文件或工件：`docs/weixin-channel-integration-design.md`（新增）、`docs/weixin-channel-connectivity-selftest.md`（新增）、`feature_list.json`（新增 channel-weixin-001，in_progress）、`claude-progress.md`。
+- 已知风险或未解决的问题：iLink 群聊支持与主动推送限制以 P0 实测为准；`MetaClawApplication.run()` 的 initializeRuntimes 已清空，启动链路是否断需 P0 第一步验证。
+- 下一步最佳动作：
+  1. 用户按《联通自测说明文档》执行 P0 实测（扫码→文本收发→偏好→知识库），回填自测记录表
+  2. 按实测结果启动 P1（token/sync_buf 持久化、@ConfigurationProperties + 渠道开关、管理端点、第一批测试）

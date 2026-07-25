@@ -40,8 +40,22 @@ spring:
 meta:
   claw:
     weixin:
-      # 微信渠道认证令牌，用于 openilink SDK 登录，优先从环境变量 WEIXIN_TOKEN 读取
-      token: ${WEIXIN_TOKEN:}
+      # 微信渠道总开关；false 时不创建任何账号实例
+      enabled: true
+      accounts:
+        # 1 账号 = 1 微信号 = 1 token = 1 Channel 实例；多账号在此追加
+        - account-id: main
+          enabled: true
+          # openilink 认证令牌（可选）；.meta-claw/channels/weixin/main/login.json 存在时以持久化为准
+          token: ${WEIXIN_TOKEN:}
+          # openilink 服务基地址（可选），为空使用 SDK 默认
+          # base-url: https://ilinkai.weixin.qq.com
+          # 默认路由到的 vesselId（可选），为空用系统第一个 Vessel
+          # default-vessel-id: ""
+          # 私聊白名单（对端 userId）；空 = 不限制（仅建议调试期）
+          allow-from: []
+          # 群聊绑定（P4 预留）：[{group-id: xxx, vessel-id: yyy, trigger-prefix: "/ai"}]
+          groups: []
 
 # Actuator 可观测性端点配置
 management:

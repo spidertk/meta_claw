@@ -36,6 +36,9 @@ public class Context {
     /** 渠道类型 */
     private String channelType;
 
+    /** 渠道实例唯一键（格式 channelType:accountId，如 weixin:main），用于多实例渠道的回复路由；单实例渠道可为空 */
+    private String channelKey;
+
     /** 是否为群聊消息的标记 */
     private boolean group;
 

@@ -22,7 +22,7 @@ public class ChannelRegistry {
      * @param channel 待注册的渠道实例
      */
     public void register(Channel channel) {
-        channels.put(channel.getChannelType(), channel);
+        channels.put(channel.getChannelKey(), channel);
     }
 
     /**
