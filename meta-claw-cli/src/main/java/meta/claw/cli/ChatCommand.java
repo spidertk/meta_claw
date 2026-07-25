@@ -246,14 +246,19 @@ public class ChatCommand implements Runnable {
      * 工具执行期间的终端转圈加载动画。
      * 工具在 agent 执行器里同步阻塞执行，动画跑在独立 daemon 线程上，
      * 通过 \r 原地刷新；停止时擦除动画行。所有终端写入都在同一把锁内，避免与流式输出交错。
+     * <p>注意：启动后延迟 {@link #SHOW_DELAY_MS} 才打印第一帧——本地快工具（几十毫秒）
+     * 不会留下只显示第一帧的静态残影；长工具则能看到 braille 帧与已执行秒数持续走动。</p>
      */
     private static final class ToolSpinner {
         private static final String[] FRAMES = {"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"};
-        private static final long FRAME_INTERVAL_MS = 80;
+        private static final long FRAME_INTERVAL_MS = 100;
+        private static final long SHOW_DELAY_MS = 300;
+        private static final int LINE_WIDTH = 80;
 
         private final Terminal terminal;
         private final Object lock = new Object();
         private boolean running;
+        private boolean visible;
         private Thread thread;
 
         private ToolSpinner(Terminal terminal) {
@@ -264,16 +269,28 @@ public class ChatCommand implements Runnable {
             stop();
             synchronized (lock) {
                 running = true;
+                visible = false;
                 thread = new Thread(() -> {
+                    try {
+                        // 快工具不显示动画：延迟内被 stop 打断则直接退出
+                        Thread.sleep(SHOW_DELAY_MS);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        return;
+                    }
                     int frame = 0;
+                    long startedAt = System.currentTimeMillis();
                     while (true) {
                         synchronized (lock) {
                             if (!running) {
                                 return;
                             }
+                            double elapsed = (System.currentTimeMillis() - startedAt) / 1000.0;
                             terminal.writer().print("\r\u001B[36m" + FRAMES[frame % FRAMES.length]
-                                    + " Executing tool " + toolName + " ...\u001B[0m");
+                                    + " Executing tool " + toolName
+                                    + String.format(" ... %.1fs", elapsed) + "\u001B[0m");
                             terminal.writer().flush();
+                            visible = true;
                         }
                         frame++;
                         try {
@@ -299,9 +316,12 @@ public class ChatCommand implements Runnable {
                     thread.interrupt();
                     thread = null;
                 }
-                // 擦除动画行
-                terminal.writer().print("\r\u001B[K");
-                terminal.writer().flush();
+                // 只有动画真的打印过才擦除；ANSI 擦行 + 空格覆写双保险（dumb 终端不支持 \u001B[K 时也能清干净）
+                if (visible) {
+                    visible = false;
+                    terminal.writer().print("\r\u001B[K\r" + " ".repeat(LINE_WIDTH) + "\r");
+                    terminal.writer().flush();
+                }
             }
         }
     }

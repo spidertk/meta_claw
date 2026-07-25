@@ -50,6 +50,10 @@ public class VesselRuntime implements InitializingBean {
     @Autowired
     private AgentEngineFactory agentEngineFactory;
 
+    /** 知识库索引注入（optional：仅 core 内 @Component，无知识库配置时也能启动） */
+    @Autowired(required = false)
+    private meta.claw.core.knowledge.KnowledgeManager knowledgeManager;
+
     /** 所有子系统，Spring 自动收集（含 VesselProfile） */
     @Autowired(required = false)
     private List<VesselSubSystem> subSystems = new ArrayList<>();
@@ -107,11 +111,21 @@ public class VesselRuntime implements InitializingBean {
         PromptVars staticVars = promptComposer.compose(registry);
 
         // 动态变量：每次任务实时计算
+        java.util.Map<String, String> dynamicVars = new java.util.LinkedHashMap<>();
+        dynamicVars.put("current_time", formatCurrentTime());
+        dynamicVars.put("location", detectLocation());
+        // 长期记忆用户偏好摘要（Letta core-memory 式常驻注入；无偏好时为空串，区块自动折叠）
+        MemorySubSystem memorySubSystem = registry.get("memory");
+        if (memorySubSystem != null && getProfile() != null) {
+            dynamicVars.put("preferences", memorySubSystem.buildPreferencesSummary(
+                    vesselId, getProfile().getBundle().getMemoryConfig()));
+        }
+        // 知识库索引 + 使用指南（让 agent 感知知识库内容，先检索再回答；空库时区块自动折叠）
+        if (knowledgeManager != null) {
+            dynamicVars.put("knowledge_index", knowledgeManager.buildKnowledgeIndex(vesselId));
+        }
         PromptVars dynamic = PromptVars.builder()
-                .vars(java.util.Map.of(
-                        "current_time", formatCurrentTime(),
-                        "location", detectLocation()
-                ))
+                .vars(dynamicVars)
                 .build();
 
         return staticVars.merge(dynamic);

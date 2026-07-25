@@ -52,6 +52,7 @@ public class PromptRenderer {
                 .replace("{current_time}",       orEmpty(vars.get("current_time")))
                 .replace("{location}",           orEmpty(vars.get("location")))
                 .replace("{preferences}",        sectionOrEmpty(vars.get("preferences"), "Preferences"))
+                .replace("{knowledge_index}",    sectionOrEmpty(vars.get("knowledge_index"), "Knowledge Base"))
                 .trim();
 
         // 清理连续空行，提升可读性

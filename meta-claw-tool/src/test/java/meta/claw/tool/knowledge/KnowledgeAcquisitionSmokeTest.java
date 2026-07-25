@@ -235,6 +235,19 @@ class KnowledgeAcquisitionSmokeTest {
                 "Approving a dryRun proposal should run the deferred analysis (no re-extraction)");
     }
 
+    @Test
+    void knowledgeIndexAppearsAfterAcquisition() {
+        // 空库时索引为空串（system prompt 区块自动折叠）
+        assertEquals("", knowledgeManager.buildKnowledgeIndex("smoke"));
+
+        tool.knowledgeAcquire("Smoke test content", null, false);
+
+        String index = knowledgeManager.buildKnowledgeIndex("smoke");
+        assertTrue(index.contains("knowledgeRetrieve"), "Index should contain usage guide, got: " + index);
+        assertTrue(index.contains("Smoke Test"), "Index should contain entry title, got: " + index);
+        assertTrue(index.contains("smoke"), "Index should contain entry topics, got: " + index);
+    }
+
     private Path createTestImage() throws Exception {
         BufferedImage img = new BufferedImage(10, 10, BufferedImage.TYPE_INT_RGB);
         ByteArrayOutputStream baos = new ByteArrayOutputStream();

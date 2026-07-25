@@ -173,8 +173,10 @@ public class KnowledgeTool {
     }
 
     @Tool(description = """
-            Search knowledge with multiple modes.
-            Knowledge is scoped to the current vessel.
+            Search the current vessel's domain knowledge base (documents/reports previously
+            acquired via knowledgeAcquire*, e.g. medical reports, nutrition references).
+            When the user's question may relate to previously acquired knowledge, search here
+            FIRST before saying you don't have the information.
             Mode 'current' returns active knowledge, 'history' returns evolution context
             including full commit history.""")
     public String knowledgeRetrieve(

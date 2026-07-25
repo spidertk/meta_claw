@@ -820,6 +820,49 @@ public class KnowledgeManager {
                 .collect(Collectors.toList());
     }
 
+    /** 注入 system prompt 的知识库索引条数上限 */
+    private static final int KNOWLEDGE_INDEX_LIMIT = 20;
+
+    /**
+     * 构建注入 system prompt 的知识库索引（含使用指南）。
+     * <p>让主 agent 感知知识库里有什么：回答涉及已采集文档时先 knowledgeRetrieve 检索，
+     * 而不是直接回复“没有相关信息”。对齐参考项目的 Knowledge vs Memory Usage Guide。</p>
+     *
+     * @param vesselId 显式 vessel id（buildPromptVars 阶段 VesselContext 尚未绑定，不能走 ThreadLocal）
+     * @return 指南 + 索引文本；空库或读取失败返回空串（prompt 区块自动折叠）
+     */
+    public String buildKnowledgeIndex(String vesselId) {
+        try {
+            String vid = vesselId != null && !vesselId.isBlank() ? vesselId : "default";
+            Path knowledgeDir = ProjectRootFinder.getMetaClawDir()
+                    .resolve("vessels").resolve(vid).resolve("knowledge");
+            if (!Files.exists(knowledgeDir)) {
+                return "";
+            }
+            try (var stream = Files.walk(knowledgeDir)) {
+                List<String> lines = stream
+                        .filter(p -> p.toString().endsWith(".md"))
+                        .map(this::loadEntry)
+                        .filter(Objects::nonNull)
+                        .filter(e -> e.getStatus() == KnowledgeStatus.ACTIVE)
+                        .limit(KNOWLEDGE_INDEX_LIMIT)
+                        .map(e -> "- " + (e.getTopics() != null && !e.getTopics().isEmpty()
+                                ? "[" + String.join("/", e.getTopics()) + "] " : "")
+                                + (e.getTitle() != null && !e.getTitle().isBlank() ? e.getTitle() : e.getId()))
+                        .collect(Collectors.toList());
+                if (lines.isEmpty()) {
+                    return "";
+                }
+                return "当前知识库包含以下已采集的领域知识（报告/文档）。当用户问题可能涉及这些内容时，"
+                        + "先用 knowledgeRetrieve 检索再回答，不要直接说“没有找到相关信息”；"
+                        + "用户偏好/个人特点则用 memorySearch：\n\n" + String.join("\n", lines);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to build knowledge index for vessel {}: {}", vesselId, e.getMessage());
+            return "";
+        }
+    }
+
     private String sanitizeFilename(String filename) {
         if (filename == null) return "";
         return filename.strip()

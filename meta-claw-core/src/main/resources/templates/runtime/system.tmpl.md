@@ -16,6 +16,8 @@
     {capabilities}       → VesselProfile ## Capabilities 段落
     {guidelines}         → VesselProfile ## Guidelines 段落
     {domain_knowledge}   → VesselProfile ## Domain Knowledge 段落
+    {preferences}        → 长期记忆用户偏好摘要（MemorySubSystem，实时读取 preferences.jsonl）
+    {knowledge_index}    → 知识库索引 + 检索使用指南（KnowledgeManager，实时扫描 knowledge/ 目录）
 
   自定义方式：
     不要直接修改本文件！如需调整 Vessel 人格，请编辑：
@@ -32,3 +34,5 @@
 {capabilities}
 {guidelines}
 {domain_knowledge}
+{preferences}
+{knowledge_index}
