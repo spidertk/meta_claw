@@ -138,6 +138,15 @@ public class VesselRuntime implements InitializingBean {
     }
 
     /**
+     * 带多模态附件的对话入口（如微信渠道图片入站）。
+     *
+     * @param mediaParts 附件列表（本地 file:// 路径的 MediaPart），可为 null
+     */
+    public Reply chat(String sessionId, String userMessage, List<meta.claw.core.llm.MediaPart> mediaParts) {
+        return execute(sessionId, userMessage, mediaParts);
+    }
+
+    /**
      * 从 HITL 挂起状态恢复，继续完成 ReAct 循环。
      */
     public Reply resume(String sessionId, String userMessage, ApprovalTicket ticket, ApprovalResolution resolution) {
@@ -155,6 +164,7 @@ public class VesselRuntime implements InitializingBean {
                     .build();
 
             Reply reply = currentEngine().resume(ctx, request, ticket, resolution);
+            attachPendingMedia(ctx, reply);
             saveAssistantMessage(ctx, reply.getContent());
             return reply;
         } finally {
@@ -163,11 +173,15 @@ public class VesselRuntime implements InitializingBean {
     }
 
     public Reply execute(String sessionId, String userMessage) {
+        return execute(sessionId, userMessage, null);
+    }
+
+    public Reply execute(String sessionId, String userMessage, List<meta.claw.core.llm.MediaPart> mediaParts) {
         // ① 渲染 system prompt
         String systemPrompt = renderSystemPrompt();
 
         // ② 构造任务上下文
-        TaskContext ctx = TaskContext.create(vesselId, sessionId, userMessage, getProfile(), registry);
+        TaskContext ctx = TaskContext.create(vesselId, sessionId, userMessage, mediaParts, getProfile(), registry);
 
         // ③ 任务开始生命周期
         registry.listAll().forEach(sub -> sub.onTaskStart(ctx));
@@ -182,6 +196,7 @@ public class VesselRuntime implements InitializingBean {
                     .build();
 
             Reply reply = currentEngine().execute(ctx, request);
+            attachPendingMedia(ctx, reply);
 
             // 保存 assistant 消息到短期记忆
             saveAssistantMessage(ctx, reply.getContent());
@@ -241,14 +256,37 @@ public class VesselRuntime implements InitializingBean {
             messages.addAll(toSpiMessages(shortMem.loadMessages(vesselId, sessionId, maxRounds)));
         }
 
-        messages.add(SpiMessage.user(ctx.getUserMessage()));
+        messages.add(userMessageOf(ctx));
 
         if (shortMem != null) {
             shortMem.appendMessage(vesselId, sessionId,
-                    MemoryMessageConverter.fromSpiMessage(SpiMessage.user(ctx.getUserMessage())));
+                    MemoryMessageConverter.fromSpiMessage(userMessageOf(ctx)));
         }
 
         return messages;
+    }
+
+    /**
+     * 构造本轮 user 消息：带附件时走多模态 SpiMessage（mediaParts 随消息进 LLM，
+     * 本地文件路径同时保留在文本中供 agent 调 knowledgeAcquireFromFile）。
+     */
+    private SpiMessage userMessageOf(TaskContext ctx) {
+        List<meta.claw.core.llm.MediaPart> mediaParts = ctx.getMediaParts();
+        if (mediaParts != null && !mediaParts.isEmpty()) {
+            return SpiMessage.user(ctx.getUserMessage(), mediaParts);
+        }
+        return SpiMessage.user(ctx.getUserMessage());
+    }
+
+    /**
+     * 将工具（sendMedia）在任务上下文中挂载的待发媒体回贴到本轮 Reply，
+     * 由渠道层在发送回复时统一携带出站。
+     */
+    private void attachPendingMedia(TaskContext ctx, Reply reply) {
+        if (reply != null && ctx.getPendingMediaPath() != null) {
+            reply.setMediaPath(ctx.getPendingMediaPath());
+            reply.setMediaType(ctx.getPendingMediaType());
+        }
     }
 
     private void saveAssistantMessage(TaskContext ctx, String content) {

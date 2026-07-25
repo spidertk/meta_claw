@@ -2,6 +2,7 @@ package meta.claw.core.runtime;
 
 import lombok.Builder;
 import lombok.Getter;
+import meta.claw.core.llm.MediaPart;
 import meta.claw.core.llm.SpiStreamingCallback;
 import meta.claw.core.llm.SpiUsage;
 import meta.claw.core.runtime.subsystem.SubSystemRegistry;
@@ -28,6 +29,23 @@ public class TaskContext {
     private final String vesselId;
     private final String sessionId;
     private final String userMessage;
+
+    /** 本轮用户消息附带的多模态内容（如微信图片），可为 null */
+    private final List<MediaPart> mediaParts;
+
+    /** 工具（sendMedia）挂载的待发媒体绝对路径，回贴到本轮 Reply 上 */
+    private String pendingMediaPath;
+
+    /** 待发媒体类型提示（IMAGE/VIDEO/FILE），可为 null 由渠道按扩展名推断 */
+    private String pendingMediaType;
+
+    /**
+     * 挂载待发媒体：渠道层在发送本轮回复时将该文件作为媒体消息发出。
+     */
+    public void scheduleMedia(String absolutePath, String mediaType) {
+        this.pendingMediaPath = absolutePath;
+        this.pendingMediaType = mediaType;
+    }
 
     @Builder.Default
     private final Instant createdAt = Instant.now();
@@ -62,11 +80,21 @@ public class TaskContext {
      */
     public static TaskContext create(String vesselId, String sessionId, String userMessage,
                                      VesselProfile profile, SubSystemRegistry registry) {
+        return create(vesselId, sessionId, userMessage, null, profile, registry);
+    }
+
+    /**
+     * 便捷构造：带多模态附件的用户消息场景（如微信图片入站）。
+     */
+    public static TaskContext create(String vesselId, String sessionId, String userMessage,
+                                     List<MediaPart> mediaParts,
+                                     VesselProfile profile, SubSystemRegistry registry) {
         return TaskContext.builder()
                 .taskId(UUID.randomUUID().toString())
                 .vesselId(vesselId)
                 .sessionId(sessionId)
                 .userMessage(userMessage)
+                .mediaParts(mediaParts)
                 .profile(profile)
                 .registry(registry)
                 .build();

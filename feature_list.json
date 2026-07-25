@@ -1480,14 +1480,15 @@
       "id": "channel-weixin-001",
       "priority": 48,
       "area": "channel",
-      "title": "微信渠道接入（iLink 官方协议）：全路径设计 + 本期实现（持久化登录/路由/管理端点）",
+      "title": "微信渠道接入（iLink 官方协议）：全路径设计 + 本期实现 + P3 多模态",
       "user_visible_behavior": "用户用手机微信扫码把一个微信号绑定为 Bot 后，另一个微信号即可在微信里直接与 vessel 对话：文本问答、调用工具、读写偏好记忆、检索知识库；后续迭代支持图片入库（联动 knowledgeAcquireFromFile 视觉识别）、渠道侧 HITL 审批、多 vessel 路由。",
       "status": "in_progress",
       "verification": [
         "全路径设计文档已产出：docs/weixin-channel-integration-design.md v2.0（最终形态配置 schema、状态布局、channelKey/路由模型、P3 多模态、P4 群聊/HITL 全部定稿，后续实现不返工）。",
         "本期实现已完成：WeixinProperties 多账号配置+渠道开关、WeixinStateStore（login.json/sync_buf 600 权限）、WeixinChannel 重构（免扫码重启/onSessionExpired 自动 relogin/allowFrom 白名单/状态访问器）、channelKey 贯通（Channel/Registry/Context/Gateway）、ChannelVesselRouter + /vessel 命令 + AgentLoop vesselId hint、WeixinChannelManager 多账号生命周期、WeixinAdminController（/bot/weixin/status|qrcode|relogin）、MetaClawApplication/AppConfig 精简、application.yml 新 schema。",
         "单元/集成测试 29 个全部通过（ChannelVesselRouterTest 6、GatewayRoutingTest 4、WeixinStateStoreTest 5、WeixinMessageConverterTest 3、WeixinChannelTest 9、WeixinPropertiesBindTest 2），已接入 init.sh P0（两处）。",
-        "P0 真实联通自测（扫码→文本收发→免扫码重启→/vessel 切换→管理端点）待用户按 docs/weixin-channel-connectivity-selftest.md 执行并回填实测记录。"
+        "P3 多模态已实现：入站图片 CDN 下载+AES-128-ECB 解密+魔数嗅探落盘，MediaPart(file://) 经 ChatMessage/Context/AgentLoop 透传到 VesselRuntime.chat 三参重载进 LLM，文本附带路径引导 knowledgeAcquireFromFile；文件/视频落盘附件、语音转写文本直通；出站 Reply.mediaPath/mediaType → uploadFile(MD5+预签名+AES+CDN POST x-encrypted-param) → sendImage/sendVideo/sendFileAttachment，失败回退文本。",
+        "单元/集成测试全部通过（新增 P3：WeixinMediaServiceTest 11、WeixinChannelMediaTest 7、AgentLoopMediaTest 2；旧 WeixinChannelTest.nonTextMessageSkipped 按 P3 新语义改写为下载失败兜底），已接入 init.sh P0（两处）。"
       ],
       "evidence": [
         {
@@ -1499,9 +1500,25 @@
           "date": "2026-07-25",
           "result": "implementation_done",
           "detail": "按全路径设计完成本期实现：登录态/游标持久化（重启免扫码+断点续传）、会话过期自动重扫码、多账号配置形状先行（加账号=加配置）、channelKey 回复路由、{channelKey,chatKey}→vesselId 路由表持久化（.meta-claw/channels/routes.json）+/vessel 对话内切换、allow-from 白名单、管理端点三件套。新增测试 29 个全绿（gateway 10 + gateway-weixin 19），init.sh -pl 与 -Dtest 两处均已接入。真实微信联通自测未执行（需用户手机扫码）。"
-        }
+        },
+        {
+          "date": "2026-07-25",
+          "result": "p3_implemented",
+          "detail": "P3 多模态按设计 §6.7 实现完成：新增 WeixinMediaService（CDN 下载/上传/AES 静态工具，协议语义对齐官方 openilink-sdk-go：aes_key 双编码 base64(raw16)/base64(hex32)、BuildCDNDownloadURL/UploadURL、x-encrypted-param 响应头、upload_full_url 优先）；SDK 小增强 getCdnBaseUrl()+GetUploadURLResp.uploadFullUrl；core 侧 TaskContext.mediaParts+VesselRuntime.chat/execute 三参重载+SpiMessage.user(content,mediaParts)；Reply 扩展 mediaPath/mediaType；ChatMessage 增加 mediaParts。新增 20 个测试全绿，./init.sh BUILD SUCCESS。真实微信图片收发待用户实测。"
+        },
+        {
+          "date": "2026-07-25",
+          "result": "admin_send_media_added",
+          "detail": "新增 POST /bot/weixin/send-media 出站媒体自测端点（account/path/to/type/caption；to 缺省取最近入站发送者 lastInboundUserId），无需上游产生媒体 Reply 即可实测完整出站管线（上传 CDN→发送媒体消息）；status 端点补充 lastInboundUserId 字段。WeixinAdminControllerTest 7 用例全绿，已入 init.sh P0（两处），./init.sh BUILD SUCCESS。"
+        },
+        {
+          "date": "2026-07-25",
+          "result": "logging_fixed",
+          "detail": "修复服务端日志只打控制台问题：根因是 vendor 的 openilink-sdk-java jar 自带 logback.xml 覆盖了 Spring Boot 默认日志配置，导致 logging.file.name 不生效。已删除 SDK 内 logback.xml 并在 bootstrap application.yml 增加 logging.file.name=logs/meta-claw-server.log；实测进程打开 meta-claw-bootstrap/logs/meta-claw-server.log（spring-boot:run 工作目录为模块目录）。"
+        },
+        "2026-07-25 Session 083：新增 SendMediaTool（agent 主动发媒体，vessel 相对路径解析 assets/...），TaskContext 待发媒体槽位 + VesselRuntime 回贴 Reply.mediaPath；SendMediaToolTest 6 测试全绿，./init.sh 通过"
       ],
-      "notes": "选型结论不变：只用腾讯官方 iLink Bot 协议。本期完成设计§4/§5/§6.1-6.6/§8.1-3；P3 多模态（§6.7）、P4 群聊/HITL（§6.8/§6.9）设计已定稿待实现。已知限制：context_token 约 24h 过期、只能回复不能主动发起、SDK 无昵称/@字段（群聊用前缀触发）。当前为唯一 in_progress 功能。"
+      "notes": "选型结论不变：只用腾讯官方 iLink Bot 协议。已完成：本期（配置/持久化/路由/管理端点）+ P3 多模态；剩余：P4 群聊（§6.8 前缀触发+限频+ChatMessage.groupId）与渠道 HITL（§6.9），设计已定稿。出站语音未做（silk 编码无现成实现，FILE 附件兜底）。真实联通自测 U1-U5 + 图片收发实测待用户执行。"
     }
   ]
 }

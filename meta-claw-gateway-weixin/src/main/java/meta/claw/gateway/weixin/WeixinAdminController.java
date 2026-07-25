@@ -1,5 +1,8 @@
 package meta.claw.gateway.weixin;
 
+import meta.claw.core.message.Context;
+import meta.claw.core.message.Reply;
+import meta.claw.core.message.ReplyType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -7,6 +10,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -54,6 +59,7 @@ public class WeixinAdminController {
                     map.put("pendingQr", ch.getPendingQrUrl() != null);
                     Instant lastInbound = ch.getLastInboundAt();
                     map.put("lastInboundAt", lastInbound != null ? lastInbound.toString() : null);
+                    map.put("lastInboundUserId", ch.getLastInboundUserId());
                     return map;
                 })
                 .map(m -> (Map<String, Object>) m)
@@ -87,5 +93,52 @@ public class WeixinAdminController {
         }
         reloginExecutor.submit(channel::relogin);
         return ResponseEntity.accepted().body(Map.of("accountId", account, "accepted", true));
+    }
+
+    /**
+     * 手动发送媒体消息（出站媒体管线自测入口）
+     * <p>
+     * to 缺省时使用最近一次入站消息的发送者（需对方先给 Bot 发过消息，
+     * 一方面获得收件人，另一方面保证 context_token 存在）。
+     * </p>
+     *
+     * @param account 账号 ID
+     * @param to      收件人 userId（可选，缺省为最近入站发送者）
+     * @param path    本地文件路径（图片/视频/文件）
+     * @param type    媒体类型 IMAGE/VIDEO/FILE（可选，缺省按扩展名推断）
+     * @param caption 说明文本（可选，单独先发一条）
+     */
+    @PostMapping("/send-media")
+    public ResponseEntity<Map<String, Object>> sendMedia(@RequestParam String account,
+                                                         @RequestParam(required = false) String to,
+                                                         @RequestParam String path,
+                                                         @RequestParam(required = false) String type,
+                                                         @RequestParam(required = false) String caption) {
+        WeixinChannel channel = manager.getChannel(account);
+        if (channel == null) {
+            return ResponseEntity.notFound().build();
+        }
+        String receiver = (to != null && !to.isBlank()) ? to : channel.getLastInboundUserId();
+        if (receiver == null || receiver.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", "缺少收件人：请提供 to 参数，或先让目标用户给 Bot 发一条消息"));
+        }
+        if (!Files.exists(Path.of(path))) {
+            return ResponseEntity.badRequest().body(Map.of("error", "文件不存在: " + path));
+        }
+
+        Reply reply = new Reply(ReplyType.TEXT, caption != null ? caption : "");
+        reply.setMediaPath(path);
+        reply.setMediaType(type);
+        Context context = new Context();
+        context.setReceiver(receiver);
+        try {
+            channel.send(reply, context);
+            return ResponseEntity.ok(Map.of(
+                    "accountId", account, "to", receiver, "path", path, "sent", true));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of(
+                    "error", "发送失败: " + e.getMessage()));
+        }
     }
 }

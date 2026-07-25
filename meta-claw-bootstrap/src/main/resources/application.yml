@@ -79,3 +79,6 @@ logging:
     org.springframework.ai.chat.client.observation: DEBUG
     # meta.claw 包日志由 ~/.meta-claw/config.yaml 中的 log.debug 控制
     meta.claw: ${META_CLAW_LOG_LEVEL:INFO}
+  # 服务端日志同时写文件（控制台仍保留）；默认 10MB 滚动
+  file:
+    name: logs/meta-claw-server.log

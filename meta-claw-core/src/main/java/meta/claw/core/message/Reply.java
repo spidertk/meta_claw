@@ -24,6 +24,12 @@ public class Reply {
     /** 可选的文本内容，用于补充说明 */
     private String optionalTextContent;
 
+    /** 可选的媒体文件本地路径（渠道出站媒体：图片/文件/视频），为 null 时按纯文本发送 */
+    private String mediaPath;
+
+    /** 可选的媒体类型提示：IMAGE / FILE / VIDEO（对应 ReplyType 无法表达媒体载体，故单独携带） */
+    private String mediaType;
+
     /**
      * 便捷构造函数
      * 初始化回复类型和主要内容

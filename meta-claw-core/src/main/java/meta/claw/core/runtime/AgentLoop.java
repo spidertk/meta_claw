@@ -97,8 +97,12 @@ public class AgentLoop {
                 return;
             }
 
-            // 步骤 3：调用 Vessel 进行对话处理
-            Reply reply = runtime.chat(sessionId,context.getContent());
+            // 步骤 3：调用 Vessel 进行对话处理（附带渠道入站的多模态附件，如微信图片）
+            @SuppressWarnings("unchecked")
+            List<meta.claw.core.llm.MediaPart> mediaParts =
+                    context.getKwargs() != null && context.getKwargs().get("mediaParts") instanceof List<?> list
+                            ? (List<meta.claw.core.llm.MediaPart>) list : null;
+            Reply reply = runtime.chat(sessionId, context.getContent(), mediaParts);
             log.info("Vessel 处理完成: vesselId={}, replyType={}, sessionId={}",
                     targetVesselId, reply.getType(), sessionId);
 

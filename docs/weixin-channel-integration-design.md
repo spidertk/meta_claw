@@ -175,14 +175,17 @@ meta:
 | `/bot/weixin/status` | GET | 全账号状态数组：`{accountId, online, botId, pendingQrUrl(脱敏为是否存在), lastInboundAt}` |
 | `/bot/weixin/qrcode?account=main` | GET | `{accountId, qrUrl}`；无待确认 QR 时 404 |
 | `/bot/weixin/relogin?account=main` | POST | 异步触发 relogin，返回 `{accepted: true}`；账号不存在 404 |
+| `/bot/weixin/send-media` | POST | 出站媒体自测入口：参数 `account`、`path`（本地文件）、`to`（可选，缺省为最近入站发送者）、`type`（可选，IMAGE/VIDEO/FILE，缺省按扩展名）、`caption`（可选）；驱动完整上传→发送管线 |
 
 > 设计约束：管理操作只走本地 HTTP，不走微信消息（协议无法主动发起会话，§3）。
 
-### 6.7 多模态【P3，设计定稿】
+### 6.7 多模态【已实现】
 
-- **入站图片**：handler 检测 `MessageItemType.IMAGE` → 用 `CDNMedia` URL 下载 + `aesKey`（AES-128-ECB）解密 → 存 `.meta-claw/channels/weixin/<accountId>/media/<msgId>.<ext>` → 以多模态 user message（mediaPart=本地路径）走现有 SpiMessage 通道进 VesselRuntime；提示词附带路径，agent 可自行调用 `knowledgeAcquireFromFile`（差异化卖点：微信发报告图片→采集进知识库）。语音/文件/视频同路径落地为附件消息。
-- **出站媒体**：Reply 携带本地文件路径 + 媒体类型 → `getUploadUrl` 预签名 → 加密上传 CDN → `sendMessage` 带媒体 item。新增 `Reply` 扩展字段而非新类型。
-- 不重设计点：转换仍在 WeixinMessageConverter 内扩展；ChatMessage 增加 `mediaParts` 字段。
+- **入站图片**：handler 检测 `MessageItemType.IMAGE` → `WeixinMediaService.downloadMedia`（CDN 下载 + AES-128-ECB 解密，aes_key 兼容 base64(raw16)/base64(hex32) 双编码）→ 魔数嗅探扩展名落盘 `.meta-claw/channels/weixin/<accountId>/media/<msgId>.<ext>` → MediaPart(image_url, file://) 经 `ChatMessage.mediaParts` → `Context.kwargs` → `AgentLoop` → `VesselRuntime.chat(sessionId, content, mediaParts)` → `SpiMessage.user(content, mediaParts)` 进 LLM；文本附带保存路径，agent 可自行调用 `knowledgeAcquireFromFile`。文件/视频同路径落盘为文本说明附件；语音有转写文本时按文本处理，否则落盘 .silk 存档。
+- **出站媒体**：`Reply` 扩展 `mediaPath`/`mediaType` 字段 → `WeixinMediaService.uploadFile`（MD5+随机 key → getUploadUrl 预签名（优先 upload_full_url）→ AES 加密 → POST CDN → x-encrypted-param 响应头）→ `sendImage/sendVideo/sendFileAttachment`（CDNMedia.aes_key=base64(hex)，encrypt_type=1）；说明文本单独先发一条；失败回退文本提示。
+- 实现位置：`WeixinMediaService`（CDN 管线+AES 静态工具）、`WeixinChannel`（入站分发/出站分支）、core 侧 `TaskContext.mediaParts` + `VesselRuntime.chat` 三参重载。SDK 小幅增强：`ILinkClient.getCdnBaseUrl()`、`GetUploadURLResp.uploadFullUrl`。
+- **agent 主动发媒体【已实现】**：`SendMediaTool`（send_media 工具模式）——工具不直接调渠道 API，只调用 `TaskContext.scheduleMedia(path, type)` 挂载待发媒体；`VesselRuntime` execute/resume 返回前回贴到 `Reply.mediaPath/mediaType`，渠道层统一出站。路径解析优先级：绝对路径 → `.meta-claw/vessels/{vesselId}/` 相对路径（知识库 `source_asset: assets/...` 即此类）→ 项目根相对 → cwd 相对；mediaType 按扩展名推断。`VesselContext.bind()` 扩展为同时持有 TaskContext（新增 `getTaskContext()`）。
+- 出站语音不做（silk 编码无现成实现，以 FILE 附件兑底）。
 
 ### 6.8 群聊【P4，设计定稿】
 
@@ -226,8 +229,8 @@ meta:
 
 | 阶段 | 内容 | 状态 |
 |---|---|---|
-| **本期** | §4 配置、§5 持久化、§6.1-6.6 全部组件、§8.1-3、§10 测试 | 本次实现 |
-| P3 | §6.7 多模态入站/出站 | 设计已定 |
+| **本期** | §4 配置、§5 持久化、§6.1-6.6 全部组件、§8.1-3、§10 测试 | 已实现 |
+| **P3** | §6.7 多模态入站/出站 | 已实现 |
 | P4 | §6.8 群聊、§6.9 渠道 HITL、ChatMessage.groupId | 设计已定 |
 | P5 | 更多通道（slack/dingtalk 等）复用 channelKey+router 体系 | 不设计 |
 
@@ -244,7 +247,10 @@ meta:
 | `ChannelVesselRouterTest` | 三级优先级、bind 持久化往返、未知回退 |
 | `GatewayRoutingTest` | /vessel 命令拦截与回复、vesselId hint 注入、channelKey 回复路由 |
 | `WeixinChannelTest` | mock ILinkClient：send() 文本 push、allowFrom 过滤、状态访问器 |
-| `WeixinPropertiesBindTest` | accounts 列表绑定（Binder 或 ApplicationContextRunner，视依赖而定） |
+| `WeixinPropertiesBindTest` | accounts 列表绑定（Binder + MockEnvironment） |
+| `WeixinMediaServiceTest` | AES 往返、aes_key 双编码、URL 拼接、下载解密、上传管线、媒体消息构造（11 用例） |
+| `WeixinChannelMediaTest` | 入站图片 MediaPart/落盘/失败兑底、文件原名落盘、语音转文字、出站上传发送/失败回退（7 用例） |
+| `AgentLoopMediaTest` | mediaParts 经 Context.kwargs 透传到 VesselRuntime.chat（2 用例） |
 
 接入 `init.sh`：`-pl` 增加 `meta-claw-gateway,meta-claw-gateway-weixin`（脚本中两处 VERIFY_CMD 都改），`-Dtest` 列表追加上述类（两处）。
 

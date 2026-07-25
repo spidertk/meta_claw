@@ -127,6 +127,10 @@ public class Gateway {
 
         // 将原始 ChatMessage 存入扩展参数，供下游处理流程使用
         context.getKwargs().put("msg", msg);
+        // 透传渠道入站的多模态附件（如微信图片），供 AgentLoop 注入 VesselRuntime
+        if (msg.getMediaParts() != null && !msg.getMediaParts().isEmpty()) {
+            context.getKwargs().put("mediaParts", msg.getMediaParts());
+        }
 
         // 对话标识：私聊为对端 userId（群聊的 groupId 路由在 P4 实现）
         String chatKey = msg.getOtherUserId();

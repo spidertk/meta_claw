@@ -22,4 +22,8 @@ public class GetUploadURLResp {
 
     @JsonProperty("thumb_upload_param")
     private String thumbUploadParam;
+
+    /** 服务端直接返回的完整上传 URL（优先于 upload_param 拼接） */
+    @JsonProperty("upload_full_url")
+    private String uploadFullUrl;
 }

@@ -127,13 +127,22 @@ class WeixinChannelTest {
     }
 
     @Test
-    void nonTextMessageSkipped() {
+    void mediaServiceNotReadyStillPassesFailureNote() {
+        // P3 起图片消息不再被跳过：mediaService 未初始化时下载失败，
+        // 以“[图片] 下载失败”说明形式继续进入对话链路
         WeixinMessage msg = WeixinMessage.builder()
                 .fromUserId("allowed-user")
-                .itemList(List.of(MessageItem.builder().type(MessageItemType.IMAGE).build()))
+                .itemList(List.of(MessageItem.builder().type(MessageItemType.IMAGE)
+                        .imageItem(com.openilink.model.ImageItem.builder()
+                                .media(com.openilink.model.CDNMedia.builder()
+                                        .encryptQueryParam("enc").aesKey("a2V5").build())
+                                .build())
+                        .build()))
                 .build();
         ReflectionTestUtils.invokeMethod(channel, "onInboundMessage", msg);
-        verify(gateway, never()).onInboundMessage(any(ChatMessage.class), anyString(), anyString(), ArgumentMatchers.<String>any());
+        org.mockito.ArgumentCaptor<ChatMessage> captor = org.mockito.ArgumentCaptor.forClass(ChatMessage.class);
+        verify(gateway).onInboundMessage(captor.capture(), eq("weixin"), eq("weixin:main"), ArgumentMatchers.<String>isNull());
+        org.junit.jupiter.api.Assertions.assertTrue(captor.getValue().getContent().contains("[图片] 下载失败"));
     }
 
     @Test

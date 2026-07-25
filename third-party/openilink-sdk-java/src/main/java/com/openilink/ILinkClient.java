@@ -154,6 +154,13 @@ public class ILinkClient {
         return baseUrl;
     }
 
+    /**
+     * Returns the CDN base URL used for media upload/download.
+     */
+    public String getCdnBaseUrl() {
+        return cdnBaseUrl;
+    }
+
     public void setBaseUrl(String baseUrl) {
         this.baseUrl = baseUrl;
     }

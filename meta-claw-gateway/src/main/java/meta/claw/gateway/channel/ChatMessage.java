@@ -106,4 +106,9 @@ public class ChatMessage {
      * 消息中 @ 的成员列表，元素为用户 ID 字符串；群聊中用于识别被 @ 的人
      */
     private List<String> atList;
+
+    /**
+     * 消息附带的多模态内容（如微信入站图片下载后的本地文件），P3 起由渠道填充
+     */
+    private List<meta.claw.core.llm.MediaPart> mediaParts;
 }
